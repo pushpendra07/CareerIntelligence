@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { CompanyDetail, Contact, Job, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 import { VERIFICATION } from "./CompaniesPage";
@@ -43,6 +43,7 @@ export function CompanyDetailPage() {
   const co = c.data!;
   return (
     <div className="space-y-4">
+      <BackButton fallback="/companies" label="Back to companies" />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1>{co.name}</h1>

@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { Application, Page } from "../../types/api";
 import { formatDate, formatDateTime, formatMoney, humanize } from "../../utils/format";
 
 export const APP_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD", "CLOSED"];
 
 export function ApplicationsPage() {
+  const [params] = useSearchParams();
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(params.get("status") ?? "");
   const [q, setQ] = useState("");
   const list = useQuery({
     queryKey: ["applications", { status, q, page }],
@@ -68,6 +69,7 @@ export function ApplicationDetailPage() {
   const a = app.data!;
   return (
     <div className="space-y-4">
+      <BackButton fallback="/applications" label="Back to applications" />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><h1>{a.job_title}</h1><p className="text-sm text-slate-600">{a.company_name} · <Link className="link" to={`/jobs/${a.job_id}`}>View job</Link></p></div>
         <div className="flex gap-2">

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge } from "../../components/ui";
 import type { Application, CV, CVVersionDetail, Page } from "../../types/api";
 import { formatDate } from "../../utils/format";
 import { ACCEPT } from "./CVsPage";
@@ -38,6 +38,7 @@ export function CVDetailPage() {
   const mutationError = activate.error ?? archive.error ?? importProfile.error ?? addVersion.error;
   return (
     <div className="space-y-4">
+      <BackButton fallback="/cvs" label="Back to CVs" />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><h1>{c.name}</h1><p className="text-sm text-slate-600">{c.target_role ?? "No target role"} {c.is_active && <Badge tone="green">active</Badge>} {c.is_archived && <Badge>archived</Badge>}</p></div>
         <div className="flex flex-wrap gap-2">

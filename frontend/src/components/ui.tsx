@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { humanize } from "../utils/format";
 
 export function Card({ title, actions, children, className = "" }: {
@@ -112,12 +113,32 @@ export function Chips({ items, tone = "gray", empty = "—" }: { items: string[]
   return <div className="flex flex-wrap gap-1">{items.map((i) => <Badge key={i} tone={tone}>{i}</Badge>)}</div>;
 }
 
-export function Stat({ label, value, tone = "text-slate-900" }: { label: string; value: ReactNode; tone?: string }) {
-  return (
-    <div className="card p-3">
+export function Stat({ label, value, tone = "text-slate-900", to }: { label: string; value: ReactNode; tone?: string; to?: string }) {
+  const body = (
+    <>
       <div className="text-xs font-medium text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${tone}`}>{value}</div>
-    </div>
+    </>
+  );
+  if (!to) return <div className="card p-3">{body}</div>;
+  return (
+    <Link to={to} aria-label={`${label}: view results`}
+      className="card block p-3 transition hover:border-indigo-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      {body}
+    </Link>
+  );
+}
+
+/** Goes back in history, or to a fallback page when opened directly (no history). */
+export function BackButton({ fallback, label = "Back" }: { fallback: string; label?: string }) {
+  const navigate = useNavigate();
+  // The first page of a visit has key "default": there is nothing in-app to go back to.
+  const hasHistory = useLocation().key !== "default";
+  return (
+    <button type="button" className="btn-secondary mb-2"
+      onClick={() => (hasHistory ? navigate(-1) : navigate(fallback))}>
+      ← {label}
+    </button>
   );
 }
 

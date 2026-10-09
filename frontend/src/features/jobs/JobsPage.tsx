@@ -19,10 +19,10 @@ const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GRE
 export function JobsPage() {
   const [params, setParams] = useSearchParams();
   const page = Number(params.get("page") ?? 1);
-  const query: Record<string, string> = {};
+  const query: Record<string, string | string[]> = {};
   for (const f of FILTERS) {
-    const v = params.get(f);
-    if (v) query[f] = v;
+    const values = params.getAll(f).filter(Boolean);
+    if (values.length) query[f] = f === "status" ? values : values[0];
   }
   const { data, isLoading, error } = useQuery({
     queryKey: ["jobs", query, page],

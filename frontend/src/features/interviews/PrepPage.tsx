@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Chips, ErrorBox, Spinner } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, Spinner } from "../../components/ui";
 import { humanize } from "../../utils/format";
 
 interface Prep {
@@ -44,6 +44,7 @@ export function PrepPage({ kind }: { kind: "job" | "interview" }) {
   const p = prep.data!;
   return (
     <div className="space-y-4">
+      <BackButton fallback={`/jobs/${p.job.id}`} />
       <div>
         <h1>Interview prep{p.interview && ` — Round ${p.interview.round_number} ${humanize(p.interview.round_type)}`}</h1>
         <p className="text-sm text-slate-600"><Link className="link" to={`/jobs/${p.job.id}`}>{p.job.title}</Link> · {p.job.company} {p.job.match_score !== null && <Badge tone="indigo">{p.job.match_score}/100</Badge>}</p>

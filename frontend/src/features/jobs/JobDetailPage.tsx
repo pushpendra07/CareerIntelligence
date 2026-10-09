@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
 import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
 import { JOB_STATUSES } from "./JobsPage";
@@ -118,6 +118,7 @@ export function JobDetailPage() {
   const dup = (location.state as { duplicate?: boolean; matchedBy?: string } | null)?.duplicate;
   return (
     <div className="space-y-4">
+      <BackButton fallback="/jobs" label="Back to jobs" />
       {dup && <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">This job already existed — the new source was added to it (matched by {humanize((location.state as { matchedBy?: string }).matchedBy)}).</div>}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>

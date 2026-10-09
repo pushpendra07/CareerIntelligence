@@ -2,14 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge } from "../../components/ui";
 import type { Interview, Job, Page } from "../../types/api";
 import { formatDateTime, humanize } from "../../utils/format";
 
 export const ROUNDS = ["RECRUITER_SCREEN", "HR", "TECHNICAL", "CODING", "SYSTEM_DESIGN", "MANAGERIAL", "CLIENT", "FINAL", "OFFER_HR"];
 
 export function InterviewsPage() {
-  const [upcoming, setUpcoming] = useState(true);
+  const [params] = useSearchParams();
+  const [upcoming, setUpcoming] = useState(params.get("upcoming") !== "false");
   const list = useQuery({
     queryKey: ["interviews", upcoming],
     queryFn: () => api.get<Page<Interview>>("/interviews", { upcoming: upcoming || undefined, sort: upcoming ? "scheduled_at" : "-scheduled_at", size: 100 }),
@@ -108,6 +109,7 @@ export function InterviewDetailPage() {
   const i = iv.data!;
   return (
     <div className="space-y-4">
+      <BackButton fallback="/interviews" label="Back to interviews" />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><h1>Round {i.round_number}: {humanize(i.round_type)}</h1><p className="text-sm text-slate-600"><Link className="link" to={`/jobs/${i.job_id}`}>{i.job_title}</Link> · {i.company_name}</p></div>
         <div className="flex gap-2">
