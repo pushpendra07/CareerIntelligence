@@ -10,6 +10,7 @@ from app.api.deps import DB, AppSettings
 from app.core.errors import AppError, DomainValidationError
 from app.matching.config import ENGINE_VERSION
 from app.models.app_settings import AppSettings as AppSettingsRow
+from app.scanner.filters import DEFAULT_SCANNER_SETTINGS, validate_scanner_settings
 from app.services import data_io
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
@@ -70,6 +71,7 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
         "daily_digest": False,
     },
     "ui": {"default_job_sort": "-match_score", "jobs_page_size": 50},
+    "scanner": DEFAULT_SCANNER_SETTINGS,
 }
 
 
@@ -98,6 +100,8 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(values, dict):
             raise DomainValidationError(f"'{section}' must be an object")
         merged[section] = {**DEFAULT_APP_SETTINGS[section], **merged.get(section, {}), **values}
+    if "scanner" in body:
+        merged["scanner"] = validate_scanner_settings(merged["scanner"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}

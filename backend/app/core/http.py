@@ -5,6 +5,7 @@ bounded redirects, timeout and response size.
 """
 
 import ipaddress
+import json
 import socket
 import ssl
 import urllib.error
@@ -51,17 +52,30 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def safe_get(
-    url: str, timeout: float = 10.0, max_redirects: int = 5, max_bytes: int = MAX_BYTES
+def safe_request(
+    method: str,
+    url: str,
+    *,
+    json_body: object | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: float = 10.0,
+    max_redirects: int = 5,
+    max_bytes: int = MAX_BYTES,
 ) -> FetchResult:
+    """GET/POST with the SSRF guard re-applied on every redirect hop."""
     opener = urllib.request.build_opener(
         _NoRedirect, urllib.request.HTTPSHandler(context=ssl.create_default_context())
     )
+    data = json.dumps(json_body).encode() if json_body is not None else None
+    hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html;q=0.9, */*;q=0.5"}
+    if data is not None:
+        hdrs["Content-Type"] = "application/json"
+    hdrs.update(headers or {})
     current = url
     for _ in range(max_redirects + 1):
         _check_host(current)
         request = urllib.request.Request(  # noqa: S310 - scheme checked in _check_host
-            current, headers={"User-Agent": USER_AGENT}
+            current, data=data, headers=hdrs, method=method
         )
         try:
             with opener.open(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked
@@ -70,6 +84,15 @@ def safe_get(
         except urllib.error.HTTPError as exc:
             if exc.code in (301, 302, 303, 307, 308) and exc.headers.get("Location"):
                 current = urljoin(current, exc.headers["Location"])
+                if exc.code == 303:
+                    method, data = "GET", None
                 continue
             return FetchResult(current, exc.code, "")
     raise BlockedURLError("Too many redirects")
+
+
+def safe_get(
+    url: str, timeout: float = 10.0, max_redirects: int = 5, max_bytes: int = MAX_BYTES
+) -> FetchResult:
+    return safe_request("GET", url, timeout=timeout, max_redirects=max_redirects,
+                        max_bytes=max_bytes)

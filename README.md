@@ -4,7 +4,7 @@
 
 **A self-hosted career command center: CVs, companies, jobs, an explainable 0–100 match score, applications, interviews and offers in one place.**
 
-*Career-Ops discovers jobs. Career Intelligence manages your career.*
+*Finds jobs on company job boards, scores them against your profile, and runs your whole job search.*
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.14x-009688?logo=fastapi&logoColor=white)
@@ -13,12 +13,13 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-127_backend_·_15_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-149_backend_·_16_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
 [How matching works](#-how-the-0100-match-score-works) ·
-[Career-Ops](#-career-ops-integration) ·
+[Job scanner](#-built-in-job-scanner) ·
+[Career-Ops](#-career-ops-integration-optional) ·
 [Configuration](#%EF%B8%8F-configuration) ·
 [Development](#-development) ·
 [Docs](#-documentation)
@@ -35,7 +36,7 @@ threads and notes. Career Intelligence brings it into one local web app:
 ```
 CV ─▶ Professional Profile ─▶ Target Profile
                                    │
-    Career-Ops scans · Manual "paste URL + JD" · CSV / JSON / Google Sheets
+  Built-in job scanner · Manual "paste URL + JD" · CSV / JSON / Google Sheets · Career-Ops
                                    │
            Normalize ─▶ Deduplicate ─▶ Parse JD ─▶ 0–100 Match Score
                                    │
@@ -46,7 +47,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Explainable.** Every score breaks down into nine components, each with plain-language reasons.
 - **Deterministic.** The same job, profile and scoring version always produce the same score.
 - **AI is optional.** Parsing, scoring and interview prep work without any API key.
-- **Works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it. Career-Ops stays the job-discovery engine.
+- **Finds jobs itself.** A built-in scanner searches the Greenhouse, Lever, Ashby, Workday… boards of companies you track.
+- **Optionally works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it.
 
 ---
 
@@ -83,6 +85,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 <tr><td valign="top">
 
 ### 💼 Jobs
+- **Built-in job scanner**: one click (or every N hours) searches the job boards of companies
+  marked *Job search* and adds relevant jobs, with full descriptions, already scored.
 - **Add Job**: paste a URL and a JD and save. A **live preview** shows the detected source, skills,
   experience, salary and possible blockers.
 - Source detection for **LinkedIn, Naukri, Indeed, Glassdoor, Greenhouse, Lever, Workday,
@@ -212,10 +216,12 @@ Career Intelligence is running
 1. **CVs** → upload your CV → **Merge into profile**.
 2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
    scored as "unknown" until you do).
-3. **Add Job** → paste a job URL and description → **Save & analyze**.
-4. *(Optional)* **Settings → Career-Ops → Import now** to pull in jobs that
+3. **Settings → Job scanner → Scan now** to search the job boards of companies marked
+   *Job search* (and **Find job boards** to discover boards for companies that only have a careers page).
+4. **Add Job** → paste a job URL and description → **Save & analyze** (for LinkedIn, Naukri, etc.).
+5. *(Optional)* **Settings → Career-Ops → Import now** to pull in jobs that
    [Career-Ops](https://github.com/career-ops-hq/career-ops) has found.
-5. **Dashboard** → work through **Today's Priorities**.
+6. **Dashboard** → work through **Today's Priorities**.
 
 <details>
 <summary><b>Optional: bulk-import companies from your own research files</b></summary>
@@ -340,9 +346,37 @@ Technical Lead – Adobe Commerce                         93 / 100  HIGHLY RECOM
 
 ---
 
-## 🔌 Career-Ops integration
+## 🔎 Built-in job scanner
 
-[Career-Ops](https://github.com/career-ops-hq/career-ops) stays the **job-discovery engine**,
+**Settings → Job scanner → Scan now** searches the public job boards of every company with
+**Job search** switched on. No API keys, no Node.js and no other project are needed.
+
+| Board | What it returns |
+|---|---|
+| Greenhouse · Lever · Ashby · Pinpoint · Recruitee · Workable · Teamtailor | All open jobs **with full descriptions** in one call |
+| SmartRecruiters · Workday | Job list, then one call per relevant job for its description |
+
+How a scan works:
+
+1. **Which board?** Each company's careers URL is matched to a supported board. Companies with only
+   a careers page can use **Find job boards**, which reads the page and looks for a linked board.
+2. **What to keep** (editable in Settings):
+   - titles with a *keep* word (Magento, Adobe Commerce, PHP…) are kept;
+   - generic titles (Software Engineer, Tech Lead, Architect…) are kept only when the **job description**
+     mentions your stack;
+   - excluded titles, other-country locations ("United States - Remote") and old postings are skipped.
+3. **Import.** Kept jobs go through the same pipeline as every other source: deduplication, JD parsing
+   and the 0–100 score. Re-scanning updates jobs instead of duplicating them.
+4. **Report.** Each run records, per company, how many postings were found, kept and new, and any board error.
+
+A company page also has **Scan jobs** for that one company. Scans can run automatically every N hours
+while the app is running (**Settings → Job scanner → What to keep → Scan automatically every**).
+
+---
+
+## 🔌 Career-Ops integration (optional)
+
+[Career-Ops](https://github.com/career-ops-hq/career-ops) can also be used as a job source,
 unmodified. Career Intelligence connects through a **read-only file adapter**:
 
 | Career-Ops file | Used for |
@@ -421,6 +455,7 @@ returned as suggestions and never affect scoring.
 │   │   ├── cv/                # file validation, text extraction, CV parser
 │   │   ├── skills/            # skills & domains taxonomy
 │   │   ├── companies/         # verification model, URL checker, importers
+│   │   ├── scanner/           # built-in job scanner: board connectors, filters, runs
 │   │   ├── integrations/      # Career-Ops adapter, Google Sheets
 │   │   ├── interviews/        # interview-prep builder
 │   │   ├── ai/                # optional AI providers
@@ -466,6 +501,7 @@ The test suite covers:
 - the parsers: real-world JD and CV formats
 - deduplication
 - company verification and invalid-URL handling
+- the job scanner: board detection, every connector, filters and the scan pipeline (no network)
 - the Career-Ops import (and that its files stay byte-identical)
 - every API workflow
 - the main UI flows
@@ -506,8 +542,10 @@ The test suite covers:
 
 - **Scanned PDFs.** CVs need extractable text; there is no OCR.
 - **Email notifications.** Not implemented yet. Reminders appear in Today's Priorities and Follow-ups.
-- **LinkedIn / Naukri / Indeed.** They are not scanned automatically, because Career-Ops core only
-  scans public ATS and career pages. Use **Add Job** (paste URL + JD) for those.
+- **LinkedIn / Naukri / Indeed.** They are not scanned automatically: they have no public jobs API
+  and forbid scraping. Use **Add Job** (paste URL + JD) for those.
+- **Custom career sites.** Companies whose careers page is their own system (no Greenhouse, Lever,
+  Workday… board) cannot be scanned; some sites also block automated requests.
 - **Private Google Sheets.** In-app sheet import needs a sheet shared as *Anyone with the link → Viewer*.
   Private sheets can be downloaded as CSV and imported.
 - **Ideas:** a Celery worker for very large re-analysis runs, S3 storage, calendar sync for interviews.
@@ -516,6 +554,6 @@ The test suite covers:
 
 <div align="center">
 
-Built to take the chaos out of a job search · **Career-Ops discovers jobs. Career Intelligence manages your career.**
+Built to take the chaos out of a job search.
 
 </div>

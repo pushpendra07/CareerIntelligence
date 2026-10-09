@@ -5,6 +5,7 @@ import { api, errorMessage } from "../../api/client";
 import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { CompanyDetail, Contact, Job, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
+import { type ScanRun, num, runSummary } from "../scanner/ScannerSettings";
 import { VERIFICATION } from "./CompaniesPage";
 
 const FIELDS = ["website", "careers_url", "linkedin_url", "headquarters", "industry", "company_type", "employee_range", "india_locations", "india_presence", "legal_name"];
@@ -38,6 +39,11 @@ export function CompanyDetailPage() {
   const contacts = useQuery({ queryKey: ["recruiters", { company_id: id }], queryFn: () => api.get<Page<Contact>>("/recruiters", { company_id: id }) });
   const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/companies/${id}`, body), onSuccess: refresh });
   const check = useMutation({ mutationFn: () => api.post<{ results: Record<string, string> }>(`/companies/${id}/check`), onSuccess: refresh });
+  const board = useQuery({ queryKey: ["company-board", id], queryFn: () => api.get<{ provider: string; url: string } | null>(`/scanner/companies/${id}/board`) });
+  const scan = useMutation({
+    mutationFn: () => api.post<{ board: { provider: string; url: string } | null; run: ScanRun }>(`/scanner/companies/${id}/scan`),
+    onSuccess: () => qc.invalidateQueries(),
+  });
   if (c.isLoading) return <Spinner />;
   if (c.error) return <ErrorBox error={c.error} />;
   const co = c.data!;
@@ -55,9 +61,18 @@ export function CompanyDetailPage() {
             <option value="">No tier</option><option value="TIER_A">Tier A</option><option value="TIER_B">Tier B</option><option value="TIER_C">Tier C</option>
           </select>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={co.job_search_enabled} onChange={(e) => patch.mutate({ job_search_enabled: e.target.checked })} />Job search</label>
+          <button className="btn-secondary" disabled={scan.isPending} onClick={() => scan.mutate()} title="Search this company's job board now">{scan.isPending ? "Scanning…" : "Scan jobs"}</button>
           <button className="btn-secondary" disabled={check.isPending} onClick={() => check.mutate()}>{check.isPending ? "Checking…" : "Run verification check"}</button>
         </div>
       </div>
+      {scan.data && (
+        <div className="rounded bg-slate-50 p-2 text-sm">
+          {scan.data.board
+            ? <>{humanize(scan.data.board.provider)} board: {runSummary(scan.data.run)}.{" "}{num(scan.data.run.stats.new) > 0 && <Link className="link" to={`/jobs?q=${encodeURIComponent(co.name)}`}>View jobs</Link>}</>
+            : <>No supported job board found on the careers page. Set the careers URL to the company's Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee, Pinpoint or Teamtailor page.</>}
+        </div>
+      )}
+      {scan.error && <ErrorBox error={new Error(errorMessage(scan.error))} />}
       {check.data && <div className="rounded bg-slate-50 p-2 text-xs">{Object.entries(check.data.results).map(([k, v]) => <div key={k}>{k}: {v}</div>)}</div>}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -66,7 +81,8 @@ export function CompanyDetailPage() {
               ["Website", co.website ? <a className="link" href={co.website} target="_blank" rel="noopener noreferrer">{co.website}</a> : "—"],
               ["Careers", co.careers_url ? <a className="link" href={co.careers_url} target="_blank" rel="noopener noreferrer">{co.careers_url}</a> : "—"],
               ["LinkedIn", co.linkedin_url ? <a className="link" href={co.linkedin_url} target="_blank" rel="noopener noreferrer">{co.linkedin_url}</a> : "—"],
-              ["ATS", co.ats_provider ?? "—"], ["Headquarters", co.headquarters], ["Industry", co.industry],
+              ["ATS", co.ats_provider ?? "—"],
+              ["Job board", board.data ? <a className="link" href={board.data.url} target="_blank" rel="noopener noreferrer">{humanize(board.data.provider)}</a> : "not detected"], ["Headquarters", co.headquarters], ["Industry", co.industry],
               ["Type", co.company_type], ["Employees", co.employee_range],
               ["India presence", co.india_presence === null ? "Unknown" : co.india_presence ? "Yes" : "No"],
               ["Hiring", humanize(co.hiring_status)], ["Priority", co.priority], ["Last verified", formatDate(co.last_verified_at)],

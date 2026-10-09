@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, errorMessage } from "../../api/client";
 import { Card, ErrorBox, Field, KeyValue, Spinner } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
+import { ScannerSettings } from "../scanner/ScannerSettings";
 
 interface ScoringConfig {
   weights: Record<string, number>;
@@ -73,7 +74,7 @@ function CareerOpsSettings() {
   const run = useMutation({ mutationFn: (kind: "import" | "sync") => api.post<Record<string, any>>(`/career-ops/${kind}`), onSuccess: () => qc.invalidateQueries() }); // eslint-disable-line @typescript-eslint/no-explicit-any
   const s = status.data;
   return (
-    <Card title="Career-Ops integration" actions={<>
+    <Card title="Career-Ops integration (optional)" actions={<>
       <button className="btn-primary" disabled={!s?.configured || run.isPending} onClick={() => run.mutate("import")}>{run.isPending ? "Working…" : "Import now"}</button>
       <button className="btn-secondary" disabled={!s?.scan_enabled || run.isPending} title={s?.scan_enabled ? "" : "Set CAREER_OPS_SCAN_ENABLED=true"} onClick={() => run.mutate("sync")}>Scan + import</button>
     </>}>
@@ -170,6 +171,7 @@ export function SettingsPage() {
     <div className="space-y-4">
       <h1>Settings</h1>
       <p className="text-sm text-slate-600">Profile, target roles, skills, locations, salary and work model live on the Profile and Target Profile pages.</p>
+      <ScannerSettings />
       <ScoringSettings />
       <CareerOpsSettings />
       <AppPreferences />

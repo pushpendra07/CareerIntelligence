@@ -11,6 +11,7 @@ from app.models.job import Job, JobSourceLink
 from app.models.match import JobMatch, ScoringConfigRow
 from app.models.offer import Offer
 from app.models.profile import ProfessionalProfile, TargetProfile
+from app.models.scan import ScanRun
 
 __all__ = [
     "CV",
@@ -31,6 +32,7 @@ __all__ = [
     "JobSourceLink",
     "Offer",
     "ProfessionalProfile",
+    "ScanRun",
     "ScoringConfigRow",
     "TargetProfile",
 ]

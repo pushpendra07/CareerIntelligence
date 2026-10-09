@@ -1,6 +1,7 @@
 # Career Intelligence — Architecture
 
-**Career-Ops discovers jobs. Career Intelligence manages the career.** This is a modular
+Career Intelligence finds jobs (built-in scanner, manual entry, imports, optional Career-Ops) and
+manages the career. This is a modular
 monolith: React → FastAPI → PostgreSQL. No Redis or worker is needed at this scale. Large
 re-analysis runs use FastAPI background tasks, and Celery can be added later behind the same
 service functions.
@@ -174,3 +175,19 @@ The full analysis is in [career-ops-assessment.md](career-ops-assessment.md).
 - Re-analysis runs in batches of 200 with a commit per batch. Large runs go to a background
   task.
 - The frontend is code-split per route (largest chunk about 112 kB gzipped).
+
+
+## Built-in job scanner (`app/scanner/`)
+
+- `providers.py`: one connector per public job-board API (Greenhouse, Lever, Ashby,
+  SmartRecruiters, Workday, Pinpoint, Recruitee, Workable, Teamtailor RSS) and
+  `resolve_board()`, which maps a careers URL to a board. Connectors never touch the database.
+- `filters.py`: title/JD/location/age rules, stored in `app_settings.data.scanner`.
+- `service.py`: `run_scan()` fetches boards in a small thread pool, then ingests kept jobs one
+  company at a time through `ingest_job` (same dedup, parsing and scoring as every source) and
+  re-scores them. A PostgreSQL advisory lock allows one scan at a time. `detect_boards()` reads
+  careers pages for linked boards and records them as `OFFICIAL_ATS` claims.
+- `runner.py`: background runs (a thread per run, its own DB session) and the optional
+  every-N-hours schedule started from the FastAPI lifespan (not in tests).
+- `scan_runs` table: one row per run with totals and a per-company report.
+- All requests go through `safe_request`, the SSRF guard re-applied on every redirect.

@@ -8,7 +8,7 @@ Conventions:
 - Lists: `?page=&size=` (max 200) → `{items, total, page, size}`.
 - Every response carries an `X-Request-ID` header (also accepted on requests).
 
-## Endpoints (96, generated from the OpenAPI schema)
+## Endpoints (104, generated from the OpenAPI schema)
 
 ### health
 - `GET /api/v1/health`
@@ -117,6 +117,15 @@ Conventions:
 - `GET /api/v1/career-ops/imports`
 - `POST /api/v1/career-ops/jobs/{job_id}/fetch-jd`
 
+### scanner
+- `GET /api/v1/scanner/status`
+- `POST /api/v1/scanner/run` (`{"company_ids"?: [..], "wait"?: bool}`; runs in the background unless `wait`)
+- `POST /api/v1/scanner/detect-boards`
+- `POST /api/v1/scanner/companies/{company_id}/scan`
+- `GET /api/v1/scanner/companies/{company_id}/board`
+- `GET /api/v1/scanner/runs`
+- `GET /api/v1/scanner/runs/{run_id}`
+
 ### system
 - `GET /api/v1/ai/status`
 - `POST /api/v1/ai/jobs/{job_id}/interview-questions`
@@ -126,5 +135,6 @@ Conventions:
 - `GET /api/v1/settings/system`
 - `GET /api/v1/export/all`
 - `GET /api/v1/export/{entity}`
+- `POST /api/v1/import/google-sheet`
 - `POST /api/v1/import/{entity}`
 
