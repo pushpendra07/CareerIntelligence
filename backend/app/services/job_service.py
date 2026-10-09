@@ -471,6 +471,7 @@ class JobFilters:
     experience: float | None = None
     salary_min: Decimal | None = None
     status: list[str] | None = None
+    closed: bool | None = None  # True: only closed positions; False: hide them
     stale: bool | None = None
     has_application: bool | None = None
     sort: str = "-match_score"
@@ -536,6 +537,9 @@ def list_jobs(db: Session, params: PageParams, f: JobFilters) -> tuple[list[Job]
         stmt = stmt.where(or_(Job.salary_max.is_(None), Job.salary_max >= f.salary_min))
     if f.status:
         stmt = stmt.where(Job.status.in_(f.status))
+    if f.closed is not None:
+        closed = Job.status == JobStatus.CLOSED.value
+        stmt = stmt.where(closed if f.closed else ~closed)
     if f.stale is not None:
         stmt = stmt.where(Job.score_stale.is_(f.stale))
     if f.has_application is not None:

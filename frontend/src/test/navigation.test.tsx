@@ -10,7 +10,13 @@ import { mockApi, renderAt } from "./utils";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const SUMMARY = { total_jobs: 416, new_jobs: 410, jobs_scored: 416, jobs_90_plus: 1, jobs_80_plus: 39, stale_scores: 0,
+/** The jobs list request (the tab counts also call /jobs, with size=1). */
+function listRequest(fn: { mock: { calls: unknown[][] } }): URL {
+  const urls = fn.mock.calls.map((c) => new URL(String(c[0]), "http://x"));
+  return urls.find((u) => u.pathname.endsWith("/jobs") && u.searchParams.get("size") !== "1")!;
+}
+
+const SUMMARY = { total_jobs: 410, closed_jobs: 6, new_jobs: 410, jobs_scored: 416, jobs_90_plus: 1, jobs_80_plus: 39, stale_scores: 0,
   shortlisted: 2, applications: 1, interviews: 3, offers: 0, rejections: 4, pending_followups: 5, overdue_followups: 0, companies: 722 };
 
 describe("dashboard cards", () => {
@@ -18,7 +24,8 @@ describe("dashboard cards", () => {
     mockApi({ "GET /dashboard": { summary: SUMMARY, priorities: [], funnels: {} }, "GET /dashboard/charts": {} });
     renderAt(<DashboardPage />);
     const link = async (label: string) => (await screen.findByRole("link", { name: `${label}: view results` })).getAttribute("href");
-    expect(await link("Total jobs")).toBe("/jobs");
+    expect(await link("Open jobs")).toBe("/jobs");
+    expect(await link("Closed positions")).toBe("/jobs/closed");
     expect(await link("New jobs")).toBe("/jobs?status=NEW&status=DISCOVERED");
     expect(await link("Jobs ≥ 90")).toBe("/jobs?min_score=90");
     expect(await link("Jobs ≥ 80")).toBe("/jobs?min_score=80");
@@ -34,8 +41,7 @@ describe("dashboard cards", () => {
     const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?status=NEW&status=DISCOVERED" });
     expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
-    const url = new URL(String(api.fn.mock.calls[0][0]), "http://x");
-    expect(url.searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
+    expect(listRequest(api.fn).searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
   });
 
   it("applications page starts with the status from the link", async () => {
@@ -66,5 +72,39 @@ describe("back button", () => {
     await fromJobs.navigate("/companies/5");
     await user.click(await screen.findByRole("button", { name: "← Back to companies" }));
     expect(await screen.findByText("Job list")).toBeInTheDocument();
+  });
+});
+
+describe("open and closed job tabs", () => {
+  const JOB = { id: 1, title: "Magento Lead", status: "CLOSED", match_score: 80, score_stale: false, jd_status: "OK",
+    company: { id: 1, name: "Acme", tier: null }, location: null, work_model: "UNKNOWN", experience_min: null,
+    experience_max: null, salary_min: null, salary_max: null, salary_currency: null, sources: ["LINKEDIN"], posting_date: null };
+
+  it("closed tab lists only closed positions, with counts and colored status labels", async () => {
+    const api = mockApi({
+      "GET /jobs": (url: URL) => url.searchParams.get("size") === "1"
+        ? { items: [], total: url.searchParams.get("closed") === "true" ? 4 : 412, page: 1, size: 1 }
+        : { items: [JOB], total: 1, page: 1, size: 50 },
+    });
+    renderAt(<JobsPage view="closed" />, { path: "/jobs/closed", route: "/jobs/closed?q=magento&status=NEW" });
+    expect(await screen.findByRole("heading", { name: "Closed positions" })).toBeInTheDocument();
+    const listUrl = listRequest(api.fn);
+    expect(listUrl.searchParams.get("closed")).toBe("true");
+    expect(listUrl.searchParams.getAll("status")).toEqual([]); // status filter doesn't apply here
+    const openTab = await screen.findByRole("tab", { name: /Open jobs\s*412/ });
+    expect(openTab).toHaveAttribute("href", "/jobs?q=magento");
+    expect(await screen.findByRole("tab", { name: /Closed positions\s*4/ })).toHaveAttribute("aria-selected", "true");
+    const label = await screen.findByText("Closed");
+    expect(label.closest("span")?.className).toContain("bg-zinc-200");
+    expect(screen.queryByRole("combobox", { name: "Status" })).not.toBeInTheDocument();
+  });
+
+  it("open tab hides closed positions", async () => {
+    const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
+    expect(listRequest(api.fn).searchParams.get("closed")).toBe("false");
+    const options = [...(screen.getByRole("combobox", { name: "Status" }) as HTMLSelectElement).options].map((o) => o.value);
+    expect(options).not.toContain("CLOSED");
   });
 });

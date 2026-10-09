@@ -13,7 +13,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-149_backend_·_16_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-149_backend_·_18_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·

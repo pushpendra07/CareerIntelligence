@@ -136,6 +136,7 @@ def list_jobs(
     experience: float | None = None,
     salary_min: Decimal | None = None,
     status: Annotated[list[str] | None, Query()] = None,
+    closed: bool | None = None,
     stale: bool | None = None,
     has_application: bool | None = None,
     sort: Literal[
@@ -164,6 +165,7 @@ def list_jobs(
         experience=experience,
         salary_min=salary_min,
         status=status,
+        closed=closed,
         stale=stale,
         has_application=has_application,
         sort=sort,

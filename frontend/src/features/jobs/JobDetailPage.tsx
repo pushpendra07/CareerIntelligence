@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, JobStatusBadge } from "../../components/ui";
 import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
 import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
 import { JOB_STATUSES } from "./JobsPage";
@@ -130,7 +130,8 @@ export function JobDetailPage() {
             <ScoreBadge score={j.match_score} stale={j.score_stale} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <JobStatusBadge value={j.status} />
           <select className="input w-48" aria-label="Job status" value={j.status} onChange={(e) => status.mutate(e.target.value)}>
             {JOB_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
           </select>

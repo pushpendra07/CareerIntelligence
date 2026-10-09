@@ -33,17 +33,20 @@ def _count(db: Session, stmt: Any) -> int:
 
 
 def summary(db: Session) -> dict[str, int]:
-    jobs = select(func.count()).select_from(Job)
+    all_jobs = select(func.count()).select_from(Job)
+    # Job cards open the "Open jobs" tab, so closed positions are counted separately.
+    jobs = all_jobs.where(Job.status != JobStatus.CLOSED.value)
     today = date.today()
     return {
         "total_jobs": _count(db, jobs),
+        "closed_jobs": _count(db, all_jobs.where(Job.status == JobStatus.CLOSED.value)),
         "new_jobs": _count(
             db, jobs.where(Job.status.in_([JobStatus.NEW.value, JobStatus.DISCOVERED.value]))
         ),
         "jobs_scored": _count(db, jobs.where(Job.match_score.is_not(None))),
         "jobs_90_plus": _count(db, jobs.where(Job.match_score >= 90)),
         "jobs_80_plus": _count(db, jobs.where(Job.match_score >= 80)),
-        "stale_scores": _count(db, jobs.where(Job.score_stale.is_(True))),
+        "stale_scores": _count(db, all_jobs.where(Job.score_stale.is_(True))),
         "shortlisted": _count(db, jobs.where(Job.status == JobStatus.SHORTLISTED.value)),
         "applications": _count(db, select(func.count()).select_from(Application)),
         "interviews": _count(db, select(func.count()).select_from(Interview)),

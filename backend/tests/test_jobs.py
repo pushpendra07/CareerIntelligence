@@ -287,6 +287,13 @@ def test_filters_sorting_and_status(client: TestClient) -> None:
     assert any(a["action"] == "job.shortlisted" for a in r.json()["activity"])
     assert client.get("/api/v1/jobs", params={"status": ["SHORTLISTED"]}).json()["total"] == 1
 
+    client.post(f"/api/v1/jobs/{java['job']['id']}/status", json={"status": "CLOSED"})
+    open_jobs = client.get("/api/v1/jobs", params={"closed": False}).json()
+    assert [j["id"] for j in open_jobs["items"]] == [lead["id"]]
+    closed = client.get("/api/v1/jobs", params={"closed": True}).json()
+    assert [j["id"] for j in closed["items"]] == [java["job"]["id"]]
+    assert client.get("/api/v1/jobs").json()["total"] == 2  # no filter: everything
+
 
 def test_stale_scores_and_reanalysis(client: TestClient) -> None:
     setup_profile(client)

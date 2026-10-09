@@ -74,8 +74,8 @@ export function DashboardPage() {
           <Link className="btn-primary" to="/jobs/new">Add Job</Link>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        <Stat label="Total jobs" value={s.total_jobs} to="/jobs" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+        <Stat label="Open jobs" value={s.total_jobs} to="/jobs" />
         <Stat label="New jobs" value={s.new_jobs} to="/jobs?status=NEW&status=DISCOVERED" />
         <Stat label="Jobs scored" value={s.jobs_scored} to="/jobs?min_score=0" />
         <Stat label="Jobs ≥ 90" value={s.jobs_90_plus} tone="text-emerald-600" to="/jobs?min_score=90" />
@@ -86,6 +86,7 @@ export function DashboardPage() {
         <Stat label="Offers" value={s.offers} tone="text-emerald-600" to="/offers" />
         <Stat label="Rejections" value={s.rejections} tone="text-rose-600" to="/applications?status=REJECTED" />
         <Stat label="Pending follow-ups" value={s.pending_followups} tone={s.overdue_followups ? "text-amber-600" : undefined} to="/followups" />
+        <Stat label="Closed positions" value={s.closed_jobs ?? 0} tone="text-zinc-500" to="/jobs/closed" />
         <Stat label="Companies" value={s.companies} to="/companies" />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">

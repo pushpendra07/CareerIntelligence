@@ -4,6 +4,7 @@ import { GlobalSearch } from "../components/GlobalSearch";
 const NAV: [string, string][] = [
   ["/", "Dashboard"],
   ["/jobs", "Jobs"],
+  ["/jobs/closed", "Closed Jobs"],
   ["/jobs/new", "Add Job"],
   ["/companies", "Companies"],
   ["/applications", "Applications"],
