@@ -309,6 +309,10 @@ def _status(value: str | None) -> JobStatus:
         return JobStatus.CLOSED
     if "to apply" in v:
         return JobStatus.NEW
+    if v.startswith("resume-ready") or v.startswith("ready"):
+        return JobStatus.READY_TO_APPLY
+    if v.startswith("skipped"):
+        return JobStatus.NOT_RELEVANT
     return next((s for k, s in STATUS_MAP.items() if v.startswith(k)), JobStatus.NEW)
 
 
@@ -338,7 +342,11 @@ def job_input_from_row(
         }.items()
         if v
     }
-    notes_parts = [_first(r, "notes")]
+    notes_parts = [_first(r, "notes", "apply_contact_notes", "apply_contact", "contact")]
+    for col, label in (("tailored_resume_link", "Tailored resume"), ("base_resume", "Base resume"),
+                       ("find_job_link_stable", "Find job"), ("find_job_link", "Find job")):
+        if value := _first(r, col):
+            notes_parts.append(f"{label}: {value}")
     if sheet.get("category") or sheet.get("match_score"):
         notes_parts.append(
             f"{source_label}: {sheet.get('category', '')} {sheet.get('match_score', '')}".strip()

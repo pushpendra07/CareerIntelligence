@@ -4,6 +4,7 @@ import { api, errorMessage } from "../../api/client";
 import { Card, ErrorBox, Field, KeyValue, Spinner } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
 import { ScannerSettings } from "../scanner/ScannerSettings";
+import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
 
 interface ScoringConfig {
   weights: Record<string, number>;
@@ -196,6 +197,7 @@ export function SettingsPage() {
       <h1>Settings</h1>
       <p className="text-sm text-slate-600">Profile, target roles, skills, locations, salary and work model live on the Profile and Target Profile pages.</p>
       <ScannerSettings />
+      <SavedSheetsSettings />
       <ScoringSettings />
       <CareerOpsSettings />
       <AppPreferences />
