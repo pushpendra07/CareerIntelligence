@@ -1,151 +1,521 @@
-# Career Intelligence
+<div align="center">
 
-Personal career command center. It covers CVs, a professional and target profile, a verified
-company database, jobs (from Career-Ops or added manually), an explainable 0–100 match score,
-applications, recruiters, interviews and prep, offers, follow-ups and analytics.
+# 🎯 Career Intelligence
 
-**Career-Ops discovers jobs. Career Intelligence manages the career.** Career-Ops stays an
-independent, unmodified project; this app only reads its files. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API.md](docs/API.md) and the original
-analysis in [`docs/career-ops-assessment.md`](docs/career-ops-assessment.md).
+**A self-hosted career command center: CVs, companies, jobs, an explainable 0–100 match score, applications, interviews and offers in one place.**
 
-Stack: React 19 + TypeScript + Vite + Tailwind + React Router + TanStack Query + React Hook Form
-+ Zod · FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic · PostgreSQL 16.
+*Career-Ops discovers jobs. Career Intelligence manages your career.*
 
-## What you can do
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.14x-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-127_backend_·_11_frontend-brightgreen)
 
-- **CVs:** upload PDF, DOCX, TXT or Markdown. The original is kept unchanged, and each upload
-  is parsed into name, experience (computed from dates), roles, companies, skills by category,
-  domains, leadership, projects, certifications, education and achievements. You can keep
-  versions, compare them, activate one, and merge or replace your profile from a CV.
-- **Profile & target profile:** both are editable. Target titles, skills, domains, locations,
-  remote/hybrid/onsite, salary, notice period and exclusions are all configurable. Architect
-  roles are off unless you enable them.
-- **Companies:** 539 imported from your research CSV, the `myjob` portal and Career-Ops'
-  `portals.yml`, deduplicated with aliases.
-  - Every field keeps its source and verification status, and fake LinkedIn URLs are marked
-    INVALID.
-  - One-click verification checks the website and careers page.
-  - Tiers and job-search toggles can be set per company.
-- **Jobs:**
-  - **Add Job:** paste a URL and a JD, with a live preview of what will be detected.
-  - **Detected automatically:** source (LinkedIn, Naukri, Indeed, Glassdoor and the major ATSs).
-  - **Parsed from the JD:** skills, experience, salary and potential blockers.
-  - **Deduplicated** across every source.
-  - **Filters and sorting:** every filter and sort the spec lists.
-- **Matching:** one deterministic engine for every job.
-  - Nine weighted components, with reasons, strong matches, missing skills, blockers and a
-    recommended CV.
-  - Weights, thresholds and hard rules are configurable and versioned.
-  - Scores go stale when your inputs change, and Re-analyze refreshes them.
-- **Career-Ops:** importing, or scanning then importing, preserves Career-Ops' own 1–5
-  evaluation and report next to the 0–100 score. Jobs you applied to in Career-Ops become
-  applications.
-- **Applications:** CV version, method, recruiter, referral, expected CTC and notice period,
-  with a full event history. A follow-up is created automatically 7 days after applying.
-- **Interviews:**
-  - Rounds of any type, with feedback and results.
-  - A question bank with practice tracking and confidence.
-  - A prep pack per job or round: requirements, matched and missing skills, likely topics,
-    projects to discuss, behavioral prep and questions to ask.
-  - Optional AI question suggestions.
-- **Offers:** compensation breakdown, automatic total CTC, a negotiation log, comparison
-  against your target, and decisions (accepted, declined, expired).
-- **Dashboard & analytics:** counters, Today's Priorities, application, interview and offer
-  funnels, charts, score analytics and skill gaps.
-- **Google Sheets:** import a jobs or companies tab with Settings → Import from Google Sheet (the sheet must be shared "Anyone with the link → Viewer"). Search-page links never merge jobs, and a sheet's own match scores are kept as notes, separate from the 0–100 score.
-- **Everything else:** global search, CSV/JSON import and export (including a full JSON
-  export), an audit log, and optional AI.
+[Features](#-features) ·
+[Quick start](#-run-locally) ·
+[How matching works](#-how-the-0100-match-score-works) ·
+[Career-Ops](#-career-ops-integration) ·
+[Configuration](#%EF%B8%8F-configuration) ·
+[Development](#-development) ·
+[Docs](#-documentation)
 
-## Run natively (recommended here: no Docker needed)
+</div>
 
-Requirements: [uv](https://docs.astral.sh/uv/) and Node.js ≥ 20. Nothing is installed
-system-wide:
-- **Python 3.12:** goes into uv's cache.
-- **Backend packages:** go into `backend/.venv`.
-- **Frontend packages:** go into `frontend/node_modules`.
-- **Dev PostgreSQL 16:** comes from the `pgserver` dev package, with its data in
-  `backend/.devdb/`.
+---
 
-```bash
-./start.sh          # DB + migrations + API (:8010) + UI (:5173) in the background, opens Chrome
-./start.sh --no-open
-./stop.sh           # stop UI, API and the dev PostgreSQL   (./stop.sh --keep-db keeps the DB)
+## 📖 What is this?
+
+Job hunting usually ends up spread across job boards, spreadsheets, CV folders, email
+threads and notes. Career Intelligence brings it into one local web app:
+
+```
+CV ─▶ Professional Profile ─▶ Target Profile
+                                   │
+    Career-Ops scans · Manual "paste URL + JD" · CSV / JSON / Google Sheets
+                                   │
+           Normalize ─▶ Deduplicate ─▶ Parse JD ─▶ 0–100 Match Score
+                                   │
+     Shortlist ─▶ Apply ─▶ Recruiter ─▶ Interviews ─▶ Offer ─▶ Analytics
 ```
 
-On first run `start.sh` creates `backend/.env` from `.env.example` (edit it for CAREER_OPS_PATH, AI keys…).
-Logs are in `.run/logs/`. For a foreground session with live reload of the API, use `./dev.sh`.
+- **Runs entirely on your machine.** No cloud service or account is needed, and your data stays local.
+- **Explainable.** Every score breaks down into nine components, each with plain-language reasons.
+- **Deterministic.** The same job, profile and scoring version always produce the same score.
+- **AI is optional.** Parsing, scoring and interview prep work without any API key.
+- **Works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it. Career-Ops stays the job-discovery engine.
 
-The backend uses port 8010 by default because 8000 is often taken by other local tools. Override
-with `BACKEND_PORT=… FRONTEND_PORT=… ./dev.sh`. To use your own PostgreSQL instead of the dev
-one, export `DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/career_intelligence`.
+---
 
-### First-time data load
+## ✨ Features
+
+<table>
+<tr><td width="50%" valign="top">
+
+### 📄 CVs & profile
+- Upload **PDF, DOCX, TXT or Markdown**. The original file is never altered or deleted.
+- Deterministic parsing extracts name, contact details, experience computed from dates,
+  roles, companies, skills by category, domains, leadership, projects, certifications,
+  education and achievements.
+- **Versions**: compare two versions (skills added or removed, text diff), activate one,
+  archive old ones.
+- Build your **Professional Profile** from a CV (merge or replace), then edit it freely.
+- **Target Profile**: titles, skills, domains, companies, locations,
+  remote/hybrid/onsite, salary, notice period and exclusions. Architect roles are opt-in.
+
+</td><td width="50%" valign="top">
+
+### 🏢 Company intelligence
+- Company master database with aliases, tiers (A/B/C) and job-search toggles.
+- **Field-level provenance**: every value records its source, source URL, verification status
+  and date.
+- The verification status is **derived from evidence**: Verified, Partially verified,
+  Researched, Discovered, Needs review, Stale, Invalid or Rejected.
+- One-click **verification check** of the official website and careers page, through an
+  SSRF-safe fetcher.
+- Fake values are rejected. A "LinkedIn" URL that points to Facebook, or a Google-search
+  "careers page", is stored as INVALID and never shown.
+
+</td></tr>
+<tr><td valign="top">
+
+### 💼 Jobs
+- **Add Job**: paste a URL and a JD and save. A **live preview** shows the detected source, skills,
+  experience, salary and possible blockers.
+- Source detection for **LinkedIn, Naukri, Indeed, Glassdoor, Greenhouse, Lever, Workday,
+  SmartRecruiters, SuccessFactors, Ashby**, other ATSs and company career pages.
+- JD parsing: required vs preferred skills, years per skill, experience range, salary
+  (LPA, lakhs, k, monthly), work model, locations, certifications, qualifications.
+- **Deduplication** across every source. One job can show
+  *Career-Ops ✓ LinkedIn ✓ Naukri ✓ Manual*. Search-results pages are never used as a job's identity.
+- Filters (score, recommendation, tier, technology, location, work model, source, date,
+  experience, salary, status, applied) and sorting.
+
+</td><td valign="top">
+
+### 🎯 Matching
+- **One engine** for every job source, producing a 0–100 score with nine weighted components.
+- Skill matches classified as **Exact / Partial / Related / Missing / Nice-to-have**, using a
+  skills taxonomy (Magento 2 ⇒ Magento, MySQL ~ MariaDB).
+- Experience fit (**under / good / over-qualified**), domain, location, seniority, salary
+  (an unknown salary is not heavily penalized), company tier and other requirements.
+- **Blocker detection**: mandatory certification, language, work authorization, minimum
+  experience, notice period. Blockers are shown, and only auto-reject when you turn on hard rules.
+- **Recommended CV** for each job. Scores go **stale** when your inputs change, and one click re-analyzes them.
+
+</td></tr>
+<tr><td valign="top">
+
+### 📬 Pipeline
+- **Applications**: CV version, method, recruiter, referral, expected CTC, notice period,
+  and a full event history. A **follow-up is created automatically** 7 days after applying.
+- **Recruiter CRM**: contact status (Contacted, Replied, Interested…) and follow-up dates.
+- **Interviews**: rounds of any type (screen, technical, system design, managerial…),
+  meeting links, feedback and results.
+- **Question bank**: expected answer, your answer, confidence and practice tracking.
+- **Interview prep pack** for each job or round: requirements, matched and missing skills, likely
+  topics, projects to discuss, behavioral prep, questions to ask.
+- **Offers**: compensation breakdown, automatic total CTC, a negotiation log, comparison
+  against your target, and the decision.
+
+</td><td valign="top">
+
+### 📊 Insights & data
+- **Dashboard**: key counters, **Today's Priorities** (interviews soon, overdue
+  follow-ups, expiring offers, best jobs to apply to) and application, interview and offer funnels.
+- **Charts**: jobs by score, source, location and work model; top companies;
+  most-requested skills; **skill gaps**.
+- **Analytics**: where scores are lost, and interview rate by score band.
+- **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills.
+- **Import & export** (CSV/JSON, including a full JSON export of everything) and **Google Sheets** import.
+- **Audit log** of every important action.
+
+</td></tr>
+</table>
+
+---
+
+## 🚀 Run locally
+
+The fastest way to run Career Intelligence is natively. **Docker is not required.**
+
+### 1. Prerequisites
+
+| Tool | Version | Notes |
+|---|---|---|
+| [uv](https://docs.astral.sh/uv/getting-started/installation/) | recent | Python package and project manager. It installs Python 3.12 into its own cache. |
+| [Node.js](https://nodejs.org/) | 20.19+ or 22.12+ | For the React frontend. |
+| PostgreSQL | 16 *(optional)* | Not required. A dev PostgreSQL 16 is bundled through the `pgserver` Python package. |
+
+Nothing is installed system-wide: Python packages go into `backend/.venv`, Node packages go
+into `frontend/node_modules`, and dev database data goes into `backend/.devdb/`.
 
 ```bash
-cd backend
-export DATABASE_URL=$(uv run python scripts/devdb.py)
-# Companies from your research sources (read-only):
-uv run python -m app.cli import-companies \
-  --research-csv ../../jobsearch/database/php_magento_adobe_laravel_company_master.csv \
-  --myjob-db ../../myjob/backend/jobs.db \
-  --career-ops ../../careerops
+# macOS / Linux: install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then in the UI:
-1. **CVs:** upload your CV, then **Merge into profile**.
-2. **Profile / Target Profile:** review both and set your salary targets.
-3. **Settings:** click **Import now** under Career-Ops.
-4. **Dashboard:** click **Re-analyze**.
-
-## Run with Docker (optional)
+### 2. Clone
 
 ```bash
-cp .env.example .env      # set POSTGRES_PASSWORD and CAREER_OPS_PATH
-docker compose up -d      # postgres + backend + frontend → http://127.0.0.1:8080
+git clone https://github.com/pushpendra07/CareerIntelligence.git
+cd CareerIntelligence
 ```
 
-The Career-Ops folder is mounted read-only. (The Docker files are provided but were not
-exercised on the development machine, which has no Docker.)
+### 3. Start
 
-## Configuration (`.env`)
+```bash
+./start.sh
+```
 
-| Variable | Purpose |
+On the first run this:
+
+1. creates `backend/.env` from `.env.example`
+2. installs backend and frontend dependencies
+3. starts a local PostgreSQL 16 and applies all database migrations
+4. starts the **API** on `http://127.0.0.1:8010` and the **web app** on `http://127.0.0.1:5173`
+5. waits until everything is healthy, then **opens the app in Google Chrome** (or your default browser)
+
+```text
+Career Intelligence is running
+  App:      http://127.0.0.1:5173
+  API docs: http://127.0.0.1:8010/docs
+  Logs:     .run/logs
+  Stop:     ./stop.sh
+```
+
+### 4. Stop
+
+```bash
+./stop.sh             # stop web app, API and the dev database
+./stop.sh --keep-db   # stop web app and API, keep the database running
+```
+
+`stop.sh` only stops processes that `start.sh` started; other apps on your machine are left alone.
+
+### Script options
+
+| Command | What it does |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection (psycopg driver). |
-| `CAREER_OPS_PATH` / `CAREER_OPS_DATA_PATH` | Career-Ops checkout and (optional) separate data root. |
-| `CAREER_OPS_SCAN_ENABLED` | Allow **Scan + import** to run `node scan.mjs --json` (default `false`). |
-| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Optional AI: `none` (default), `anthropic`, `openai`, `gemini`, `ollama`. |
-| `STORAGE_PATH`, `MAX_UPLOAD_BYTES` | Where original CVs are stored, and the upload limit. |
-| `CORS_ORIGINS`, `LOG_LEVEL`, `LOG_FORMAT` | Allowed browser origins, and JSON or text logs. |
+| `./start.sh` | Start everything in the background and open the app in Chrome |
+| `./start.sh --no-open` | Start without opening a browser |
+| `BACKEND_PORT=9000 FRONTEND_PORT=3000 ./start.sh` | Use different ports |
+| `DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/ci ./start.sh` | Use your own PostgreSQL instead of the bundled one |
+| `./dev.sh` | Foreground development mode: API auto-reload and Vite hot reload, Ctrl+C to stop |
+| `./dev.sh stop-db` | Stop the dev database used by `dev.sh` |
 
-## Development checks
+### 5. First steps in the app
+
+1. **CVs** → upload your CV → **Merge into profile**.
+2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
+   scored as "unknown" until you do).
+3. **Add Job** → paste a job URL and description → **Save & analyze**.
+4. *(Optional)* **Settings → Career-Ops → Import now** to pull in jobs that
+   [Career-Ops](https://github.com/career-ops-hq/career-ops) has found.
+5. **Dashboard** → work through **Today's Priorities**.
+
+<details>
+<summary><b>Optional: bulk-import companies from your own research files</b></summary>
 
 ```bash
 cd backend
-uv run pytest                      # 121 tests (real PostgreSQL via pgserver, or TEST_DATABASE_URL)
-uv run ruff check . && uv run ruff format --check . && uv run mypy app
-uv run alembic check               # models and migrations in sync
-
-cd ../frontend
-npm test                           # Vitest + Testing Library
-npx tsc -b && npm run build
+export DATABASE_URL=$(uv run python scripts/devdb.py)   # bundled dev database
+uv run python -m app.cli import-companies \
+  --research-csv /path/to/company_master.csv \
+  --myjob-db     /path/to/jobs.db \
+  --career-ops   /path/to/careerops
 ```
 
-## Layout
+Every source is read-only. Placeholders such as "Not verified" or "Unknown" become empty
+values, never data. Companies are matched by domain and by normalized name, so
+*"Codilar Technologies Pvt Ltd"* and *"Codilar"* merge into one company.
+
+Companies can also be imported from the UI (Companies API / Settings) as CSV, JSON or a
+Google Sheet.
+</details>
+
+<details>
+<summary><b>Manual setup (without the scripts)</b></summary>
+
+```bash
+# Backend
+cd backend
+uv sync
+cp ../.env.example .env                          # then edit .env
+export DATABASE_URL=$(uv run python scripts/devdb.py)
+uv run alembic upgrade head
+uv run uvicorn app.main:app --port 8010 --reload
+
+# Frontend (second terminal)
+cd frontend
+npm ci
+VITE_API_TARGET=http://127.0.0.1:8010 npm run dev   # http://127.0.0.1:5173
+```
+</details>
+
+<details>
+<summary><b>Troubleshooting</b></summary>
+
+| Problem | Fix |
+|---|---|
+| `Port 8010 is already in use` | Another program uses the port. Run `BACKEND_PORT=8020 ./start.sh`. |
+| `Career Intelligence is already running` | Run `./stop.sh` first. If it was stopped uncleanly, delete `.run/*.pid`. |
+| API exited during start | Check `.run/logs/backend.log`, which usually shows a migration or `.env` error. |
+| Web UI exited during start | Check `.run/logs/frontend.log`. Make sure your Node.js version is 20.19+ or 22.12+. |
+| "This sheet is not public" | Share the Google Sheet as *Anyone with the link → Viewer*, or download it as CSV and import the file. |
+| CV parsed with little text | It is probably a scanned/image PDF. OCR is not supported, so upload a DOCX or text-based PDF. |
+| Scores show **stale** | Your profile, preferences, CVs or scoring changed. Click **Re-analyze** on the dashboard. |
+</details>
+
+---
+
+## 🐳 Run with Docker (optional)
+
+```bash
+cp .env.example .env          # set POSTGRES_PASSWORD and CAREER_OPS_PATH
+docker compose up -d          # postgres + backend + frontend
+open http://127.0.0.1:8080
+```
+
+| Service | Description |
+|---|---|
+| `postgres` | PostgreSQL 16, with data in a named volume |
+| `backend` | FastAPI. It applies migrations on start, and the Career-Ops folder is mounted **read-only** |
+| `frontend` | nginx serving the built app and proxying `/api` to the backend |
+
+---
+
+## 🧮 How the 0–100 match score works
+
+Every job, whether it came from Career-Ops, manual entry, CSV or Google Sheets, goes through
+**one deterministic engine**:
+
+| Component | Weight | What it measures |
+|---|---:|---|
+| Role match | 20 | Title vs your target titles, role family (developer / lead / architect…), technology named in the title, other disciplines |
+| Core skills | 25 | Required (80%) and preferred (20%) skills, each classified Exact / Partial / Related / Missing |
+| Experience | 15 | Your relevant years vs the JD's range: under, good, or over-qualified; leadership |
+| Domain | 10 | E-commerce, B2B, payments, ERP and so on, vs your profile and preferred domains |
+| Location | 10 | Remote / hybrid / onsite allowed? Preferred cities (aliases such as Bangalore → Bengaluru, Delhi NCR) |
+| Seniority | 5 | Title level vs your target levels |
+| Salary | 5 | Above target / meets minimum / below minimum. **Unknown is not heavily penalized** |
+| Company | 5 | Tier A / B / C, or one of your preferred companies |
+| Other | 5 | Mandatory certification, language, work authorization, notice period, travel/shift |
+
+**90–100** Highly recommended · **80–89** Recommended · **70–79** Consider · **60–69** Low priority · **< 60** Not recommended
+
+<details>
+<summary><b>Example breakdown</b></summary>
+
+```text
+Technical Lead – Adobe Commerce                         93 / 100  HIGHLY RECOMMENDED → APPLY
+  Role Match            20.0 / 20   Title matches target 'Technical Lead'
+  Core Skills Match     19.6 / 25   15/18 required skills matched exactly · 2/3 preferred covered
+  Experience Match      15.0 / 15   12.6 years meets the 10+ years asked
+  Domain Match          10.0 / 10   E-commerce, Adobe Commerce, ERP & Integrations
+  Location Match        10.0 / 10   Hybrid in a preferred city
+  Seniority Match        5.0 / 5    Lead level is targeted
+  Salary Match           3.0 / 5    Salary not disclosed
+  Company Preference     5.0 / 5    Tier A
+  Other Requirements     5.0 / 5    No special requirements detected
+  Strong: PHP · Magento 2 · Adobe Commerce · GraphQL · MySQL · RabbitMQ · SAP
+  Missing: AWS · Docker · Kubernetes        Blockers: none
+  Recommended CV: Tech Lead – Magento
+```
+</details>
+
+**Design guarantees**
+
+- **Configurable**: every weight, factor, threshold and tier value is editable in *Settings*. Each
+  change is saved as a **new scoring version**.
+- **Deterministic and auditable**: each result stores a SHA-256 hash of its inputs, the scoring
+  version and the profile/target versions. Re-scoring identical inputs creates no new history entry.
+- **Never silently stale**: changing your profile, preferences, CVs or weights flags existing scores as
+  stale until they are re-analyzed.
+- **Honest about missing data**: a job without a description gets **low confidence**, and its skills
+  credit is capped, so a title alone can't produce a top score.
+
+---
+
+## 🔌 Career-Ops integration
+
+[Career-Ops](https://github.com/career-ops-hq/career-ops) stays the **job-discovery engine**,
+unmodified. Career Intelligence connects through a **read-only file adapter**:
+
+| Career-Ops file | Used for |
+|---|---|
+| `data/scan-history.tsv` | Jobs found by scans: portal, posted date, requisition ID, trust signals |
+| `data/pipeline.md` | Pending and processed jobs (expired and pre-screen-skipped ones are not imported) |
+| `data/applications.md` | Tracker status → initial job status; applied rows become applications |
+| `reports/*.md` | The 1–5 evaluation, Machine Summary YAML and archived JD |
+| `jds/` | Saved job descriptions |
+
+- Career-Ops' **own 1–5 evaluation is kept separately** and shown next to the 0–100 score. It is never converted into it.
+- Imports are idempotent: re-importing updates existing jobs instead of duplicating them.
+- Optional: run `node scan.mjs --json` (opt-in through `CAREER_OPS_SCAN_ENABLED`) and `node fetch-jd.mjs`
+  through an allowlisted runner.
+- The full analysis of why this design was chosen is in [docs/career-ops-assessment.md](docs/career-ops-assessment.md).
+
+---
+
+## ⚙️ Configuration
+
+Settings live in `backend/.env`, which `start.sh` creates from [`.env.example`](.env.example).
+Never commit it.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | bundled dev DB | PostgreSQL connection (`postgresql+psycopg://…`) |
+| `CAREER_OPS_PATH` | — | Path to your Career-Ops checkout (read-only) |
+| `CAREER_OPS_DATA_PATH` | — | Separate Career-Ops data root, if you use one |
+| `CAREER_OPS_SCAN_ENABLED` | `false` | Allow **Scan + import** to run Career-Ops' scanner |
+| `AI_PROVIDER` | `none` | `none`, `anthropic`, `openai`, `gemini` or `ollama` |
+| `AI_MODEL` / `AI_API_KEY` / `AI_BASE_URL` | — | Optional AI settings (e.g. a local Ollama at `http://localhost:11434/v1`) |
+| `STORAGE_PATH` | `storage` | Where original CV files are stored |
+| `MAX_UPLOAD_BYTES` | `10485760` | Upload size limit |
+| `CORS_ORIGINS` | `localhost:5173` | Allowed browser origins |
+| `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Structured logging |
+
+AI is used only for optional extras (suggested interview questions and JD summaries). Results are
+returned as suggestions and never affect scoring.
+
+---
+
+## 🏗 Architecture
 
 ```
-backend/   FastAPI app (see docs/ARCHITECTURE.md), alembic/, tests/, scripts/devdb.py
-frontend/  src/{api,components,layouts,pages,features/*,router,types,utils,test}
-docs/      ARCHITECTURE.md, API.md
-dev.sh     native launcher;  docker-compose.yml  optional containers
+┌──────────────────────────┐   /api/v1    ┌───────────────────────────────┐      ┌────────────┐
+│  React 19 + TypeScript   │ ───────────▶ │  FastAPI (modular monolith)   │ ───▶ │ PostgreSQL │
+│  Vite · Tailwind ·       │              │  services · matching engine · │      │     16     │
+│  TanStack Query · RHF+Zod│              │  JD/CV parsers · importers    │      └────────────┘
+└──────────────────────────┘              └───────────────┬───────────────┘
+                                                          │ read-only
+                                                          ▼
+                                              Career-Ops checkout (unmodified)
 ```
 
-## Known limits
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript 7, Vite 8, Tailwind CSS 4, React Router 7, TanStack Query 5, React Hook Form + Zod |
+| Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic |
+| Database | PostgreSQL 16 (JSONB, GIN indexes) |
+| Testing | pytest against real PostgreSQL · Vitest + Testing Library |
+| Quality | Ruff (lint + format), mypy `--strict`, `tsc` |
 
-- **CV parsing** reads text-based files only. Scanned/image PDFs have no OCR; the app says so
-  and asks for a DOCX or TXT.
-- **Notifications** are shown in Today's Priorities and Follow-ups. Email delivery is not
-  implemented; the daily-digest setting is stored for later.
-- **Naukri, LinkedIn and Indeed** are not scanned: Career-Ops core doesn't scan them.
-  Use **Add Job** (paste URL + JD) for those.
+<details>
+<summary><b>Project structure</b></summary>
+
+```
+.
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/            # REST routers (thin)
+│   │   ├── services/          # business logic and transactions
+│   │   ├── models/            # SQLAlchemy models
+│   │   ├── schemas/           # Pydantic request/response models
+│   │   ├── matching/          # 0–100 engine (pure) + versioned config
+│   │   ├── jobs/              # JD parser, dedup rules
+│   │   ├── cv/                # file validation, text extraction, CV parser
+│   │   ├── skills/            # skills & domains taxonomy
+│   │   ├── companies/         # verification model, URL checker, importers
+│   │   ├── integrations/      # Career-Ops adapter, Google Sheets
+│   │   ├── interviews/        # interview-prep builder
+│   │   ├── ai/                # optional AI providers
+│   │   ├── storage/           # write-once file storage (S3-ready interface)
+│   │   └── core/              # config, logging, errors, pagination, URL utils
+│   ├── alembic/               # database migrations
+│   ├── tests/                 # pytest suite
+│   └── scripts/devdb.py       # bundled dev PostgreSQL
+├── frontend/
+│   └── src/
+│       ├── features/          # dashboard, jobs, companies, cvs, profile, applications,
+│       │                      # interviews, questions, offers, followups, analytics, settings
+│       ├── components/        # shared UI (cards, badges, charts, list input…)
+│       ├── api/  types/  utils/  router/  layouts/  test/
+├── docs/                      # architecture, API reference, analyses
+├── start.sh  stop.sh  dev.sh  # local run scripts
+└── docker-compose.yml         # optional containers
+```
+</details>
+
+---
+
+## 🧪 Development
+
+```bash
+# Backend: tests run against a real PostgreSQL (bundled, or TEST_DATABASE_URL)
+cd backend
+uv run pytest                                   # 127 tests
+uv run ruff check . && uv run ruff format --check .
+uv run mypy app                                 # strict type checking
+uv run alembic check                            # models and migrations in sync
+uv run alembic revision --autogenerate -m "describe change"
+
+# Frontend
+cd frontend
+npm test                                        # Vitest + Testing Library
+npx tsc -b                                      # type check
+npm run build                                   # production build
+```
+
+The test suite covers:
+- the matching engine: determinism, every component, blockers and configurable weights
+- the parsers: real-world JD and CV formats
+- deduplication
+- company verification and invalid-URL handling
+- the Career-Ops import (and that its files stay byte-identical)
+- every API workflow
+- the main UI flows
+
+---
+
+## 🔒 Security & privacy
+
+- **Local-first.** Your data lives in your own PostgreSQL and `backend/storage/`. Nothing is sent
+  anywhere unless you enable an AI provider or run a verification check.
+- **Uploads.** File types are allowlisted and checked by content signature, with a size limit and
+  sanitized names. Files are stored write-once and served only as downloads (`nosniff`).
+- **Inputs.** All input is validated with Pydantic and all SQL goes through bound parameters.
+  Only `http(s)` URLs are accepted, and the React UI escapes everything it renders.
+- **Outbound requests.** Verification fetches go through an SSRF guard (public IPs only, re-checked
+  on every redirect).
+- **Secrets.** They come only from the environment. Logs redact secret-like keys, and API responses
+  never return keys.
+- **Untrusted text.** Job text sent to AI is fenced as untrusted data, and AI output is validated
+  and only offered as suggestions.
+- **Exports.** CSV exports neutralize spreadsheet formula injection.
+- **Git.** `.gitignore` keeps `.env` files, uploaded CVs, databases, exports and logs out of the repository.
+
+---
+
+## 📚 Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, data model, matching engine, verification, security, performance |
+| [docs/API.md](docs/API.md) | All 96 REST endpoints (interactive docs at `/docs` when running) |
+| [docs/career-ops-assessment.md](docs/career-ops-assessment.md) | Analysis of Career-Ops and the integration decision |
+| [docs/company-sources.md](docs/company-sources.md) | Company data sources, quality and mapping |
+
+---
+
+## 🗺 Known limitations & roadmap
+
+- **Scanned PDFs.** CVs need extractable text; there is no OCR.
+- **Email notifications.** Not implemented yet. Reminders appear in Today's Priorities and Follow-ups.
+- **LinkedIn / Naukri / Indeed.** They are not scanned automatically, because Career-Ops core only
+  scans public ATS and career pages. Use **Add Job** (paste URL + JD) for those.
+- **Private Google Sheets.** In-app sheet import needs a sheet shared as *Anyone with the link → Viewer*.
+  Private sheets can be downloaded as CSV and imported.
+- **Ideas:** a Celery worker for very large re-analysis runs, S3 storage, calendar sync for interviews.
+
+---
+
+<div align="center">
+
+Built to take the chaos out of a job search · **Career-Ops discovers jobs. Career Intelligence manages your career.**
+
+</div>
