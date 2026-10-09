@@ -22,6 +22,7 @@
 [Career-Ops](#-career-ops-integration-optional) ·
 [Configuration](#%EF%B8%8F-configuration) ·
 [Development](#-development) ·
+[AI agents](#-using-ai-coding-agents) ·
 [Docs](#-documentation)
 
 </div>
@@ -216,6 +217,10 @@ Career Intelligence is running
 | `./dev.sh stop-db` | Stop the dev database used by `dev.sh` |
 
 ### 5. First steps in the app
+
+> Full walkthrough of every page from an empty start (CV upload, profile, target profile,
+> scoring, companies, getting jobs, applying, interviews, offers, settings, backups):
+> **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 
 1. **CVs** → upload your CV → **Merge into profile**.
 2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
@@ -516,6 +521,74 @@ The test suite covers:
 
 ---
 
+## 🤖 Using AI coding agents
+
+This repo is set up so an AI coding agent (Antigravity, Claude Code, Codex, Cursor, Gemini CLI,
+GitHub Copilot…) can understand it, run it, and **search jobs for you**, not just edit code.
+
+### What the agent reads
+
+| File | Purpose |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | The main guide: stack, setup, configuration, how every flow works (job ingest → dedup → score), Career-Ops, the job scanner, Google Sheets, troubleshooting and rules |
+| [`.agent/rules/project-rules.md`](.agent/rules/project-rules.md) | Always-on rules (no personal data in git, no AI attribution in commits, ask before pushing, never edit Career-Ops…) |
+| [`.agent/workflows/`](.agent/workflows) | Step-by-step procedures the agent can run (table below) |
+| [`docs/scan-coverage.md`](docs/scan-coverage.md) | Which companies are searched for jobs, on which job board |
+| [`docs/google-sheets.md`](docs/google-sheets.md) | Your sheets, tabs, columns and how rows become jobs and companies |
+| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | How a person uses every page, from an empty start (CV → profile → jobs → offers) |
+| `CLAUDE.md` · `GEMINI.md` · `.github/copilot-instructions.md` | Pointers to `AGENTS.md` for tools that look for their own file name |
+
+Which file each tool picks up automatically:
+
+| Agent | Reads |
+|---|---|
+| **Google Antigravity** | `AGENTS.md`, rules in `.agent/rules/`, workflows in `.agent/workflows/` (run with `/<name>`, e.g. `/find-jobs`) |
+| **Claude Code** | `CLAUDE.md` (which imports `AGENTS.md`) |
+| **OpenAI Codex**, **Cursor** | `AGENTS.md` |
+| **Gemini CLI** | `GEMINI.md` → `AGENTS.md` |
+| **GitHub Copilot** | `.github/copilot-instructions.md` → `AGENTS.md` |
+
+Any other agent: tell it *"Read AGENTS.md first."*
+
+### Workflows
+
+| Workflow | Ask the agent… | What it does |
+|---|---|---|
+| `fresh-start` | "Set this up for me from scratch" | Walks you through CV upload, profile, target profile, companies and the first job search ([USER_GUIDE](docs/USER_GUIDE.md)) |
+| `find-jobs` | "Find jobs for me" | Runs the scanner, imports your sheets, optionally Career-Ops, re-scores, then lists new jobs and top matches (score · title · company · location · link) |
+| `job-scanner` | "Run the job scanner" | Built-in scan of all job-search companies and a report |
+| `career-ops-scan` | "Run a Career-Ops scan" | Starts Career-Ops' scanner (no AI, no tokens), waits, reports new/updated jobs |
+| `import-google-sheets` | "Import my Google Sheets" | Uses the app's own import (service account) or a Google connector; reports new vs existing per tab |
+| `add-company-for-scanning` | "Add Acme and search its jobs" | Finds and verifies the company's real job board, enables job search, scans it, reports jobs |
+| `run-app` | "Start the app" | `./start.sh`, restart after backend changes, logs |
+| `run-checks` | "Run all checks" | pytest, ruff, mypy, tsc, vitest, build |
+| `add-migration` | "Add a column for …" | Model + Alembic migration + tests |
+| `commit` | "Commit this" | Checks, no personal files, owner-only authorship, asks before pushing |
+
+### Getting started
+
+1. Clone the repo, copy `.env.example` to `backend/.env` and fill it in (see [Configuration](#%EF%B8%8F-configuration)).
+2. Open the folder in your agent and say: **"Read AGENTS.md, then start the app."**
+3. Then ask for what you need, for example:
+   - "Find jobs for me — Magento / Adobe Commerce lead roles, India or remote, score 70+."
+   - "Add these companies and search their jobs: Ranosys, Webkul, Krish TechnoLabs."
+   - "Import my Google Sheets and show me what's new."
+   - "Run a Career-Ops scan and tell me the new jobs."
+   - "Add a 'Hiring manager' field to jobs, with tests."
+
+### Before you start
+
+- **The app must be running** (`./start.sh`) — the agent searches through the app's API.
+- **Private Google Sheets:** connect the service account once (Settings → Google Sheets), or give
+  the agent a Google Sheets/Drive connector.
+- **Career-Ops** is optional; set `CAREER_OPS_PATH` and `CAREER_OPS_SCAN_ENABLED=true` to use it.
+- **Safety built in:** the rules tell agents never to commit personal data or credentials, never to
+  add AI co-author lines to commits, to ask before pushing or deleting, never to edit your
+  Career-Ops folder or Google Sheets, and never to invent jobs, companies or links.
+- Review what the agent changed (`git diff`) before you push.
+
+---
+
 ## 🔒 Security & privacy
 
 - **Local-first.** Your data lives in your own PostgreSQL and `backend/storage/`. Nothing is sent
@@ -541,7 +614,10 @@ The test suite covers:
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, data model, matching engine, verification, security, performance |
 | [docs/API.md](docs/API.md) | All 96 REST endpoints (interactive docs at `/docs` when running) |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Start from scratch: every page of the app step by step |
 | [AGENTS.md](AGENTS.md) | Guide for AI coding agents (Antigravity, Claude Code, …): flow, rules, workflows in `.agent/` |
+| [docs/scan-coverage.md](docs/scan-coverage.md) | Companies searched for jobs and their job boards |
+| [docs/google-sheets.md](docs/google-sheets.md) | Google Sheets: tabs, columns, mapping, private-sheet setup |
 | [docs/career-ops-assessment.md](docs/career-ops-assessment.md) | Analysis of Career-Ops and the integration decision |
 | [docs/company-sources.md](docs/company-sources.md) | Company data sources, quality and mapping |
 

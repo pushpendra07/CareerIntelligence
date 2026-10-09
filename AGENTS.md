@@ -223,6 +223,10 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 
 ## Day-to-day flow
 
+Full page-by-page guide for a fresh start (CV upload, profile fields, target profile, scoring,
+companies, applying, interviews, offers, settings, backups): `docs/USER_GUIDE.md`. When the user
+asks how to do something in the app, answer from it.
+
 1. **CVs** → upload CV → *Merge into profile*. Review **Profile** and **Target Profile**
    (titles, skills, locations, salary).
 2. Get jobs: **Scan now** (built-in), **Scan + import** (Career-Ops), Google Sheets, Add Job.
@@ -303,7 +307,7 @@ frontend/src/
   api/client.ts             fetch wrapper (api.get/post/patch/put/delete, ApiError)
   features/<area>/          one folder per page area (jobs, companies, scanner, sheets, …)
   test/                     Vitest tests + utils.tsx (renderAt, mockApi)
-docs/                       ARCHITECTURE.md, API.md, scan-coverage.md, google-sheets.md,
+docs/                       USER_GUIDE.md, ARCHITECTURE.md, API.md, scan-coverage.md, google-sheets.md,
                             career-ops-assessment.md, company-sources.md
 start.sh / stop.sh / dev.sh run scripts
 ```
