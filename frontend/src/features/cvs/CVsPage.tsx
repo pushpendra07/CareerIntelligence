@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
+import { CVAdvice } from "./CVAdvice";
 import { Badge, Card, Chips, Empty, ErrorBox, Field, Spinner, PageIntro } from "../../components/ui";
 import type { CV, Page } from "../../types/api";
 import { formatDate } from "../../utils/format";
@@ -26,7 +27,7 @@ export function CVsPage() {
   });
   return (
     <div className="space-y-4">
-      <div><h1>CVs</h1><PageIntro>Upload your CV (PDF or Word). It fills your profile, and for every job the best-matching CV is suggested.</PageIntro></div>
+      <div><h1>CVs</h1><PageIntro>Upload your CV (PDF or Word). It fills your profile, and for every job the best-matching CV is suggested. Below, <b>Improve your CV</b> shows which skills to add, based on your jobs.</PageIntro></div>
       <Card title="Upload a CV">
         <div className="grid gap-3 sm:grid-cols-4">
           <Field label="File (PDF, DOCX, TXT, Markdown)"><input className="input" type="file" accept={ACCEPT} aria-label="CV file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
@@ -49,6 +50,7 @@ export function CVsPage() {
           ))}
         </div>
       ))}
+      <CVAdvice />
     </div>
   );
 }

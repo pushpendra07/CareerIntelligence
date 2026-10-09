@@ -6,6 +6,7 @@ import { Badge, Card, ErrorBox, Spinner, Stat, PageIntro } from "../../component
 import type { Bar, Priority } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
 import { BestMatches, ComingUp, GettingStarted, JobSources } from "./widgets";
+import { CVAdviceSummary } from "../cvs/CVAdvice";
 
 interface Dashboard {
   summary: Record<string, number>;
@@ -110,6 +111,7 @@ export function DashboardPage() {
         </div>
         <div className="space-y-4">
           <ComingUp />
+          <CVAdviceSummary />
           <JobSources newThisWeek={s.new_this_week ?? 0} />
           <Card title="Your pipeline">
             <div className="space-y-4">

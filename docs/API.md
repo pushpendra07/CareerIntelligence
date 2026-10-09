@@ -8,7 +8,7 @@ Conventions:
 - Lists: `?page=&size=` (max 200) → `{items, total, page, size}`.
 - Every response carries an `X-Request-ID` header (also accepted on requests).
 
-## Endpoints (112, generated from the OpenAPI schema)
+## Endpoints (114, generated from the OpenAPI schema)
 
 ### health
 - `GET /api/v1/health`
@@ -135,6 +135,10 @@ Conventions:
 - `GET /api/v1/sheets/access` (service-account email to share private sheets with)
 - `POST /api/v1/sheets/{sheet_id}/import` (all tabs via service account, or public CSV; 409 with a hint)
 - `POST /api/v1/sheets/{sheet_id}/import-rows` (`{"tabs": [{"tab", "rows": [{...}]}]}`)
+
+### cv-advice
+- `GET /api/v1/cv-advice` (skills to add to the CV; skills you lack — from open jobs' match results)
+- `POST /api/v1/cv-advice/skills/{action}` (`add-to-profile` | `add-to-search` | `hide` | `unhide`, body `{"skill"}`)
 
 ### system
 - `GET /api/v1/ai/status`

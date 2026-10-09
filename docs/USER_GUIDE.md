@@ -55,6 +55,17 @@ Then fill your profile from it:
 - **Replace profile from CV** — overwrites the profile with this CV's data (use on a fresh start
   or a major rewrite).
 
+**Improve your CV** (bottom of the CVs page; summary on the Dashboard) compares the skills your
+open jobs ask for with your profile and your active CV:
+
+- **Add to your CV** — skills you have (on your profile) that jobs ask for but your CV doesn't
+  mention. Add them to your CV's skills and projects, then upload the new version.
+- **Skills your jobs ask for that you don't have yet** — ranked by how many jobs require them.
+- Buttons per skill: **I have it — add to my skills** (adds it to your profile and re-scores jobs),
+  **Add to job search** (adds it to Target Profile → preferred skills, so jobs using it score
+  higher), **Which jobs?** (examples) and **Hide** (stop suggesting it; *show* brings it back).
+- Only jobs with a description list their skills — add descriptions for better advice.
+
 > Uploading or activating a CV marks all job scores **stale** (the best CV may change).
 > Re-analyze from the Dashboard afterwards (step 7).
 
