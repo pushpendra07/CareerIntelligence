@@ -430,3 +430,12 @@ def test_delete_job_with_application_needs_confirmation(client: TestClient) -> N
     assert "1 application" in r.json()["error"]["message"]
     assert client.delete(f"/api/v1/jobs/{job['id']}", params={"force": True}).status_code == 200
     assert client.get("/api/v1/applications").json()["total"] == 0
+
+
+def test_locations_compare_by_city() -> None:
+    from app.jobs.dedup import locations_compatible as same
+
+    assert same(["Ahmedabad, Gujarat / Pune, Maharashtra, India"], ["Pune / Ahmedabad"])
+    assert same(["Bangalore"], ["Bengaluru, Karnataka"])
+    assert not same(["Pune, Maharashtra"], ["Mumbai, Maharashtra"])  # same state, other city
+    assert not same(["Chennai, Tamil Nadu"], ["Coimbatore, Tamil Nadu"])

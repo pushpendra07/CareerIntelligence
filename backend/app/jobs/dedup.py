@@ -52,11 +52,37 @@ def title_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, title_key(a), title_key(b)).ratio()
 
 
+# Words that say nothing about *which* city: states, countries, work models.
+_NOT_A_PLACE = {
+    "india", "remote", "hybrid", "onsite", "on", "site", "office", "work", "from", "home", "wfh",
+    "in", "and", "or", "the", "any", "anywhere", "pan", "global", "worldwide", "multiple",
+    "locations", "location", "city", "district", "north", "south", "east", "west", "metro",
+    "karnataka", "maharashtra", "gujarat", "tamil", "nadu", "haryana", "telangana", "kerala",
+    "rajasthan", "uttar", "pradesh", "west bengal", "bengal", "punjab", "madhya", "ncr",
+    "usa", "us", "uk", "united", "states", "kingdom",
+}
+_CITY_ALIASES = {"bangalore": "bengaluru", "gurgaon": "gurugram", "bombay": "mumbai",
+                 "madras": "chennai", "calcutta": "kolkata", "new": "", "delhi": "delhi"}
+
+
+def _places(values: list[str]) -> set[str]:
+    words: set[str] = set()
+    for value in values:
+        for w in re.findall(r"[a-z]+", value.lower()):
+            w = _CITY_ALIASES.get(w, w)
+            if w and len(w) > 2 and w not in _NOT_A_PLACE:
+                words.add(w)
+    return words
+
+
 def locations_compatible(a: list[str], b: list[str]) -> bool:
+    """Same place, however it's written ("Pune / Ahmedabad" vs "Ahmedabad, Gujarat / Pune")."""
     if not a or not b:
         return True
     la, lb = {x.lower() for x in a}, {x.lower() for x in b}
     if la & lb:
+        return True
+    if _places(a) & _places(b):
         return True
     return any("remote" in x for x in la) and any("remote" in x for x in lb)
 

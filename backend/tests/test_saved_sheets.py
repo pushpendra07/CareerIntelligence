@@ -54,7 +54,8 @@ def test_direct_import_private_and_public(client: TestClient,
     assert "private" in client.get("/api/v1/sheets").json()[0]["last_error"]
 
     csv_text = "job_url,title,company\nhttps://jobs.lever.co/acme/1,Magento Lead,Acme\n"
-    monkeypatch.setattr(google_sheets, "safe_get", lambda url, **kw: FetchResult(url, 200, csv_text))
+    monkeypatch.setattr(google_sheets, "safe_get",
+                        lambda url, **kw: FetchResult(url, 200, csv_text))
     ok = client.post(f"/api/v1/sheets/{sheet['id']}/import").json()
     assert ok["last_result"]["via"] == "direct" and ok["last_result"]["created"] == 1
     assert ok["last_error"] is None
