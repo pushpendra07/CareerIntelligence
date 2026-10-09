@@ -13,7 +13,7 @@ from sqlalchemy import Select, String, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.errors import DomainValidationError, NotFoundError
+from app.core.errors import ConflictError, DomainValidationError, NotFoundError
 from app.core.pagination import PageParams, paginate
 from app.core.text import clean, title_key
 from app.core.urls import (
@@ -34,7 +34,7 @@ from app.jobs.jd_parser import (
     parse_salary,
 )
 from app.models.company import Company, Contact
-from app.models.job import Job, JobSourceLink, JobStatus, WorkModel
+from app.models.job import DeletedJob, Job, JobSourceLink, JobStatus, WorkModel
 from app.services.activity import record_activity
 from app.services.company_service import find_or_create_by_name
 from app.skills.catalog import normalize_skill_list
@@ -93,6 +93,29 @@ class JobInput:
     origin: str = "manual"  # "manual" | "career_ops" | "import"
     # False for search/listing pages: kept as provenance, never used to identify the job.
     url_identifies_job: bool = True
+
+
+class DeletedJobError(Exception):
+    """The job was deleted by the user; imports and scans must not add it back."""
+
+
+def _title_key(company: str, title: str) -> str:
+    return f"{' '.join(company.lower().split())}|{' '.join(title.lower().split())}"[:820]
+
+
+def _find_deleted(
+    db: Session, data: "JobInput", normalized: str | None, source: JobSource,
+    external_id: str | None,
+) -> DeletedJob | None:
+    conds = []
+    if normalized:
+        conds.append(DeletedJob.normalized_urls.contains(cast([normalized], JSONB)))
+    if external_id:
+        conds.append(DeletedJob.external_ids.contains(
+            cast([f"{source.value}:{external_id}"], JSONB)))
+    if not conds:  # nothing identifies the posting: fall back to company + title
+        conds.append(DeletedJob.title_key == _title_key(data.company_name, data.title))
+    return db.scalar(select(DeletedJob).where(or_(*conds)).limit(1))
 
 
 @dataclass
@@ -333,6 +356,11 @@ def ingest_job(
     identifies = bool(data.url) and data.url_identifies_job and not is_listing_url(data.url or "")
     normalized = normalize_url(data.url) if data.url and identifies else None
     external_id = data.external_id or (detected.external_id if detected and identifies else None)
+    deleted = _find_deleted(db, data, normalized, source, external_id)
+    if deleted is not None:
+        if data.origin != "manual":
+            raise DeletedJobError(f"'{deleted.title}' at {deleted.company_name} was deleted")
+        db.delete(deleted)  # added again by hand: imports may update it from now on
     company = find_or_create_by_name(db, data.company_name)
     manual = _manual_values(data) if data.origin in ("manual", "import") else {}
 
@@ -701,3 +729,41 @@ def job_counts_by(db: Session, column: Any, where: Any = None) -> dict[str, int]
     if where is not None:
         stmt = stmt.where(where)
     return {str(k): v for k, v in db.execute(stmt.group_by(column)).all()}
+
+
+def delete_job(db: Session, job_id: int, *, force: bool = False) -> dict[str, Any]:
+    """Delete a job. Its applications, interviews and offers go with it, so those need `force`.
+
+    The job's URLs/IDs are remembered so Career-Ops imports, scans and file imports skip it.
+    """
+    from app.models.application import Application
+    from app.models.interview import Interview
+    from app.models.offer import Offer
+
+    job = get_job(db, job_id)
+    linked = {
+        "applications": db.scalar(select(func.count()).select_from(Application)
+                                  .where(Application.job_id == job_id)) or 0,
+        "interviews": db.scalar(select(func.count()).select_from(Interview)
+                                .where(Interview.job_id == job_id)) or 0,
+        "offers": db.scalar(select(func.count()).select_from(Offer)
+                            .where(Offer.job_id == job_id)) or 0,
+    }
+    if any(linked.values()) and not force:
+        parts = [f"{n} {k[:-1] if n == 1 else k}" for k, n in linked.items() if n]
+        raise ConflictError(
+            f"This job has {', '.join(parts)}. Deleting it deletes those too.", details=linked
+        )
+    db.add(DeletedJob(
+        title=job.title,
+        company_name=job.company.name,
+        title_key=_title_key(job.company.name, job.title),
+        normalized_urls=sorted({s.normalized_url for s in job.source_links if s.normalized_url}),
+        external_ids=sorted({f"{s.source}:{s.external_id}" for s in job.source_links
+                             if s.external_id}),
+    ))
+    record_activity(db, "job.deleted", "job", job.id,
+                    f"Deleted '{job.title}' at {job.company.name}", linked)
+    db.delete(job)
+    db.commit()
+    return {"deleted": job_id, **linked}

@@ -12,8 +12,9 @@ import contextlib
 import hashlib
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -22,14 +23,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.core.errors import DomainValidationError
+from app.core.errors import ConflictError, DomainValidationError
 from app.core.text import clean
 from app.core.urls import JobSource, detect_source, normalize_url
 from app.integrations.career_ops import readers, runner
 from app.models.career_ops import CareerOpsImport
 from app.models.job import Job, JobStatus
 from app.services.activity import record_activity
-from app.services.job_service import JobInput, ingest_job
+from app.services.job_service import DeletedJobError, JobInput, ingest_job
 
 logger = logging.getLogger(__name__)
 
@@ -204,24 +205,37 @@ def _evaluation(rec: CORecord, root: Path) -> dict[str, Any] | None:
     return out
 
 
-def import_from_career_ops(
-    db: Session, settings: Settings, *, run_scan: bool = False
-) -> CareerOpsImport:
-    root = data_root(settings)
+def check_scan_allowed(settings: Settings) -> None:
+    if not settings.career_ops_scan_enabled:
+        raise DomainValidationError("Scanning is disabled (CAREER_OPS_SCAN_ENABLED=false)")
+    if settings.career_ops_path is None:
+        raise DomainValidationError("CAREER_OPS_PATH is not configured")
+
+
+def new_run(db: Session, settings: Settings, *, scan: bool = False) -> CareerOpsImport:
     run = CareerOpsImport(
-        data_root=str(root),
+        data_root=str(data_root(settings)),
         career_ops_version=readers.read_version(settings.career_ops_path),
+        scan_triggered=scan,
         stats={},
         file_hashes={},
         errors=[],
     )
     db.add(run)
     db.flush()
+    return run
+
+
+def import_from_career_ops(
+    db: Session, settings: Settings, *, run_scan: bool = False,
+    run: CareerOpsImport | None = None,
+) -> CareerOpsImport:
+    root = data_root(settings)
     if run_scan:
-        if not settings.career_ops_scan_enabled:
-            raise DomainValidationError("Scanning is disabled (CAREER_OPS_SCAN_ENABLED=false)")
-        if settings.career_ops_path is None:
-            raise DomainValidationError("CAREER_OPS_PATH is not configured")
+        check_scan_allowed(settings)
+    run = run or new_run(db, settings, scan=run_scan)
+    if run_scan:
+        assert settings.career_ops_path is not None  # check_scan_allowed
         run.scan_triggered = True
         try:
             run.scan_receipt = runner.run_scan(settings.career_ops_path)
@@ -301,6 +315,8 @@ def import_from_career_ops(
                     stats["with_jd"] += 1
                 stats["created" if result.created else "merged"] += 1
                 touched.append(job.id)
+        except DeletedJobError:
+            stats["deleted_skipped"] = stats.get("deleted_skipped", 0) + 1
         except Exception as exc:  # noqa: BLE001 - one bad record must not stop the import
             logger.exception("career-ops record failed", extra={"url": rec.url})
             errors.append({"url": rec.url, "error": str(exc)})
@@ -385,7 +401,13 @@ def status(db: Session, settings: Settings) -> dict[str, Any]:
         "reports": len(list((root / "reports").glob("*.md"))) if (root / "reports").is_dir() else 0,
         "tracker_rows": len(readers.read_tracker(readers.resolve_tracker(root))),
     }
-    last = db.scalar(select(CareerOpsImport).order_by(CareerOpsImport.id.desc()).limit(1))
+    running = running_import(db)
+    info["running"] = (
+        {"id": running.id, "started_at": running.started_at, "scan": running.scan_triggered}
+        if running else None
+    )
+    last = db.scalar(select(CareerOpsImport).where(CareerOpsImport.status != "RUNNING")
+                     .order_by(CareerOpsImport.id.desc()).limit(1))
     info["last_import"] = (
         None
         if last is None
@@ -394,9 +416,56 @@ def status(db: Session, settings: Settings) -> dict[str, Any]:
             "started_at": last.started_at,
             "status": last.status,
             "stats": last.stats,
+            "scan_triggered": last.scan_triggered,
+            "errors": last.errors,
         }
     )
     info["imported_jobs"] = len(
         list(db.scalars(select(Job.id).where(Job.source == JobSource.CAREER_OPS.value)))
     )
     return info
+
+
+# --- background sync ------------------------------------------------------------------------
+
+STALE_AFTER = timedelta(hours=1)
+
+
+def running_import(db: Session) -> CareerOpsImport | None:
+    """An import still in progress; one left RUNNING by an app restart is closed as FAILED."""
+    run = db.scalar(select(CareerOpsImport).where(CareerOpsImport.status == "RUNNING")
+                    .order_by(CareerOpsImport.id.desc()).limit(1))
+    if run and run.started_at < datetime.now(UTC) - STALE_AFTER:
+        run.status, run.finished_at = "FAILED", datetime.now(UTC)
+        run.errors = [*run.errors, {"stage": "run", "error": "Interrupted (the app stopped)"}]
+        db.commit()
+        return None
+    return run
+
+
+def _sync_in_background(run_id: int, settings: Settings) -> None:
+    from app.db.session import get_sessionmaker
+
+    with get_sessionmaker()() as db:
+        run = db.get(CareerOpsImport, run_id)
+        assert run is not None
+        try:
+            import_from_career_ops(db, settings, run_scan=True, run=run)
+        except Exception as exc:
+            logger.exception("career-ops sync failed", extra={"run_id": run_id})
+            db.rollback()
+            run.status, run.finished_at = "FAILED", datetime.now(UTC)
+            run.errors = [*run.errors, {"stage": "import", "error": str(exc)[:300]}]
+            db.commit()
+
+
+def start_sync(db: Session, settings: Settings) -> CareerOpsImport:
+    """Scan + import without holding the request open (a scan can take many minutes)."""
+    check_scan_allowed(settings)
+    if running_import(db):
+        raise ConflictError("A Career-Ops scan is already running — wait for it to finish")
+    run = new_run(db, settings, scan=True)
+    db.commit()
+    threading.Thread(target=_sync_in_background, args=(run.id, settings),
+                     name=f"career-ops-sync-{run.id}", daemon=True).start()
+    return run

@@ -218,3 +218,34 @@ def test_runner_guards(co_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runner, "node_binary", lambda: None)
     with pytest.raises(runner.RunnerError, match="Node.js"):
         runner.run_scan(co_root)
+
+
+def test_blank_env_values_mean_unset(database_url: str) -> None:
+    s = Settings(  # type: ignore[call-arg]
+        _env_file=None, database_url=database_url, career_ops_path="/x/careerops",
+        career_ops_data_path="", ai_api_key=" ",
+    )
+    assert s.career_ops_data_path is None and s.ai_api_key is None
+    assert s.career_ops_data_root == Path("/x/careerops")  # not "." (the backend folder)
+
+
+def test_sync_runs_scan_then_import_and_one_at_a_time(
+    co_root: Path, client: TestClient, settings: Settings, db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.core.config import get_settings
+    from app.models.career_ops import CareerOpsImport
+
+    enabled = settings.model_copy(update={"career_ops_path": co_root,
+                                          "career_ops_scan_enabled": True})
+    client.app.dependency_overrides[get_settings] = lambda: enabled  # type: ignore[attr-defined]
+    monkeypatch.setattr(runner, "run_scan", lambda root, timeout=0: {"new_added": 0})
+    run = client.post("/api/v1/career-ops/sync", params={"wait": True}).json()
+    assert run["status"] == "COMPLETED" and run["scan_triggered"] is True
+    assert run["scan_receipt"] == {"new_added": 0} and run["stats"]["created"] == 3
+
+    busy = service.new_run(db, enabled, scan=True)  # an import still in progress
+    db.commit()
+    assert client.get("/api/v1/career-ops/status").json()["running"]["id"] == busy.id
+    assert client.post("/api/v1/career-ops/sync").status_code == 409
+    assert db.get(CareerOpsImport, busy.id) is not None

@@ -13,7 +13,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-149_backend_·_18_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-153_backend_·_21_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
@@ -96,7 +96,10 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Deduplication** across every source. One job can show
   *Career-Ops ✓ LinkedIn ✓ Naukri ✓ Manual*. Search-results pages are never used as a job's identity.
 - Filters (score, recommendation, tier, technology, location, work model, source, date,
-  experience, salary, status, applied) and sorting.
+  experience, salary, applied, and **any combination of statuses**) and sorting.
+- Color-coded status labels; **closed positions** live in their own tab.
+- **Delete** a job (with confirmation). Deleted jobs are remembered, so imports and scans don't
+  add them back; adding one again by hand still works.
 
 </td><td valign="top">
 
@@ -389,8 +392,12 @@ unmodified. Career Intelligence connects through a **read-only file adapter**:
 
 - Career-Ops' **own 1–5 evaluation is kept separately** and shown next to the 0–100 score. It is never converted into it.
 - Imports are idempotent: re-importing updates existing jobs instead of duplicating them.
-- Optional: run `node scan.mjs --json` (opt-in through `CAREER_OPS_SCAN_ENABLED`) and `node fetch-jd.mjs`
-  through an allowlisted runner.
+- **No token cost.** The app only ever runs Career-Ops' `scan.mjs` and `fetch-jd.mjs`, which call public
+  job-board APIs and no AI model. Career-Ops' AI evaluations (`/career-ops pipeline`, `*-eval.mjs`) are
+  never started by this app; if you run them yourself, their reports are imported.
+- **Settings → Career-Ops → Scan + import** (opt-in: `CAREER_OPS_SCAN_ENABLED=true`) runs `node scan.mjs --json`
+  in the background (allowed up to 45 minutes; it checks 10,000+ postings), then imports. **Import now**
+  only reads the files and takes seconds.
 - The full analysis of why this design was chosen is in [docs/career-ops-assessment.md](docs/career-ops-assessment.md).
 
 ---

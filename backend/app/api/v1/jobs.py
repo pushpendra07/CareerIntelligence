@@ -187,6 +187,12 @@ def update_job(db: DB, job_id: int, body: JobUpdate) -> JobDetail:
     return detail(db, job_service.update_job(db, job_id, changes))
 
 
+@router.delete("/jobs/{job_id}")
+def delete_job(db: DB, job_id: int, force: bool = False) -> dict[str, Any]:
+    """Delete a job. 409 (with counts) if it has applications/interviews/offers, unless `force`."""
+    return job_service.delete_job(db, job_id, force=force)
+
+
 @router.post("/jobs/{job_id}/status", response_model=JobDetail)
 def set_status(db: DB, job_id: int, body: StatusIn) -> JobDetail:
     job_service.set_status(db, job_id, body.status, body.note)

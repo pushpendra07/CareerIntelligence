@@ -65,7 +65,11 @@ def _run(code_root: Path, args: list[str], timeout: int) -> RunResult:
     return RunResult(proc.returncode, proc.stdout, proc.stderr)
 
 
-def run_scan(code_root: Path, timeout: int = 900) -> dict[str, Any]:
+# Career-Ops scans check 10,000+ postings; they run in the background, so allow time.
+SCAN_TIMEOUT_SECONDS = 45 * 60
+
+
+def run_scan(code_root: Path, timeout: int = SCAN_TIMEOUT_SECONDS) -> dict[str, Any]:
     result = _run(code_root, ["scan.mjs", "--json", "--quiet"], timeout)
     lines = [ln for ln in result.stdout.splitlines() if ln.strip().startswith("{")]
     if not lines:

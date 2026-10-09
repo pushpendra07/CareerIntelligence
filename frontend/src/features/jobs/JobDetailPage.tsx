@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
 import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, JobStatusBadge } from "../../components/ui";
 import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
 import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
+import { DeleteJobButton } from "./DeleteJobButton";
 import { JOB_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -102,6 +103,7 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
 
 export function JobDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
   const [applying, setApplying] = useState(false);
@@ -138,6 +140,7 @@ export function JobDetailPage() {
           <button className="btn-secondary" onClick={() => analyze.mutate()} disabled={analyze.isPending}>Re-analyze</button>
           <Link className="btn-secondary" to={`/jobs/${j.id}/prep`}>Interview prep</Link>
           <button className="btn-primary" onClick={() => setApplying((a) => !a)}>Apply</button>
+          <DeleteJobButton jobId={j.id} title={j.title} onDeleted={() => navigate(j.status === "CLOSED" ? "/jobs/closed" : "/jobs")} />
         </div>
       </div>
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}

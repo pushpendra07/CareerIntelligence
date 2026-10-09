@@ -394,3 +394,39 @@ def test_single_paragraph_jd_is_classified_per_sentence() -> None:
     assert set(p.preferred_skills) == {"AWS", "Docker"}
     notice = [c for c in p.constraints if c.type == "NOTICE_PERIOD"]
     assert notice and notice[0].text == "Only immediate joiners." and notice[0].mandatory
+
+
+def test_delete_job_and_imports_skip_it(client: TestClient, db: Session) -> None:
+    from app.services.job_service import DeletedJobError, JobInput, ingest_job
+
+    job = add(client)["job"]
+    r = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert r.status_code == 200 and r.json()["deleted"] == job["id"]
+    assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
+
+    # A scan/import finding the same posting (same URL) does not bring it back...
+    with pytest.raises(DeletedJobError):
+        ingest_job(db, JobInput(
+            title="Technical Lead - Adobe Commerce", company_name="Acme Commerce",
+            url="https://www.linkedin.com/jobs/view/4012345678/", origin="scan"))
+    # ...nor does a file import row without a URL (matched on company + title).
+    with pytest.raises(DeletedJobError):
+        ingest_job(db, JobInput(title="technical lead - adobe commerce",
+                                company_name="ACME Commerce", origin="import"))
+    # Adding it again by hand works, and imports may update it from then on.
+    again = add(client)["job"]
+    assert again["id"] != job["id"]
+    assert ingest_job(db, JobInput(title="Technical Lead - Adobe Commerce",
+                                   company_name="Acme Commerce", origin="import")).job.id \
+        == again["id"]
+
+
+def test_delete_job_with_application_needs_confirmation(client: TestClient) -> None:
+    job = add(client)["job"]
+    assert client.post("/api/v1/applications", json={"job_id": job["id"]}).status_code == 201
+    r = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert r.status_code == 409
+    assert r.json()["error"]["details"]["applications"] == 1
+    assert "1 application" in r.json()["error"]["message"]
+    assert client.delete(f"/api/v1/jobs/{job['id']}", params={"force": True}).status_code == 200
+    assert client.get("/api/v1/applications").json()["total"] == 0

@@ -186,3 +186,25 @@ class JobSourceLink(Base):
             postgresql_where=text("external_id IS NOT NULL"),
         ),
     )
+
+
+class DeletedJob(Base):
+    """A job the user deleted: imports and scans skip it instead of adding it back."""
+
+    __tablename__ = "deleted_jobs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    company_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    # Lowercased "company|title", used when an imported row has no URL or ID.
+    title_key: Mapped[str] = mapped_column(String(820), nullable=False, index=True)
+    normalized_urls: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    # ["SOURCE:external_id", ...]
+    external_ids: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

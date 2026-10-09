@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
+import { DeleteJobButton } from "./DeleteJobButton";
+import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
@@ -66,6 +68,14 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     next.delete("page");
     setParams(next);
   };
+  const setStatuses = (values: string[]) => {
+    const next = new URLSearchParams(params);
+    next.delete("status");
+    // All statuses selected is the same as no filter: keep the URL short.
+    if (values.length < OPEN_STATUSES.length) values.forEach((v) => next.append("status", v));
+    next.delete("page");
+    setParams(next);
+  };
   const select = (key: string, options: string[], label: string) => (
     <select className="input" aria-label={label} value={params.get(key) ?? ""} onChange={(e) => set(key, e.target.value)}>
       <option value="">{label}</option>
@@ -86,7 +96,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <input className="input" type="number" min={0} max={100} placeholder="Min score" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
           {select("recommendation", RECS, "Recommendation")}
-          {!closed && select("status", OPEN_STATUSES, "Status")}
+          {!closed && <StatusMultiSelect options={OPEN_STATUSES} value={params.getAll("status").filter((v) => OPEN_STATUSES.includes(v))} onChange={setStatuses} />}
           {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Company tier")}
           <input className="input" placeholder="Technology" aria-label="Technology" defaultValue={params.get("technology") ?? ""}
             onBlur={(e) => set("technology", e.target.value)} />
@@ -126,7 +136,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                 <thead><tr>
                   <th className="th">Score</th><th className="th">Job</th><th className="th">Location</th>
                   <th className="th">Exp</th><th className="th">Salary</th><th className="th">Sources</th>
-                  <th className="th">Posted</th><th className="th">Status</th>
+                  <th className="th">Posted</th><th className="th">Status</th><th className="th"><span className="sr-only">Actions</span></th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
@@ -145,6 +155,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                       <td className="td text-xs">{j.sources.map(humanize).join(", ")}</td>
                       <td className="td text-xs">{formatDate(j.posting_date)}</td>
                       <td className="td"><JobStatusBadge value={j.status} /></td>
+                      <td className="td text-right"><DeleteJobButton jobId={j.id} title={j.title} compact /></td>
                     </tr>
                   ))}
                 </tbody>

@@ -96,7 +96,7 @@ describe("open and closed job tabs", () => {
     expect(await screen.findByRole("tab", { name: /Closed positions\s*4/ })).toHaveAttribute("aria-selected", "true");
     const label = await screen.findByText("Closed");
     expect(label.closest("span")?.className).toContain("bg-zinc-200");
-    expect(screen.queryByRole("combobox", { name: "Status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Status" })).not.toBeInTheDocument();
   });
 
   it("open tab hides closed positions", async () => {
@@ -104,7 +104,7 @@ describe("open and closed job tabs", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
     expect(listRequest(api.fn).searchParams.get("closed")).toBe("false");
-    const options = [...(screen.getByRole("combobox", { name: "Status" }) as HTMLSelectElement).options].map((o) => o.value);
-    expect(options).not.toContain("CLOSED");
+    await userEvent.click(screen.getByRole("button", { name: "Status" }));
+    expect(screen.getByRole("listbox", { name: "Job statuses" })).not.toHaveTextContent("Closed");
   });
 });

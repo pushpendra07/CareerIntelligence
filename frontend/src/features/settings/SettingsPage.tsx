@@ -70,13 +70,29 @@ function ScoringSettings() {
 
 function CareerOpsSettings() {
   const qc = useQueryClient();
-  const status = useQuery({ queryKey: ["career-ops"], queryFn: () => api.get<Record<string, any>>("/career-ops/status") }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const status = useQuery({
+    queryKey: ["career-ops"],
+    queryFn: () => api.get<Record<string, any>>("/career-ops/status"), // eslint-disable-line @typescript-eslint/no-explicit-any
+    refetchInterval: (q) => (q.state.data?.running ? 5000 : false),
+    refetchIntervalInBackground: true, // a Career-Ops scan can take 15+ minutes
+  });
   const run = useMutation({ mutationFn: (kind: "import" | "sync") => api.post<Record<string, any>>(`/career-ops/${kind}`), onSuccess: () => qc.invalidateQueries() }); // eslint-disable-line @typescript-eslint/no-explicit-any
   const s = status.data;
+  const running = s?.running;
+  const [wasRunning, setWasRunning] = useState(false);
+  useEffect(() => {
+    if (running) setWasRunning(true);
+    else if (wasRunning) {
+      setWasRunning(false);
+      qc.invalidateQueries(); // the scan finished: new jobs, dashboard counts
+    }
+  }, [running, wasRunning, qc]);
+  const last = s?.last_import;
+  const busy = run.isPending || !!running;
   return (
     <Card title="Career-Ops integration (optional)" actions={<>
-      <button className="btn-primary" disabled={!s?.configured || run.isPending} onClick={() => run.mutate("import")}>{run.isPending ? "Working…" : "Import now"}</button>
-      <button className="btn-secondary" disabled={!s?.scan_enabled || run.isPending} title={s?.scan_enabled ? "" : "Set CAREER_OPS_SCAN_ENABLED=true"} onClick={() => run.mutate("sync")}>Scan + import</button>
+      <button className="btn-primary" disabled={!s?.configured || busy} onClick={() => run.mutate("import")}>{run.isPending && run.variables === "import" ? "Importing…" : "Import now"}</button>
+      <button className="btn-secondary" disabled={!s?.scan_enabled || busy} title={s?.scan_enabled ? "Run Career-Ops' own scanner (no AI, no tokens), then import" : "Set CAREER_OPS_SCAN_ENABLED=true"} onClick={() => run.mutate("sync")}>{running ? "Scanning…" : "Scan + import"}</button>
     </>}>
       {!s ? <Spinner /> : (
         <KeyValue items={[
@@ -84,13 +100,21 @@ function CareerOpsSettings() {
           ["Node.js", s.node_available ? "available" : "not found"], ["Scanning", s.scan_enabled ? "enabled" : "disabled"],
           ["Pending in pipeline", s.counts?.pipeline_pending ?? "—"], ["Reports", s.counts?.reports ?? "—"],
           ["Tracker rows", s.counts?.tracker_rows ?? "—"], ["Imported jobs", s.imported_jobs ?? 0],
-          ["Last import", s.last_import ? `${formatDateTime(s.last_import.started_at)} · ${s.last_import.status}` : "never"],
+          ["Last import", last ? `${formatDateTime(last.started_at)} · ${last.status}${last.scan_triggered ? " (with scan)" : ""}` : "never"],
         ]} />
       )}
+      {running && <p className="mt-2 rounded bg-indigo-50 p-2 text-sm text-indigo-800">Career-Ops is scanning job boards (started {formatDateTime(running.started_at)}). This can take 15–30 minutes; you can keep using the app.</p>}
+      {!running && last && (
+        <p className="mt-2 text-sm">
+          Last result: {last.stats?.created ?? 0} new, {last.stats?.merged ?? 0} updated from {last.stats?.records ?? 0} Career-Ops records.
+          {(last.errors ?? []).filter((e: { stage?: string }) => e.stage).map((e: { stage: string; error: string }, i: number) => (
+            <span key={i} className="block text-rose-600">{humanize(e.stage)}: {e.error}</span>
+          ))}
+        </p>
+      )}
       {s?.error && <p className="mt-2 text-sm text-rose-600">{s.error}</p>}
-      {run.data && <pre className="mt-2 rounded bg-slate-50 p-2 text-xs">{JSON.stringify(run.data.stats, null, 2)}</pre>}
       {run.error && <ErrorBox error={new Error(errorMessage(run.error))} />}
-      <p className="mt-2 text-xs text-slate-500">Career-Ops files are only read; nothing is written back.</p>
+      <p className="mt-2 text-xs text-slate-500">Uses Career-Ops' scanner only — no AI, no tokens. Career Intelligence only reads Career-Ops' files; Career-Ops' own scanner updates its pipeline as usual.</p>
     </Card>
   );
 }

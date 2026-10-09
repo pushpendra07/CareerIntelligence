@@ -8,7 +8,7 @@ Conventions:
 - Lists: `?page=&size=` (max 200) → `{items, total, page, size}`.
 - Every response carries an `X-Request-ID` header (also accepted on requests).
 
-## Endpoints (104, generated from the OpenAPI schema)
+## Endpoints (105, generated from the OpenAPI schema)
 
 ### health
 - `GET /api/v1/health`
@@ -64,6 +64,7 @@ Conventions:
 - `GET /api/v1/jobs`
 - `GET /api/v1/jobs/{job_id}`
 - `PATCH /api/v1/jobs/{job_id}`
+- `DELETE /api/v1/jobs/{job_id}` (`?force=true` also deletes its applications/interviews/offers; otherwise 409 with counts)
 - `POST /api/v1/jobs/{job_id}/status`
 - `POST /api/v1/jobs/{job_id}/sources`
 - `POST /api/v1/jobs/{job_id}/merge`

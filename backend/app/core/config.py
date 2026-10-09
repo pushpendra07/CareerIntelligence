@@ -40,6 +40,15 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
 
+    @field_validator(
+        "career_ops_path", "career_ops_data_path", "career_ops_url", "career_ops_api_key",
+        "ai_api_key", "ai_model", "ai_base_url", "redis_url", mode="before",
+    )
+    @classmethod
+    def _blank_is_unset(cls, value: object) -> object:
+        # `CAREER_OPS_DATA_PATH=` in .env means "not set", not Path("") (the current folder).
+        return None if isinstance(value, str) and not value.strip() else value
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

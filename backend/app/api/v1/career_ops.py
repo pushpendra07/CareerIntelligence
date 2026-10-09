@@ -38,9 +38,15 @@ def import_now(db: DB, settings: AppSettings) -> dict[str, Any]:
 
 
 @router.post("/sync")
-def sync(db: DB, settings: AppSettings) -> dict[str, Any]:
-    """Run Career-Ops' own scanner (`node scan.mjs --json`), then import. Opt-in."""
-    return _run_out(service.import_from_career_ops(db, settings, run_scan=True))
+def sync(db: DB, settings: AppSettings, wait: bool = False) -> dict[str, Any]:
+    """Run Career-Ops' own scanner (`node scan.mjs --json`), then import. Opt-in.
+
+    Runs in the background (a scan can take many minutes); poll `/status` for `running`.
+    `wait=true` runs inside the request instead.
+    """
+    if wait:
+        return _run_out(service.import_from_career_ops(db, settings, run_scan=True))
+    return _run_out(service.start_sync(db, settings))
 
 
 @router.get("/imports")
