@@ -540,6 +540,7 @@ The test suite covers:
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, data model, matching engine, verification, security, performance |
 | [docs/API.md](docs/API.md) | All 96 REST endpoints (interactive docs at `/docs` when running) |
+| [AGENTS.md](AGENTS.md) | Guide for AI coding agents (Antigravity, Claude Code, …): flow, rules, workflows in `.agent/` |
 | [docs/career-ops-assessment.md](docs/career-ops-assessment.md) | Analysis of Career-Ops and the integration decision |
 | [docs/company-sources.md](docs/company-sources.md) | Company data sources, quality and mapping |
 
