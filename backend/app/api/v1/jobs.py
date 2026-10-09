@@ -117,10 +117,7 @@ def create_job(db: DB, body: JobCreate) -> JobCreateOut:
     )
 
 
-@router.get("/jobs", response_model=Page[JobOut])
-def list_jobs(
-    db: DB,
-    params: Annotated[PageParams, Depends(page_params)],
+def job_filters(
     q: str | None = None,
     min_score: Annotated[int | None, Query(ge=0, le=100)] = None,
     max_score: Annotated[int | None, Query(ge=0, le=100)] = None,
@@ -148,8 +145,8 @@ def list_jobs(
         "experience",
         "-created_at",
     ] = "-match_score",
-) -> Page[JobOut]:
-    f = JobFilters(
+) -> JobFilters:
+    return JobFilters(
         q=q,
         min_score=min_score,
         max_score=max_score,
@@ -170,6 +167,21 @@ def list_jobs(
         has_application=has_application,
         sort=sort,
     )
+
+
+JobFiltersDep = Annotated[JobFilters, Depends(job_filters)]
+
+
+@router.get("/jobs/status-counts")
+def job_status_counts(db: DB, f: JobFiltersDep) -> dict[str, int]:
+    """Number of jobs per status for these filters (status/closed ignored) — for status tabs."""
+    return job_service.status_counts(db, f)
+
+
+@router.get("/jobs", response_model=Page[JobOut])
+def list_jobs(
+    db: DB, params: Annotated[PageParams, Depends(page_params)], f: JobFiltersDep
+) -> Page[JobOut]:
     items, total = job_service.list_jobs(db, params, f)
     return Page(items=[_out(j) for j in items], total=total, page=params.page, size=params.size)
 

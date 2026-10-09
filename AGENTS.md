@@ -341,8 +341,13 @@ Changing profile, preferences, CVs or scoring config marks scores **stale**;
   Sheets, tabs, columns and row mappings for jobs **and** companies: `docs/google-sheets.md`.
 - CSV/JSON uploads and Add Job (manual).
 
-**Jobs UI**: Open jobs and Closed positions are separate tabs (`/jobs`, `/jobs/closed`;
-API filter `closed=true|false`). Status filter is multi-select (`status=A&status=B`).
+**Jobs UI**: status tabs with counts — All open (`/jobs`), New, Pending, Applied, Interview,
+Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). Tab → statuses:
+new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
+Applied+Recruiter contacted+Screening · interview · selected = Offer+Accepted · rejected ·
+not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).
+Counts: `GET /api/v1/jobs/status-counts` (same filters as the list). Inside a tab the Status
+filter is multi-select (`status=A&status=B`). API: `closed=true|false` separates closed jobs.
 Delete asks for confirmation; jobs with applications need `?force=true`.
 
 **Companies**: values come from field-level claims with sources and verification status;

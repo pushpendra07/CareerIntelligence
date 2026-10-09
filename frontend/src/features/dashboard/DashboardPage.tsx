@@ -76,11 +76,11 @@ export function DashboardPage() {
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
         <Stat label="Open jobs" value={s.total_jobs} to="/jobs" />
-        <Stat label="New jobs" value={s.new_jobs} to="/jobs?status=NEW&status=DISCOVERED" />
+        <Stat label="New jobs" value={s.new_jobs} to="/jobs?tab=new" />
         <Stat label="Jobs scored" value={s.jobs_scored} to="/jobs?min_score=0" />
         <Stat label="Jobs ≥ 90" value={s.jobs_90_plus} tone="text-emerald-600" to="/jobs?min_score=90" />
         <Stat label="Jobs ≥ 80" value={s.jobs_80_plus} tone="text-sky-600" to="/jobs?min_score=80" />
-        <Stat label="Shortlisted" value={s.shortlisted} to="/jobs?status=SHORTLISTED" />
+        <Stat label="Shortlisted" value={s.shortlisted} to="/jobs?tab=pending&status=SHORTLISTED" />
         <Stat label="Applications" value={s.applications} to="/applications" />
         <Stat label="Interviews" value={s.interviews} to="/interviews?upcoming=false" />
         <Stat label="Offers" value={s.offers} tone="text-emerald-600" to="/offers" />

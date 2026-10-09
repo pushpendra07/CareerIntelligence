@@ -20,47 +20,69 @@ const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GRE
 
 const OPEN_STATUSES = JOB_STATUSES.filter((s) => s !== "CLOSED");
 
-/** Open jobs and closed positions are separate tabs; filters (except status) carry over. */
-function ViewTabs({ closed, query }: { closed: boolean; query: Record<string, string | string[]> }) {
+/** Status tabs: every job is in exactly one tab (plus "All open"). */
+export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
+  { key: "all", label: "All open", statuses: OPEN_STATUSES },
+  { key: "new", label: "New", statuses: ["NEW", "DISCOVERED"] },
+  { key: "pending", label: "Pending", statuses: ["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"] },
+  { key: "applied", label: "Applied", statuses: ["APPLIED", "RECRUITER_CONTACTED", "SCREENING"] },
+  { key: "interview", label: "Interview", statuses: ["INTERVIEW"] },
+  { key: "selected", label: "Selected", statuses: ["OFFER", "ACCEPTED"] },
+  { key: "rejected", label: "Rejected", statuses: ["REJECTED"] },
+  { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT"] },
+  { key: "closed", label: "Closed", statuses: ["CLOSED"] },
+];
+
+const tabHref = (key: string) => (key === "closed" ? "/jobs/closed" : key === "all" ? "/jobs" : `/jobs?tab=${key}`);
+
+/** Tabs with counts; search and filters (except status) carry over between tabs. */
+function StatusTabs({ active, query }: { active: string; query: Record<string, string | string[]> }) {
   const [params] = useSearchParams();
   const shared = Object.fromEntries(Object.entries(query).filter(([k]) => k !== "status"));
-  const countOf = (isClosed: boolean) => ({
-    queryKey: ["jobs", "count", isClosed, shared],
-    queryFn: () => api.get<Page<Job>>("/jobs", { ...shared, closed: String(isClosed), size: 1 }),
-  });
-  const openCount = useQuery(countOf(false)).data?.total;
-  const closedCount = useQuery(countOf(true)).data?.total;
+  const counts = useQuery({
+    queryKey: ["jobs", "status-counts", shared],
+    queryFn: () => api.get<Record<string, number>>("/jobs/status-counts", shared),
+  }).data;
   const carry = new URLSearchParams(params);
-  carry.delete("status");
-  carry.delete("page");
-  const suffix = carry.toString() ? `?${carry}` : "";
-  const tab = (to: string, label: string, n: number | undefined, active: boolean) => (
-    <Link to={to + suffix} role="tab" aria-selected={active}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${active ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
-      {label}{n !== undefined && <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${active ? "bg-indigo-50" : "bg-slate-100"}`}>{n}</span>}
-    </Link>
-  );
+  for (const k of ["status", "page", "tab"]) carry.delete(k);
+  const withFilters = (href: string) => {
+    const extra = carry.toString();
+    return extra ? `${href}${href.includes("?") ? "&" : "?"}${extra}` : href;
+  };
   return (
-    <div role="tablist" className="flex gap-1 border-b border-slate-200">
-      {tab("/jobs", "Open jobs", openCount, !closed)}
-      {tab("/jobs/closed", "Closed positions", closedCount, closed)}
+    <div role="tablist" aria-label="Job status" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+      {JOB_TABS.map((t) => {
+        const on = t.key === active;
+        const n = counts ? t.statuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
+        return (
+          <Link key={t.key} to={withFilters(tabHref(t.key))} role="tab" aria-selected={on}
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${on ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+            {t.label}{n !== undefined && <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${on ? "bg-indigo-50" : "bg-slate-100"}`}>{n}</span>}
+          </Link>
+        );
+      })}
     </div>
   );
 }
 
 export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
-  const closed = view === "closed";
   const [params, setParams] = useSearchParams();
+  const tabKey = view === "closed" ? "closed" : params.get("tab") ?? "all";
+  const tab = JOB_TABS.find((t) => t.key === tabKey) ?? JOB_TABS[0];
+  const closed = tab.key === "closed";
   const page = Number(params.get("page") ?? 1);
   const query: Record<string, string | string[]> = {};
   for (const f of FILTERS) {
-    if (closed && f === "status") continue;
     const values = params.getAll(f).filter(Boolean);
     if (values.length) query[f] = f === "status" ? values : values[0];
   }
+  // The tab limits the statuses; the Status filter can narrow further inside the tab.
+  const picked = params.getAll("status").filter((s) => tab.statuses.includes(s));
+  const statuses = picked.length ? picked : tab.statuses;
+  const listQuery = { ...query, status: tab.key === "all" && !picked.length ? undefined : statuses, closed: String(closed) };
   const { data, isLoading, error } = useQuery({
-    queryKey: ["jobs", query, page, view],
-    queryFn: () => api.get<Page<Job>>("/jobs", { ...query, closed: String(closed), page, size: 50 }),
+    queryKey: ["jobs", listQuery, page],
+    queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: 50 }),
   });
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -84,10 +106,10 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1>{closed ? "Closed positions" : "Jobs"}</h1>
+        <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
         <Link className="btn-primary" to="/jobs/new">Add Job</Link>
       </div>
-      <ViewTabs closed={closed} query={query} />
+      <StatusTabs active={tab.key} query={query} />
       <Card>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
           <input className="input col-span-2" placeholder="Search title, company, location" aria-label="Search jobs"
@@ -95,7 +117,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <input className="input" type="number" min={0} max={100} placeholder="Min score" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
           {select("recommendation", RECS, "Recommendation")}
-          {!closed && <StatusMultiSelect options={OPEN_STATUSES} value={params.getAll("status").filter((v) => OPEN_STATUSES.includes(v))} onChange={setStatuses} />}
+          {tab.statuses.length > 1 && <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses} />}
           {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Company tier")}
           <input className="input" placeholder="Technology" aria-label="Technology" defaultValue={params.get("technology") ?? ""}
             onBlur={(e) => set("technology", e.target.value)} />
@@ -129,7 +151,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       {error && <ErrorBox error={error} />}
       {data && (
         <Card>
-          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : "No jobs match these filters."}</Empty> : (
+          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>

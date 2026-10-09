@@ -13,7 +13,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-159_backend_·_24_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-160_backend_·_25_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
@@ -97,7 +97,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
   *Career-Ops ✓ LinkedIn ✓ Naukri ✓ Manual*. Search-results pages are never used as a job's identity.
 - Filters (score, recommendation, tier, technology, location, work model, source, date,
   experience, salary, applied, and **any combination of statuses**) and sorting.
-- Color-coded status labels; **closed positions** live in their own tab.
+- Color-coded status labels and **status tabs** with counts: All open · New · Pending · Applied ·
+  Interview · Selected · Rejected · Not pursuing · Closed.
 - **Delete** a job (with confirmation). Deleted jobs are remembered, so imports and scans don't
   add them back; adding one again by hand still works.
 

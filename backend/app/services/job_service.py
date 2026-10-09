@@ -4,7 +4,7 @@ Manual entry, Career-Ops import and any future source all go through `ingest_job
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -516,7 +516,8 @@ SORTS: dict[str, Any] = {
 }
 
 
-def list_jobs(db: Session, params: PageParams, f: JobFilters) -> tuple[list[Job], int]:
+def filtered_jobs(f: JobFilters) -> Select[Any]:
+    """The jobs query with every filter applied (no ordering)."""
     from app.skills.catalog import normalize_skill
 
     stmt: Select[Any] = (
@@ -575,8 +576,20 @@ def list_jobs(db: Session, params: PageParams, f: JobFilters) -> tuple[list[Job]
 
         exists = select(Application.id).where(Application.job_id == Job.id).exists()
         stmt = stmt.where(exists if f.has_application else ~exists)
-    stmt = stmt.order_by(*SORTS.get(f.sort, SORTS["-match_score"]))
+    return stmt
+
+
+def list_jobs(db: Session, params: PageParams, f: JobFilters) -> tuple[list[Job], int]:
+    stmt = filtered_jobs(f).order_by(*SORTS.get(f.sort, SORTS["-match_score"]))
     return paginate(db, stmt, params)
+
+
+def status_counts(db: Session, f: JobFilters) -> dict[str, int]:
+    """Jobs per status for the same filters (status/closed ignored) — feeds the status tabs."""
+    f = replace(f, status=None, closed=None)
+    sub = filtered_jobs(f).subquery()
+    rows = db.execute(select(sub.c.status, func.count()).group_by(sub.c.status))
+    return {status: int(n) for status, n in rows}
 
 
 # --- writes ------------------------------------------------------------------------------

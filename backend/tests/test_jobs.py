@@ -439,3 +439,15 @@ def test_locations_compare_by_city() -> None:
     assert same(["Bangalore"], ["Bengaluru, Karnataka"])
     assert not same(["Pune, Maharashtra"], ["Mumbai, Maharashtra"])  # same state, other city
     assert not same(["Chennai, Tamil Nadu"], ["Coimbatore, Tamil Nadu"])
+
+
+def test_status_counts_for_tabs(client: TestClient) -> None:
+    lead = add(client)["job"]
+    other = add(client, title="Magento Developer", company="Beta Corp",
+                url="https://jobs.lever.co/beta/1")["job"]
+    client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "APPLIED"})
+    counts = client.get("/api/v1/jobs/status-counts").json()
+    assert counts == {lead["status"]: 1, "APPLIED": 1}
+    # Same filters as the list (status/closed ignored so every tab gets its count).
+    assert client.get("/api/v1/jobs/status-counts",
+                      params={"q": "beta", "status": ["NEW"]}).json() == {"APPLIED": 1}
