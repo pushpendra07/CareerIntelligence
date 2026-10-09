@@ -19,7 +19,7 @@ export function StatusMultiSelect({ options, value, onChange }: {
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
   }, [open]);
   const toggle = (s: string) => onChange(value.includes(s) ? value.filter((v) => v !== s) : options.filter((o) => o === s || value.includes(o)));
-  const label = value.length === 0 ? "All statuses"
+  const label = value.length === 0 || value.length === options.length ? "All statuses"
     : value.length === 1 ? humanize(value[0])
     : `${value.length} statuses`;
   return (

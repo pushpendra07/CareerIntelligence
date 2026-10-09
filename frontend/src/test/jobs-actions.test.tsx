@@ -34,6 +34,16 @@ describe("status multi-select", () => {
 
     await userEvent.click(within(box).getByLabelText("Shortlisted")); // untick one
     expect(listUrls(api.fn).at(-1)!.searchParams.getAll("status")).toEqual(["NEW", "APPLIED"]);
+    await userEvent.click(within(box).getByRole("button", { name: "Select all" }));
+    const all = within(box).getAllByRole("checkbox") as HTMLInputElement[];
+    expect(all.length).toBeGreaterThan(10);
+    expect(all.every((c) => c.checked)).toBe(true); // every box shows as ticked
+    expect(listUrls(api.fn).at(-1)!.searchParams.getAll("status")).toHaveLength(all.length);
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All statuses");
+    await userEvent.click(within(box).getByLabelText("New")); // untick one from "all"
+    expect(listUrls(api.fn).at(-1)!.searchParams.getAll("status")).not.toContain("NEW");
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent(`${all.length - 1} statuses`);
+
     await userEvent.click(within(box).getByRole("button", { name: "Clear" }));
     expect(listUrls(api.fn).at(-1)!.searchParams.getAll("status")).toEqual([]);
     expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All statuses");

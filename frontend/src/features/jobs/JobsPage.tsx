@@ -71,8 +71,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const setStatuses = (values: string[]) => {
     const next = new URLSearchParams(params);
     next.delete("status");
-    // All statuses selected is the same as no filter: keep the URL short.
-    if (values.length < OPEN_STATUSES.length) values.forEach((v) => next.append("status", v));
+    values.forEach((v) => next.append("status", v));
     next.delete("page");
     setParams(next);
   };
