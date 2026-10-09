@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Empty, ErrorBox, Pagination, Spinner, StatusBadge } from "../../components/ui";
+import { Card, Empty, ErrorBox, Pagination, Spinner, StatusBadge, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Company, Page } from "../../types/api";
 
 export const VERIFICATION = ["DISCOVERED", "RESEARCHED", "VERIFIED", "PARTIALLY_VERIFIED", "NEEDS_REVIEW",
@@ -16,7 +16,7 @@ export function CompaniesPage() {
     .map((k) => [k, params.get(k) ?? undefined]));
   const { data, isLoading, error } = useQuery({
     queryKey: ["companies", filters, page],
-    queryFn: () => api.get<Page<Company>>("/companies", { ...filters, page, size: 50 }),
+    queryFn: () => api.get<Page<Company>>("/companies", { ...filters, page, size: PAGE_SIZE }),
   });
   const stats = useQuery({ queryKey: ["companies", "stats"], queryFn: () => api.get<Record<string, unknown>>("/companies/stats") });
   const [newName, setNewName] = useState("");
@@ -34,7 +34,7 @@ export function CompaniesPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1>Companies</h1>
+        <div><h1>Companies</h1><PageIntro>Companies you track. Turn on Job search for a company to have its jobs found automatically by the job scanner.</PageIntro></div>
         <div className="flex gap-2">
           <input className="input w-56" placeholder="New company name" aria-label="New company name" value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button className="btn-primary" disabled={!newName.trim() || create.isPending} onClick={() => create.mutate()}>Add</button>
@@ -93,7 +93,7 @@ export function CompaniesPage() {
               </table>
             </div>
           )}
-          <Pagination page={page} size={50} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
+          <Pagination page={page} size={PAGE_SIZE} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
         </Card>
       )}
     </div>

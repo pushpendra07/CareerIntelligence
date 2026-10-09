@@ -32,7 +32,7 @@ export function DeleteJobButton({ jobId, title, onDeleted, compact = false }: {
   const size = compact ? "px-2 py-0.5 text-xs" : "";
   if (step === "idle") {
     return (
-      <button type="button" className={`btn-secondary text-rose-700 hover:bg-rose-50 ${size}`} aria-label={`Delete ${title}`}
+      <button type="button" className={compact ? "rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-700" : `btn-secondary text-rose-700 hover:bg-rose-50 ${size}`} aria-label={`Delete ${title}`} title="Delete this job"
         onClick={() => setStep("confirm")}>Delete</button>
     );
   }

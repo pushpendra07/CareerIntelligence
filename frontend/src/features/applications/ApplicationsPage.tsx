@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Spinner, StatusBadge, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Application, Page } from "../../types/api";
 import { formatDate, formatDateTime, formatMoney, humanize } from "../../utils/format";
 
@@ -15,11 +15,11 @@ export function ApplicationsPage() {
   const [q, setQ] = useState("");
   const list = useQuery({
     queryKey: ["applications", { status, q, page }],
-    queryFn: () => api.get<Page<Application>>("/applications", { status: status ? [status] : undefined, q, page }),
+    queryFn: () => api.get<Page<Application>>("/applications", { status: status ? [status] : undefined, q, page, size: PAGE_SIZE }),
   });
   return (
     <div className="space-y-4">
-      <h1>Applications</h1>
+      <div><h1>Applications</h1><PageIntro>Every job you applied to and where it stands. Open one to update its status or add a follow-up.</PageIntro></div>
       <Card>
         <div className="mb-3 flex gap-2">
           <input className="input max-w-xs" placeholder="Search job or company" aria-label="Search applications" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
@@ -47,7 +47,7 @@ export function ApplicationsPage() {
             </tbody>
           </table>
         ))}
-        {list.data && <Pagination page={page} size={50} total={list.data.total} onPage={setPage} />}
+        {list.data && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>
     </div>
   );

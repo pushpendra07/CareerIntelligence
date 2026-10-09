@@ -18,6 +18,11 @@ export function Card({ title, actions, children, className = "" }: {
   );
 }
 
+/** One plain-language line under a page title: what this page is for. */
+export function PageIntro({ children }: { children: ReactNode }) {
+  return <p className="mt-0.5 max-w-3xl text-sm text-slate-500">{children}</p>;
+}
+
 const TONES: Record<string, string> = {
   green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   blue: "bg-sky-50 text-sky-700 ring-sky-200",
@@ -124,6 +129,9 @@ export function Field({ label, children, hint, error }: { label: string; childre
     </label>
   );
 }
+
+/** Rows per page on every paginated list. */
+export const PAGE_SIZE = 20;
 
 export function Pagination({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (p: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / size));

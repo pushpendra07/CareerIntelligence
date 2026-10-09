@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, Field, Spinner } from "../../components/ui";
+import { Badge, Card, Empty, ErrorBox, Field, Spinner, PageIntro } from "../../components/ui";
 import type { FollowUp, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 
@@ -29,7 +29,7 @@ export function FollowupsPage() {
   });
   return (
     <div className="space-y-4">
-      <h1>Follow-ups</h1>
+      <div><h1>Follow-ups</h1><PageIntro>Reminders so nothing slips: follow up with a recruiter, send a thank-you note, check on an application.</PageIntro></div>
       <Card title="New reminder">
         <div className="grid gap-2 sm:grid-cols-4">
           <Field label="What"><input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>

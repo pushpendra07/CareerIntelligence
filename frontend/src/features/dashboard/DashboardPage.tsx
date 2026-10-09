@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { BarChart, Funnel } from "../../components/charts";
-import { Badge, Card, ErrorBox, Spinner, Stat } from "../../components/ui";
+import { Badge, Card, ErrorBox, Spinner, Stat, PageIntro } from "../../components/ui";
 import type { Bar, Priority } from "../../types/api";
-import { formatDate, formatDateTime } from "../../utils/format";
+import { formatDate, formatDateTime, humanize } from "../../utils/format";
+import { BestMatches, ComingUp, GettingStarted, JobSources } from "./widgets";
 
 interface Dashboard {
   summary: Record<string, number>;
@@ -26,7 +27,7 @@ const PRIORITY_TONE: Record<string, "green" | "blue" | "amber" | "red" | "indigo
 };
 
 export function TodaysPriorities({ items }: { items: Priority[] }) {
-  if (!items.length) return <p className="text-sm text-slate-500">Nothing urgent today. Add jobs or import from Career-Ops.</p>;
+  if (!items.length) return <p className="text-sm text-slate-500">Nothing urgent today. Review your best matches above, or scan for new jobs.</p>;
   return (
     <ol className="divide-y divide-slate-100">
       {items.map((p) => (
@@ -64,7 +65,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1>Dashboard</h1>
+        <div><h1>Dashboard</h1><PageIntro>What to do today, and how your job search is going. Click any number to see those jobs.</PageIntro></div>
         <div className="flex gap-2">
           {s.stale_scores > 0 && (
             <button className="btn-secondary" disabled={reanalyze.isPending} onClick={() => reanalyze.mutate()}>
@@ -74,36 +75,55 @@ export function DashboardPage() {
           <Link className="btn-primary" to="/jobs/new">Add Job</Link>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
-        <Stat label="Open jobs" value={s.total_jobs} to="/jobs" />
-        <Stat label="New jobs" value={s.new_jobs} to="/jobs?tab=new" />
-        <Stat label="Jobs scored" value={s.jobs_scored} to="/jobs?min_score=0" />
-        <Stat label="Jobs ≥ 90" value={s.jobs_90_plus} tone="text-emerald-600" to="/jobs?min_score=90" />
-        <Stat label="Jobs ≥ 80" value={s.jobs_80_plus} tone="text-sky-600" to="/jobs?min_score=80" />
-        <Stat label="Shortlisted" value={s.shortlisted} to="/jobs?tab=pending&status=SHORTLISTED" />
-        <Stat label="Applications" value={s.applications} to="/applications" />
-        <Stat label="Interviews" value={s.interviews} to="/interviews?upcoming=false" />
-        <Stat label="Offers" value={s.offers} tone="text-emerald-600" to="/offers" />
-        <Stat label="Rejections" value={s.rejections} tone="text-rose-600" to="/applications?status=REJECTED" />
-        <Stat label="Pending follow-ups" value={s.pending_followups} tone={s.overdue_followups ? "text-amber-600" : undefined} to="/followups" />
-        <Stat label="Closed positions" value={s.closed_jobs ?? 0} tone="text-zinc-500" to="/jobs/closed" />
-        <Stat label="Companies" value={s.companies} to="/companies" />
+      <GettingStarted totalJobs={s.total_jobs + (s.closed_jobs ?? 0)} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section aria-label="Jobs">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Jobs</h2>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Open jobs" value={s.total_jobs} to="/jobs" />
+            <Stat label="New to review" value={s.new_jobs} to="/jobs?tab=new" />
+            <Stat label="Shortlisted" value={s.shortlisted} to="/jobs?tab=pending&status=SHORTLISTED" />
+            <Stat label="Excellent fit (90+)" value={s.jobs_90_plus} tone="text-emerald-600" to="/jobs?min_score=90" />
+            <Stat label="Strong fit (80+)" value={s.jobs_80_plus} tone="text-sky-600" to="/jobs?min_score=80" />
+            <Stat label="Closed positions" value={s.closed_jobs ?? 0} tone="text-zinc-500" to="/jobs/closed" />
+          </div>
+        </section>
+        <section aria-label="Your pipeline">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Your pipeline</h2>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Applications" value={s.applications} to="/applications" />
+            <Stat label="Applied this week" value={s.applied_this_week ?? 0} to="/applications" />
+            <Stat label="Interviews" value={s.interviews} to="/interviews?upcoming=false" />
+            <Stat label="Offers" value={s.offers} tone="text-emerald-600" to="/offers" />
+            <Stat label="Rejections" value={s.rejections} tone="text-rose-600" to="/applications?status=REJECTED" />
+            <Stat label={s.overdue_followups ? `Follow-ups (${s.overdue_followups} overdue)` : "Follow-ups to do"} value={s.pending_followups}
+              tone={s.overdue_followups ? "text-amber-600" : undefined} to="/followups" />
+          </div>
+        </section>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Today's Priorities" className="lg:col-span-2">
-          <TodaysPriorities items={dash.data!.priorities} />
-        </Card>
-        <Card title="Funnels">
-          <div className="space-y-4">
-            {Object.entries(dash.data!.funnels).map(([name, stages]) => (
-              <div key={name}>
-                <div className="mb-1 text-xs font-semibold uppercase text-slate-400">{name}</div>
-                <Funnel stages={stages} />
-              </div>
-            ))}
-          </div>
-        </Card>
+        <div className="space-y-4 lg:col-span-2">
+          <BestMatches />
+          <Card title="Today's priorities">
+            <TodaysPriorities items={dash.data!.priorities} />
+          </Card>
+        </div>
+        <div className="space-y-4">
+          <ComingUp />
+          <JobSources newThisWeek={s.new_this_week ?? 0} />
+          <Card title="Your pipeline">
+            <div className="space-y-4">
+              {Object.entries(dash.data!.funnels).map(([name, stages]) => (
+                <div key={name}>
+                  <div className="mb-1 text-xs font-semibold uppercase text-slate-400">{humanize(name)}</div>
+                  <Funnel stages={stages} />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
+      <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Insights</h2>
       {c && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Card title="Jobs by score"><BarChart data={c.jobs_by_score} color="bg-emerald-500" /></Card>

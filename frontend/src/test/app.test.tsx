@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorMessage, qs, ApiError } from "../api/client";
@@ -97,7 +97,7 @@ describe("dashboard", () => {
     });
     renderAt(<DashboardPage />);
     expect(await screen.findByText("Apply — Technical Lead — 93/100")).toHaveAttribute("href", "/jobs/5");
-    expect(screen.getByText("541")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open jobs: view results" })).toHaveTextContent("78");
     expect(screen.getByRole("button", { name: "Re-analyze 2 stale" })).toBeInTheDocument();
   });
 
@@ -118,7 +118,10 @@ describe("jobs list", () => {
     });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?technology=PHP&min_score=70" });
     expect(await screen.findByText("Adobe Commerce Technical Lead")).toBeInTheDocument();
-    expect(screen.getByText("stale")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("stale")).toBeInTheDocument();
+    // Technology is a "more" filter: the panel opens by itself when it's in use.
+    expect(screen.getByLabelText("Technology")).toHaveValue("PHP");
+    expect(screen.getByRole("button", { name: "Fewer filters" })).toHaveAttribute("aria-expanded", "true");
     const call = api.fn.mock.calls[0][0] as string;
     expect(call).toContain("technology=PHP");
     expect(call).toContain("min_score=70");

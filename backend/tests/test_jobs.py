@@ -451,3 +451,25 @@ def test_status_counts_for_tabs(client: TestClient) -> None:
     # Same filters as the list (status/closed ignored so every tab gets its count).
     assert client.get("/api/v1/jobs/status-counts",
                       params={"q": "beta", "status": ["NEW"]}).json() == {"APPLIED": 1}
+
+
+def test_sort_by_every_column_both_ways(client: TestClient) -> None:
+    a = add(client)["job"]  # Technical Lead - Adobe Commerce @ Acme Commerce
+    b = add(client, title="Backend Developer", company="Zeta Labs",
+            url="https://jobs.lever.co/zeta/1")["job"]
+    client.post(f"/api/v1/jobs/{b['id']}/status", json={"status": "APPLIED"})
+
+    def ids(sort: str) -> list[int]:
+        r = client.get("/api/v1/jobs", params={"sort": sort})
+        assert r.status_code == 200, (sort, r.text)
+        return [j["id"] for j in r.json()["items"]]
+
+    assert ids("title") == [b["id"], a["id"]] and ids("-title") == [a["id"], b["id"]]
+    assert ids("company") == [a["id"], b["id"]] and ids("-company") == [b["id"], a["id"]]
+    assert ids("status") == [a["id"], b["id"]]  # New before Applied (pipeline order)
+    assert ids("-status") == [b["id"], a["id"]]
+    for sort in ("match_score", "-match_score", "location", "-location", "experience",
+                 "-experience", "salary", "-salary", "posting_date", "-posting_date",
+                 "created_at", "-created_at"):
+        assert sorted(ids(sort)) == sorted([a["id"], b["id"]])
+    assert client.get("/api/v1/jobs", params={"sort": "bogus"}).status_code == 422

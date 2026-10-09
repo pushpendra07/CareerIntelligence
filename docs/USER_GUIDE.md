@@ -156,8 +156,13 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - **Re-analyze stale scores** first if the Dashboard shows *Re-analyze N stale*.
 - Sidebar → **Jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected ·
   Rejected · Not pursuing · Closed**, each with a count.
-- Filters: search, minimum score, recommendation, status (multi-select), company tier,
-  technology, location, work model, source, posted after, your years, applied or not, sort.
+- Filters: search, minimum score, status (multi-select inside a tab) and sort are always shown;
+  **More filters** opens recommendation, company tier, technology, location, work model, source,
+  posted after, your years, applied or not and outdated scores. 20 jobs per page.
+- **Sort by clicking a column title** (Score, Job, Company, Location, Exp, Salary, Posted,
+  Status); click again to reverse. ▲/▼ shows the current order.
+- The **score legend** under the filters explains the colours (90+ excellent … below 60 poor),
+  *stale* (re-analyze) and *no JD* (no description, less certain score).
 - Open a job to see:
   - **Match** — score, recommendation, the 9-component breakdown with reasons, blockers,
     confidence, recommended CV;
@@ -203,10 +208,17 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
 
 ## 11. Dashboard and analytics
 
-- **Dashboard**: cards (Open jobs, New jobs, Jobs ≥ 90 / ≥ 80, Shortlisted, Applications,
-  Interviews, Offers, Rejections, Follow-ups, Closed positions, Companies) — click any card to
-  open those jobs. **Today's Priorities** lists what to do next (interviews, overdue follow-ups,
-  strong jobs to apply to, stale scores).
+- **Dashboard** (top to bottom):
+  - **Getting started** checklist — shown until your CV, profile, target roles, salary target,
+    scannable companies and first jobs are all in place; each step links to where you do it.
+  - **Jobs** and **Your pipeline** numbers — click any number to open those jobs/applications.
+  - **Best new matches to review** — your top new jobs scoring 70+ that you haven't applied to;
+    **★ Shortlist** or **Not relevant** in one click, without opening each job.
+  - **Today's priorities** — interviews, overdue follow-ups, strong jobs to apply to.
+  - **Coming up** — next interviews and follow-ups due.
+  - **Job sources** — new jobs in the last 7 days, when the scanner / Google Sheets /
+    Career-Ops last ran, and **Scan now**.
+  - **Insights** — charts: jobs by score, source, location; top skills; your skill gaps.
 - **Analytics**: funnels, *where scores are lost* (average component fit), interview rate by
   score band, most-requested skills and your **skill gaps** (required skills you miss most).
 

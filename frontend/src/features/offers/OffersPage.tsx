@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge } from "../../components/ui";
+import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge, PageIntro } from "../../components/ui";
 import type { Job, Offer, Page } from "../../types/api";
 import { formatDate, formatMoney, humanize } from "../../utils/format";
 
@@ -74,7 +74,7 @@ export function OffersPage() {
   });
   return (
     <div className="space-y-4">
-      <h1>Offers</h1>
+      <div><h1>Offers</h1><PageIntro>Record offers you receive, note your counter-offer, and compare open offers side by side before you decide.</PageIntro></div>
       <Card title="Record an offer">
         <div className="grid gap-2 sm:grid-cols-4">
           <div className="sm:col-span-2"><Field label="Job *">

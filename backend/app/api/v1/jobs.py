@@ -137,13 +137,9 @@ def job_filters(
     stale: bool | None = None,
     has_application: bool | None = None,
     sort: Literal[
-        "-match_score",
-        "-posting_date",
-        "posting_date",
-        "company",
-        "-salary",
-        "experience",
-        "-created_at",
+        "-match_score", "match_score", "title", "-title", "company", "-company",
+        "location", "-location", "experience", "-experience", "salary", "-salary",
+        "posting_date", "-posting_date", "status", "-status", "created_at", "-created_at",
     ] = "-match_score",
 ) -> JobFilters:
     return JobFilters(

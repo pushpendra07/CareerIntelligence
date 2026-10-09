@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../../api/client";
 import { ListInput } from "../../components/ListInput";
-import { Card, ErrorBox, Field, Spinner } from "../../components/ui";
+import { Card, ErrorBox, Field, Spinner, PageIntro } from "../../components/ui";
 import type { Profile } from "../../types/api";
 import { formatDateTime } from "../../utils/format";
 
@@ -46,7 +46,7 @@ export function ProfilePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div><h1>Professional Profile</h1><p className="text-xs text-slate-500">Version {profile.data!.version} · updated {formatDateTime(profile.data!.updated_at)} · populate it from a CV on the CVs page, then edit freely.</p></div>
+        <div><h1>Professional Profile</h1><PageIntro>What you bring: your experience and skills. Filled from your CV — correct anything that's wrong, because every job is scored against it.</PageIntro><p className="text-xs text-slate-400">Version {profile.data!.version} · updated {formatDateTime(profile.data!.updated_at)} · populate it from a CV on the CVs page, then edit freely.</p></div>
         <button className="btn-primary" onClick={submit} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save profile"}</button>
       </div>
       {save.error && <ErrorBox error={new Error(errorMessage(save.error))} />}

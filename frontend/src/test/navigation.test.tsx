@@ -27,15 +27,15 @@ describe("dashboard cards", () => {
     const link = async (label: string) => (await screen.findByRole("link", { name: `${label}: view results` })).getAttribute("href");
     expect(await link("Open jobs")).toBe("/jobs");
     expect(await link("Closed positions")).toBe("/jobs/closed");
-    expect(await link("New jobs")).toBe("/jobs?tab=new");
-    expect(await link("Jobs ≥ 90")).toBe("/jobs?min_score=90");
-    expect(await link("Jobs ≥ 80")).toBe("/jobs?min_score=80");
+    expect(await link("New to review")).toBe("/jobs?tab=new");
+    expect(await link("Excellent fit (90+)")).toBe("/jobs?min_score=90");
+    expect(await link("Strong fit (80+)")).toBe("/jobs?min_score=80");
     expect(await link("Shortlisted")).toBe("/jobs?tab=pending&status=SHORTLISTED");
     expect(await link("Applications")).toBe("/applications");
     expect(await link("Interviews")).toBe("/interviews?upcoming=false");
     expect(await link("Rejections")).toBe("/applications?status=REJECTED");
-    expect(await link("Pending follow-ups")).toBe("/followups");
-    expect(await link("Companies")).toBe("/companies");
+    expect(await link("Follow-ups to do")).toBe("/followups");
+    expect(await link("Applied this week")).toBe("/applications");
   });
 
   it("jobs page sends every status from the card link", async () => {

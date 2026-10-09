@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, String, cast, func, or_, select
+from sqlalchemy import Select, String, case, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, selectinload
 
@@ -505,13 +505,38 @@ class JobFilters:
     sort: str = "-match_score"
 
 
+# Pipeline order, so sorting by status reads New → … → Closed.
+STATUS_ORDER = case(
+    {st.value: i for i, st in enumerate([
+        JobStatus.NEW, JobStatus.DISCOVERED, JobStatus.REVIEWING, JobStatus.SHORTLISTED,
+        JobStatus.READY_TO_APPLY, JobStatus.ON_HOLD, JobStatus.APPLIED,
+        JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW, JobStatus.OFFER,
+        JobStatus.ACCEPTED, JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.NOT_RELEVANT,
+        JobStatus.CLOSED,
+    ])},
+    value=Job.status,
+    else_=99,
+)
+
+# Every sortable column in both directions ("-" = descending). Empty values always go last.
 SORTS: dict[str, Any] = {
     "-match_score": (Job.match_score.desc().nulls_last(), Job.id.desc()),
-    "-posting_date": (Job.posting_date.desc().nulls_last(), Job.id.desc()),
-    "posting_date": (Job.posting_date.asc().nulls_last(), Job.id),
-    "company": (Company.name.asc(), Job.id),
-    "-salary": (Job.salary_max.desc().nulls_last(), Job.id.desc()),
+    "match_score": (Job.match_score.asc().nulls_last(), Job.id),
+    "title": (func.lower(Job.title).asc(), Job.id),
+    "-title": (func.lower(Job.title).desc(), Job.id.desc()),
+    "company": (func.lower(Company.name).asc(), Job.id),
+    "-company": (func.lower(Company.name).desc(), Job.id.desc()),
+    "location": (func.lower(Job.location).asc().nulls_last(), Job.id),
+    "-location": (func.lower(Job.location).desc().nulls_last(), Job.id.desc()),
     "experience": (Job.experience_min.asc().nulls_last(), Job.id),
+    "-experience": (Job.experience_min.desc().nulls_last(), Job.id.desc()),
+    "salary": (Job.salary_max.asc().nulls_last(), Job.id),
+    "-salary": (Job.salary_max.desc().nulls_last(), Job.id.desc()),
+    "posting_date": (Job.posting_date.asc().nulls_last(), Job.id),
+    "-posting_date": (Job.posting_date.desc().nulls_last(), Job.id.desc()),
+    "status": (STATUS_ORDER.asc(), Job.match_score.desc().nulls_last(), Job.id),
+    "-status": (STATUS_ORDER.desc(), Job.match_score.desc().nulls_last(), Job.id.desc()),
+    "created_at": (Job.created_at.asc(), Job.id),
     "-created_at": (Job.created_at.desc(), Job.id.desc()),
 }
 

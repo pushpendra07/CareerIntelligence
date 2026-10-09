@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../../api/client";
 import { ListInput } from "../../components/ListInput";
-import { Card, Chips, ErrorBox, Field, Spinner } from "../../components/ui";
+import { Card, Chips, ErrorBox, Field, Spinner, PageIntro } from "../../components/ui";
 import type { Preferences } from "../../types/api";
 
 const LISTS: [keyof Preferences, string, string?][] = [
@@ -44,7 +44,7 @@ export function PreferencesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div><h1>Target Job Profile</h1><p className="text-xs text-slate-500">Version {prefs.data!.version}. Changing preferences marks existing scores stale.</p></div>
+        <div><h1>Target Job Profile</h1><PageIntro>What you want next: job titles, skills, locations, work model and salary. Jobs that fit these score higher; excluded roles or technologies are flagged.</PageIntro><p className="text-xs text-slate-400">Version {prefs.data!.version}. Changing preferences marks existing scores stale.</p></div>
         <button className="btn-primary" onClick={submit} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save preferences"}</button>
       </div>
       {save.error && <ErrorBox error={new Error(errorMessage(save.error))} />}

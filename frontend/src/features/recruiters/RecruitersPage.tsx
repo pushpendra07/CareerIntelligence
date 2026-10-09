@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, errorMessage } from "../../api/client";
-import { Card, Empty, ErrorBox, Field, Pagination, Spinner } from "../../components/ui";
+import { Card, Empty, ErrorBox, Field, Pagination, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Contact, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 
@@ -13,7 +13,7 @@ export function RecruitersPage() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
-  const list = useQuery({ queryKey: ["recruiters", q, status, page], queryFn: () => api.get<Page<Contact>>("/recruiters", { q, status, page }) });
+  const list = useQuery({ queryKey: ["recruiters", q, status, page], queryFn: () => api.get<Page<Contact>>("/recruiters", { q, status, page, size: PAGE_SIZE }) });
   const [form, setForm] = useState(EMPTY);
   const create = useMutation({
     mutationFn: () => api.post("/recruiters", Object.fromEntries(Object.entries(form).filter(([, v]) => v))),
@@ -25,7 +25,7 @@ export function RecruitersPage() {
   });
   return (
     <div className="space-y-4">
-      <h1>Recruiters & contacts</h1>
+      <div><h1>Recruiters & contacts</h1><PageIntro>People you're talking to about jobs — recruiters, hiring managers and referrers — with their company and how to reach them.</PageIntro></div>
       <Card title="Add contact">
         <p className="mb-2 text-xs text-slate-500">Only store publicly available professional information.</p>
         <div className="grid gap-2 sm:grid-cols-4">
@@ -71,7 +71,7 @@ export function RecruitersPage() {
             </tbody>
           </table>
         ))}
-        {list.data && <Pagination page={page} size={50} total={list.data.total} onPage={setPage} />}
+        {list.data && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>
     </div>
   );

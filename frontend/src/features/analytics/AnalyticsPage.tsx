@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { BarChart, Funnel } from "../../components/charts";
-import { Card, ErrorBox, Spinner } from "../../components/ui";
+import { Card, ErrorBox, Spinner, PageIntro } from "../../components/ui";
 import type { Bar } from "../../types/api";
 import { humanize } from "../../utils/format";
 
@@ -25,7 +25,7 @@ export function AnalyticsPage() {
   const s = a.data!.scores;
   return (
     <div className="space-y-4">
-      <h1>Career analytics</h1>
+      <div><h1>Career analytics</h1><PageIntro>Where your matches lose points, which skills employers ask for most, and which ones you're missing.</PageIntro></div>
       <div className="grid gap-4 md:grid-cols-3">
         {f.data && Object.entries(f.data).map(([name, stages]) => <Card key={name} title={`${humanize(name)} funnel`}><Funnel stages={stages} /></Card>)}
       </div>

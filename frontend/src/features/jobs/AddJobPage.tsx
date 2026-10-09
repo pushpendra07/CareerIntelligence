@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Chips, ErrorBox, Field } from "../../components/ui";
+import { Badge, Card, Chips, ErrorBox, Field, PageIntro } from "../../components/ui";
 import type { JobDetail } from "../../types/api";
 import { formatMoney, humanize, splitList } from "../../utils/format";
 
@@ -94,7 +94,7 @@ export function AddJobPage() {
   const p = preview.data?.parsed;
   return (
     <div className="space-y-4">
-      <h1>Add Job</h1>
+      <div><h1>Add Job</h1><PageIntro>Found a job on LinkedIn, Naukri or elsewhere? Paste its link and description — it's checked for duplicates and scored against your profile.</PageIntro></div>
       <form className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit((v) => save.mutate(v))} noValidate>
         <Card className="space-y-3 lg:col-span-2">
           <div className="grid gap-3 sm:grid-cols-2">

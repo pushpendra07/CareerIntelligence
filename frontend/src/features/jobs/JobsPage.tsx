@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner } from "../../components/ui";
+import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { StatusMultiSelect } from "./StatusMultiSelect";
@@ -32,6 +33,53 @@ export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
   { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT"] },
   { key: "closed", label: "Closed", statuses: ["CLOSED"] },
 ];
+
+/** What the score colours mean. */
+function ScoreLegend() {
+  const items: [string, string][] = [["bg-emerald-500", "90+ excellent fit"], ["bg-sky-500", "80+ strong"],
+    ["bg-indigo-500", "70+ worth a look"], ["bg-amber-500", "60+ weak"], ["bg-rose-500", "below 60 poor"]];
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+      <span className="font-medium text-slate-600">Score:</span>
+      {items.map(([dot, label]) => <span key={label} className="inline-flex items-center gap-1"><span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />{label}</span>)}
+      <span><span className="rounded bg-amber-50 px-1 text-amber-800 ring-1 ring-amber-200">stale</span> = profile changed, re-analyze</span>
+      <span><span className="rounded bg-amber-50 px-1 text-amber-800 ring-1 ring-amber-200">no JD</span> = no description, score less certain</span>
+    </p>
+  );
+}
+
+export const SORT_OPTIONS: [string, string][] = [
+  ["-match_score", "Highest score"], ["match_score", "Lowest score"],
+  ["-posting_date", "Newest posted"], ["posting_date", "Oldest posted"],
+  ["-created_at", "Recently added"], ["title", "Job title A–Z"], ["-title", "Job title Z–A"],
+  ["company", "Company A–Z"], ["-company", "Company Z–A"], ["location", "Location A–Z"],
+  ["-location", "Location Z–A"], ["experience", "Least experience"], ["-experience", "Most experience"],
+  ["-salary", "Highest salary"], ["salary", "Lowest salary"], ["status", "Status (pipeline order)"],
+  ["-status", "Status (reverse)"],
+];
+
+type SortProps = { label: string; field: string; first: "asc" | "desc"; sort: string; onSort: (v: string) => void };
+
+/** Click to sort by this column; click again to reverse. */
+function SortButton({ label, field, first, sort, onSort }: SortProps) {
+  const dir = sort === field ? "asc" : sort === `-${field}` ? "desc" : null;
+  const next = dir ? (dir === "asc" ? `-${field}` : field) : first === "asc" ? field : `-${field}`;
+  return (
+    <button type="button" onClick={() => onSort(next)} title={`Sort by ${label.toLowerCase()}`} aria-label={`Sort by ${label.toLowerCase()}`}
+      className={`inline-flex items-center gap-0.5 uppercase tracking-wide hover:text-indigo-700 ${dir ? "text-indigo-700" : ""}`}>
+      {label}<span aria-hidden className="text-[10px]">{dir === "asc" ? "▲" : dir === "desc" ? "▼" : "↕"}</span>
+    </button>
+  );
+}
+
+function SortHeader({ extra, ...props }: SortProps & { extra?: ReactNode }) {
+  const dir = props.sort === props.field ? "ascending" : props.sort === `-${props.field}` ? "descending" : "none";
+  return (
+    <th className="th" aria-sort={dir}>
+      <span className="inline-flex items-center gap-2"><SortButton {...props} />{extra && <span className="text-slate-300">·</span>}{extra}</span>
+    </th>
+  );
+}
 
 const tabHref = (key: string) => (key === "closed" ? "/jobs/closed" : key === "all" ? "/jobs" : `/jobs?tab=${key}`);
 
@@ -82,7 +130,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const listQuery = { ...query, status: tab.key === "all" && !picked.length ? undefined : statuses, closed: String(closed) };
   const { data, isLoading, error } = useQuery({
     queryKey: ["jobs", listQuery, page],
-    queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: 50 }),
+    queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: PAGE_SIZE }),
   });
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -97,6 +145,11 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     next.delete("page");
     setParams(next);
   };
+  const MORE_KEYS = ["recommendation", "tier", "technology", "location", "work_model", "source", "posted_after", "experience", "has_application", "stale"];
+  const moreActive = MORE_KEYS.filter((k) => params.get(k)).length;
+  const [showMore, setShowMore] = useState(moreActive > 0);
+  const sort = params.get("sort") ?? "-match_score";
+  const sortBy = (value: string) => set("sort", value === "-match_score" ? "" : value);
   const select = (key: string, options: string[], label: string) => (
     <select className="input" aria-label={label} value={params.get(key) ?? ""} onChange={(e) => set(key, e.target.value)}>
       <option value="">{label}</option>
@@ -106,46 +159,58 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
+        <div>
+          <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
+          <PageIntro>Every job from every source, scored 0–100 for how well it fits you. Use the tabs to see each stage; click a column title to sort.</PageIntro>
+        </div>
         <Link className="btn-primary" to="/jobs/new">Add Job</Link>
       </div>
       <StatusTabs active={tab.key} query={query} />
       <Card>
+        {/* Main filters stay visible; the rest open with "More filters" (auto-open when one is in use). */}
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
-          <input className="input col-span-2" placeholder="Search title, company, location" aria-label="Search jobs"
-            defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)} />
-          <input className="input" type="number" min={0} max={100} placeholder="Min score" aria-label="Min score"
+          <input className="input col-span-2" placeholder="Search job title, company or location" aria-label="Search jobs"
+            defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
+            onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
+          <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 70)" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
-          {select("recommendation", RECS, "Recommendation")}
-          {tab.statuses.length > 1 && <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses} />}
-          {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Company tier")}
-          <input className="input" placeholder="Technology" aria-label="Technology" defaultValue={params.get("technology") ?? ""}
-            onBlur={(e) => set("technology", e.target.value)} />
-          <input className="input" placeholder="Location" aria-label="Location" defaultValue={params.get("location") ?? ""}
-            onBlur={(e) => set("location", e.target.value)} />
-          {select("work_model", ["REMOTE", "HYBRID", "ONSITE", "UNKNOWN"], "Work model")}
-          {select("source", SOURCES, "Source")}
-          <input className="input" type="date" aria-label="Posted after" defaultValue={params.get("posted_after") ?? ""}
-            onChange={(e) => set("posted_after", e.target.value)} />
-          <input className="input" type="number" step="0.5" placeholder="My years" aria-label="Experience fits"
-            defaultValue={params.get("experience") ?? ""} onBlur={(e) => set("experience", e.target.value)} />
-          <select className="input" aria-label="Application" value={params.get("has_application") ?? ""} onChange={(e) => set("has_application", e.target.value)}>
-            <option value="">Any application</option><option value="false">Not applied</option><option value="true">Applied</option>
-          </select>
+          {tab.statuses.length > 1 ? <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses} /> : <span className="hidden lg:block" />}
           <select className="input" aria-label="Sort" value={params.get("sort") ?? "-match_score"} onChange={(e) => set("sort", e.target.value)}>
-            <option value="-match_score">Highest score</option>
-            <option value="-posting_date">Newest</option>
-            <option value="posting_date">Oldest</option>
-            <option value="company">Company</option>
-            <option value="-salary">Salary</option>
-            <option value="experience">Experience</option>
+            {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={params.get("stale") === "true"} onChange={(e) => set("stale", e.target.checked ? "true" : "")} />
-            Stale only
-          </label>
-          <button className="btn-secondary" onClick={() => setParams(new URLSearchParams())}>Clear</button>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary flex-1" aria-expanded={showMore} onClick={() => setShowMore((v) => !v)}>
+              {showMore ? "Fewer filters" : `More filters${moreActive ? ` (${moreActive})` : ""}`}
+            </button>
+            <button type="button" className="btn-secondary" title="Clear all filters" onClick={() => setParams(tab.key === "all" || closed ? new URLSearchParams() : new URLSearchParams({ tab: tab.key }))}>Clear</button>
+          </div>
         </div>
+        {showMore && (
+          <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 md:grid-cols-4 lg:grid-cols-6">
+            {select("recommendation", RECS, "Any recommendation")}
+            {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Any company tier")}
+            <input className="input" placeholder="Technology (e.g. magento2)" aria-label="Technology" defaultValue={params.get("technology") ?? ""}
+              onBlur={(e) => set("technology", e.target.value)} />
+            <input className="input" placeholder="Location (e.g. Bengaluru)" aria-label="Location" defaultValue={params.get("location") ?? ""}
+              onBlur={(e) => set("location", e.target.value)} />
+            {select("work_model", ["REMOTE", "HYBRID", "ONSITE", "UNKNOWN"], "Any work model")}
+            {select("source", SOURCES, "Any source")}
+            <label className="flex flex-col text-xs text-slate-500">Posted after
+              <input className="input" type="date" aria-label="Posted after" defaultValue={params.get("posted_after") ?? ""}
+                onChange={(e) => set("posted_after", e.target.value)} />
+            </label>
+            <input className="input" type="number" step="0.5" placeholder="Fits my years (e.g. 12)" aria-label="Experience fits"
+              defaultValue={params.get("experience") ?? ""} onBlur={(e) => set("experience", e.target.value)} />
+            <select className="input" aria-label="Application" value={params.get("has_application") ?? ""} onChange={(e) => set("has_application", e.target.value)}>
+              <option value="">Applied or not</option><option value="false">Not applied yet</option><option value="true">Already applied</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-slate-600" title="Scores calculated before your profile or preferences changed">
+              <input type="checkbox" checked={params.get("stale") === "true"} onChange={(e) => set("stale", e.target.checked ? "true" : "")} />
+              Outdated scores only
+            </label>
+          </div>
+        )}
+        <ScoreLegend />
       </Card>
       {isLoading && <Spinner />}
       {error && <ErrorBox error={error} />}
@@ -155,9 +220,16 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>
-                  <th className="th">Score</th><th className="th">Job</th><th className="th">Location</th>
-                  <th className="th">Exp</th><th className="th">Salary</th><th className="th">Sources</th>
-                  <th className="th">Posted</th><th className="th">Status</th><th className="th"><span className="sr-only">Actions</span></th>
+                  <SortHeader label="Score" field="match_score" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
+                    extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
+                  <SortHeader label="Location" field="location" first="asc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
+                  <th className="th">Sources</th>
+                  <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
+                  <th className="th"><span className="sr-only">Actions</span></th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
@@ -183,7 +255,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
               </table>
             </div>
           )}
-          <Pagination page={page} size={50} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
+          <Pagination page={page} size={PAGE_SIZE} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
         </Card>
       )}
     </div>

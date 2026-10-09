@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../../api/client";
-import { Card, ErrorBox, Field, KeyValue, Spinner } from "../../components/ui";
+import { Card, ErrorBox, Field, KeyValue, Spinner, PageIntro } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
 import { ScannerSettings } from "../scanner/ScannerSettings";
 import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
@@ -194,8 +194,7 @@ function AppPreferences() {
 export function SettingsPage() {
   return (
     <div className="space-y-4">
-      <h1>Settings</h1>
-      <p className="text-sm text-slate-600">Profile, target roles, skills, locations, salary and work model live on the Profile and Target Profile pages.</p>
+      <div><h1>Settings</h1><PageIntro>Set up where jobs come from (job scanner, Google Sheets, Career-Ops), how jobs are scored, and import or export your data. (Your skills, target roles, locations and salary are on the Profile and Target Profile pages.)</PageIntro></div>
       <ScannerSettings />
       <SavedSheetsSettings />
       <ScoringSettings />

@@ -65,6 +65,15 @@ def summary(db: Session) -> dict[str, int]:
             .where(FollowUp.completed.is_(False), FollowUp.due_date < today),
         ),
         "companies": _count(db, select(func.count()).select_from(Company)),
+        # Last 7 days, for "this week" on the dashboard.
+        "new_this_week": _count(
+            db, all_jobs.where(Job.created_at >= datetime.now(UTC) - timedelta(days=7))
+        ),
+        "applied_this_week": _count(
+            db,
+            select(func.count()).select_from(Application)
+            .where(Application.created_at >= datetime.now(UTC) - timedelta(days=7)),
+        ),
     }
 
 

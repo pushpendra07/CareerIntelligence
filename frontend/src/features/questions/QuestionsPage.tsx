@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, Field, Pagination, Spinner } from "../../components/ui";
+import { Badge, Card, Empty, ErrorBox, Field, Pagination, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Page, Question } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 import { ROUNDS } from "../interviews/InterviewsPage";
@@ -45,7 +45,7 @@ export function QuestionsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ q: "", category: "", max_confidence: "", sort: "-updated_at" });
-  const list = useQuery({ queryKey: ["questions", filters, page], queryFn: () => api.get<Page<Question>>("/questions", { ...filters, page }) });
+  const list = useQuery({ queryKey: ["questions", filters, page], queryFn: () => api.get<Page<Question>>("/questions", { ...filters, page, size: PAGE_SIZE }) });
   const [form, setForm] = useState(EMPTY);
   const create = useMutation({
     mutationFn: () => api.post("/questions", Object.fromEntries(Object.entries(form).filter(([, v]) => v))),
@@ -53,7 +53,7 @@ export function QuestionsPage() {
   });
   return (
     <div className="space-y-4">
-      <h1>Interview question bank</h1>
+      <div><h1>Interview question bank</h1><PageIntro>Questions you've been asked (or expect), with your best answers. They're suggested again when you prepare for similar jobs.</PageIntro></div>
       <Card title="Add question">
         <div className="grid gap-2 sm:grid-cols-4">
           <div className="sm:col-span-4"><Field label="Question *"><textarea className="input" rows={2} value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} /></Field></div>
@@ -76,7 +76,7 @@ export function QuestionsPage() {
         </div>
         {list.isLoading && <Spinner />}
         {list.data && (!list.data.items.length ? <Empty>No questions yet.</Empty> : <ul className="divide-y divide-slate-100">{list.data.items.map((q) => <QuestionRow key={q.id} q={q} />)}</ul>)}
-        {list.data && <Pagination page={page} size={50} total={list.data.total} onPage={setPage} />}
+        {list.data && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>
     </div>
   );

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge, PageIntro } from "../../components/ui";
 import type { Interview, Job, Page } from "../../types/api";
 import { formatDateTime, humanize } from "../../utils/format";
 
@@ -18,7 +18,7 @@ export function InterviewsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1>Interviews</h1>
+        <div><h1>Interviews</h1><PageIntro>Your interview rounds. Open one for details, the prep sheet, and to record how it went.</PageIntro></div>
         <Link className="btn-primary" to="/interviews/new">Schedule interview</Link>
       </div>
       <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} />Upcoming only</label>}>
