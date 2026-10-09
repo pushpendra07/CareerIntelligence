@@ -1,0 +1,67 @@
+# ---------------------------------------------------------------------------
+# Personal data — never commit
+# ---------------------------------------------------------------------------
+
+# Secrets and local configuration (keep only the template)
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Uploaded CVs, documents and attachments (backend/storage/)
+storage/
+uploads/
+
+# Local database (dev PostgreSQL data dir) and any database files/dumps
+.devdb/
+pgdata/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
+# CV and document files anywhere in the tree (tests build their own in memory)
+*.pdf
+*.docx
+*.doc
+
+# Data exports and imports (downloads from the app, sheet/CSV/JSON dumps)
+career-data.json
+exports/
+imports/
+sheet_import/
+data/
+*.csv
+!backend/tests/**/*.csv
+
+# Runtime state and logs (start.sh / stop.sh)
+.run/
+logs/
+*.log
+
+# ---------------------------------------------------------------------------
+# Build / tooling output
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

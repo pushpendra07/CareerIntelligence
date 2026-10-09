@@ -1,0 +1,44 @@
+# Optional: one-command start with Docker (`docker compose up -d`).
+# Not required — see README for the native setup.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: career
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: career_intelligence
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U career -d career_intelligence"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://career:${POSTGRES_PASSWORD}@postgres:5432/career_intelligence
+      CAREER_OPS_PATH: /career-ops
+      STORAGE_PATH: /data/storage
+    volumes:
+      # Career-Ops is mounted read-only: this app never writes to it.
+      - ${CAREER_OPS_PATH:?set CAREER_OPS_PATH in .env}:/career-ops:ro
+      - storage:/data/storage
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      # Open http://127.0.0.1:8080 — nginx serves the app and proxies /api to the backend.
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  storage:

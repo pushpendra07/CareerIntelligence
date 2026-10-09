@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@layer base {
+  body { @apply text-slate-800 antialiased; }
+  h1 { @apply text-xl font-semibold text-slate-900; }
+  h2 { @apply text-base font-semibold text-slate-900; }
+}
+
+/* Tailwind v4: reusable classes are declared as utilities so they can compose with @apply. */
+@utility input { @apply w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-100; }
+@utility label { @apply mb-1 block text-xs font-medium text-slate-600; }
+@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700; }
+@utility btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
+@utility card { @apply rounded-lg border border-slate-200 bg-white p-4 shadow-sm; }
+@utility link { @apply text-indigo-600 hover:underline; }
+@utility th { @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
+@utility td { @apply px-3 py-2 text-sm align-top; }
