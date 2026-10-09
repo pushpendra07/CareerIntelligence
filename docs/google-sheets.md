@@ -97,9 +97,24 @@ search links and no job-search column). For each company the user wants searched
 
 | Situation | How |
 |---|---|
-| Sheet shared "Anyone with the link → Viewer" | Settings → Google Sheets → **Import** (`POST /api/v1/sheets/{id}/import`; first tab or the tab in the URL's `gid`) |
-| Private sheet (both saved sheets are private) | An agent reads the rows with a Google Sheets/Drive connector and POSTs them: `.agent/workflows/import-google-sheets.md` |
+| **Private sheet + service account connected** (recommended) | Settings → Google Sheets → **Import**. Reads **every tab** with the Google Sheets API (`POST /api/v1/sheets/{id}/import`, `via: google_api`) |
+| Sheet shared "Anyone with the link → Viewer" | Same **Import** button (first tab, or the tab in the URL's `gid`) |
+| Private sheet, no service account | An agent reads the rows with a Google connector and POSTs them: `.agent/workflows/import-google-sheets.md` |
 | A one-off tab | Download as CSV → Settings → Import & export |
 | New sheet | Settings → Google Sheets → paste URL → Save sheet (`POST /api/v1/sheets {"url","title"}`) |
 
 Never edit the Google Sheets themselves.
+
+## Connecting private sheets (service account, one-time)
+
+1. Google Cloud Console → create a project (free, no billing) → enable the **Google Sheets API**.
+2. IAM & Admin → Service accounts → **Create service account** (no roles) → Keys → Add key →
+   JSON. A key file downloads.
+3. Save it as `backend/secrets/google-service-account.json` (git-ignored; or set
+   `GOOGLE_SERVICE_ACCOUNT_FILE` in `backend/.env`), then restart the app.
+4. Settings → Google Sheets now shows the service account's email
+   (`GET /api/v1/sheets/access`). In each sheet: **Share** → add that email → **Viewer**.
+5. Click **Import**. If a sheet isn't shared yet, the app says which email to add.
+
+The key is a private credential: never commit it, paste it in chat, or copy it elsewhere.
+The app only requests read-only access (`spreadsheets.readonly`).

@@ -6,6 +6,12 @@ Reference: `docs/google-sheets.md` (sheets, tabs, columns, mappings). The app de
 you only read the sheets and send rows. Never edit the Google Sheets.
 
 1. Make sure the app is running (`.agent/workflows/run-app.md`).
+   **First try the app's own import** — if a service account is connected it reads every tab:
+// turbo
+   `curl -s http://127.0.0.1:8010/api/v1/sheets/access`
+   If `service_account` is set: `curl -s -X POST http://127.0.0.1:8010/api/v1/sheets/<id>/import`
+   for each sheet, report `last_result.tabs`, and stop here. A 409 naming an email means the
+   sheet isn't shared with it yet — tell the user. Otherwise continue with the connector steps.
 2. List saved sheets and their last import:
 // turbo
    `curl -s http://127.0.0.1:8010/api/v1/sheets | python3 -m json.tool`

@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     career_ops_api_key: SecretStr | None = None
     career_ops_scan_enabled: bool = False
 
+    # Google service-account key (JSON) for reading private Google Sheets. If unset, the app
+    # uses backend/secrets/google-service-account.json when that file exists.
+    google_service_account_file: Path | None = None
+
     ai_provider: Literal["none", "openai", "anthropic", "gemini", "ollama"] = "none"
     ai_api_key: SecretStr | None = None
     ai_model: str | None = None
@@ -42,7 +46,8 @@ class Settings(BaseSettings):
 
     @field_validator(
         "career_ops_path", "career_ops_data_path", "career_ops_url", "career_ops_api_key",
-        "ai_api_key", "ai_model", "ai_base_url", "redis_url", mode="before",
+        "ai_api_key", "ai_model", "ai_base_url", "redis_url", "google_service_account_file",
+        mode="before",
     )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:

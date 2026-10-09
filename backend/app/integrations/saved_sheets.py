@@ -2,8 +2,9 @@
 
 Rows reach the normal importers (deduplication, JD parsing, scoring) either way:
 - "direct": the app downloads the sheet itself (works for sheets shared by link);
-- "connector": Claude reads a private sheet through the Google Drive/Sheets connector and
-  posts the rows to `/sheets/{id}/import-rows`.
+- "google_api": private sheets, read with the app's Google service account (all tabs);
+- "connector": an agent reads a private sheet through a Google connector and posts the rows to
+  `/sheets/{id}/import-rows`.
 """
 
 from datetime import UTC, datetime
@@ -12,14 +13,21 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.core.errors import ConflictError, DomainValidationError, NotFoundError
-from app.integrations.google_sheets import detect_kind, fetch_rows, parse_sheet_url
+from app.integrations import google_api
+from app.integrations.google_sheets import (
+    detect_kind,
+    fetch_rows,
+    parse_sheet_url,
+    rows_from_values,
+)
 from app.models.sheet import SavedSheet
 
 PRIVATE_HINT = (
-    "This sheet is private, so the app can't open it. Ask Claude to import it "
-    "(it reads the sheet through your Google Drive connector), or share the sheet as "
-    "'Anyone with the link → Viewer'."
+    "This sheet is private. To import it from here, connect a Google service account once "
+    "(Settings → Google Sheets → 'Connect private sheets') and share the sheet with it as Viewer. "
+    "Or share the sheet as 'Anyone with the link → Viewer'."
 )
 
 
@@ -89,12 +97,32 @@ def import_tabs(db: Session, sheet: SavedSheet, tabs: list[tuple[str, list[dict[
     return sheet
 
 
-def import_direct(db: Session, sheet: SavedSheet) -> SavedSheet:
-    """Download the sheet as CSV (sheets shared by link). Private sheets get a clear hint."""
+def access_info(settings: Settings) -> dict[str, Any]:
+    """How the app can read sheets: service account (private sheets) or link-shared only."""
+    path = google_api.key_file(settings.google_service_account_file)
+    if path is None:
+        return {"service_account": None, "key_file": str(google_api.DEFAULT_KEY_FILE),
+                "error": None}
     try:
-        rows = fetch_rows(sheet.url)
+        return {"service_account": google_api.ServiceAccount.load(path).email,
+                "key_file": str(path), "error": None}
+    except DomainValidationError as exc:
+        return {"service_account": None, "key_file": str(path), "error": exc.message}
+
+
+def import_direct(db: Session, sheet: SavedSheet, settings: Settings) -> SavedSheet:
+    """Import every tab. Private sheets need the service account; otherwise the public CSV."""
+    path = google_api.key_file(settings.google_service_account_file)
+    try:
+        if path is not None:
+            account = google_api.ServiceAccount.load(path)
+            title, tabs = google_api.read_all_tabs(account, sheet.spreadsheet_id)
+            if title and sheet.title in ("", "Google Sheet"):
+                sheet.title = title
+            rows = [(tab, rows_from_values(values)) for tab, values in tabs]
+            return import_tabs(db, sheet, rows, via="google_api")
+        return import_tabs(db, sheet, [("", fetch_rows(sheet.url))], via="direct")
     except DomainValidationError as exc:
         sheet.last_error = PRIVATE_HINT if "not public" in exc.message else exc.message
         db.commit()
         raise ConflictError(sheet.last_error) from exc
-    return import_tabs(db, sheet, [("", rows)], via="direct")

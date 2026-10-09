@@ -76,6 +76,7 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `AI_PROVIDER` | `none` | Optional AI: `none`, `openai`, `anthropic`, `gemini`, `ollama` |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | — | Only when an AI provider is set (costs tokens) |
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | `secrets/google-service-account.json` if present | Google service-account key for importing private Google Sheets |
 | `CORS_ORIGINS` | 5173 origins | Allowed UI origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Logging |
 | `BACKEND_PORT` / `FRONTEND_PORT` | `8010` / `5173` | Ports used by `start.sh` (shell env, not `.env`) |
@@ -193,9 +194,13 @@ Teamtailor). Takes 1–3 minutes. No keys, no tokens.
 ## Google Sheets
 
 Settings → Google Sheets lists saved sheets with **Import** and the last result.
+- Private sheets: connect a Google **service account** once (Settings → Google Sheets →
+  *Connect private sheets*; key at `backend/secrets/google-service-account.json`, git-ignored),
+  share each sheet with its email as Viewer, then **Import** reads every tab itself.
+  Check: `GET /api/v1/sheets/access` (`service_account` = the email, `null` = not connected).
 - Sheets shared "Anyone with the link → Viewer": **Import** downloads and imports directly.
-- Private sheets: the app can't open them; an agent with a Google Sheets/Drive connector
-  reads the rows and posts them — follow `.agent/workflows/import-google-sheets.md`.
+- Without a service account, an agent with a Google connector can read private sheets and post
+  the rows — follow `.agent/workflows/import-google-sheets.md`.
 - Add a sheet: paste its URL in the panel (or `POST /api/v1/sheets {"url", "title"}`).
 - Column names are matched flexibly (Job Title/title, Company, Location, Application Link/
   job_url, Status, Match Score, notes…). Company tabs (Company Name, Careers URL) import companies.

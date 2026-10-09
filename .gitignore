@@ -65,3 +65,9 @@ dist/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Google service-account keys (private credentials)
+secrets/
+backend/secrets/
+*service-account*.json
+google-credentials*.json

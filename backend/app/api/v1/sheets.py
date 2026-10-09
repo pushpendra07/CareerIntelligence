@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.api.deps import DB
+from app.api.deps import DB, AppSettings
 from app.integrations import saved_sheets as svc
 from app.models.sheet import SavedSheet
 
@@ -57,10 +57,16 @@ def delete_sheet(db: DB, sheet_id: int) -> None:
     svc.delete_sheet(db, sheet_id)
 
 
+@router.get("/access")
+def access(settings: AppSettings) -> dict[str, Any]:
+    """Service-account email the sheets must be shared with (null = not connected)."""
+    return svc.access_info(settings)
+
+
 @router.post("/{sheet_id}/import", response_model=SheetOut)
-def import_sheet(db: DB, sheet_id: int) -> SheetOut:
-    """Download and import the sheet. 409 with a hint when the sheet is private."""
-    return _out(svc.import_direct(db, svc.get_sheet(db, sheet_id)))
+def import_sheet(db: DB, settings: AppSettings, sheet_id: int) -> SheetOut:
+    """Import every tab (service account) or the public CSV. 409 with a hint if it can't read."""
+    return _out(svc.import_direct(db, svc.get_sheet(db, sheet_id), settings))
 
 
 @router.post("/{sheet_id}/import-rows", response_model=SheetOut)

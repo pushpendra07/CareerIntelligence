@@ -15,12 +15,13 @@ describe("saved Google Sheets", () => {
   it("lists sheets with their last import, imports on click and explains private sheets", async () => {
     const api = mockApi({
       "GET /sheets": [SHEET],
+    "GET /sheets/access": { service_account: null, key_file: "secrets/google-service-account.json", error: null },
       "POST /sheets/1/import": new Response(JSON.stringify({ error: { code: "conflict", message: PRIVATE } }), { status: 409, headers: { "content-type": "application/json" } }),
       "POST /sheets": { ...SHEET, id: 2 },
     });
     renderAt(<SavedSheetsSettings />);
     expect(await screen.findByRole("link", { name: "Seen Jobs" })).toHaveAttribute("href", SHEET.url);
-    expect(screen.getByText(/by Claude, via Google Drive/)).toBeInTheDocument();
+    expect(screen.getByText(/by an agent, via Google connector/)).toBeInTheDocument();
     expect(screen.getByText("11 new")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Import" }));
@@ -31,5 +32,21 @@ describe("saved Google Sheets", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save sheet" }));
     expect(api.calls.find((c) => c.method === "POST" && c.path === "/sheets")?.body)
       .toEqual({ url: "https://docs.google.com/spreadsheets/d/xyz/edit", title: null });
+  });
+});
+
+describe("private sheet access", () => {
+  it("shows the service-account email to share sheets with", async () => {
+    mockApi({ "GET /sheets": [], "GET /sheets/access": { service_account: "reader@proj.iam.gserviceaccount.com", key_file: "x", error: null } });
+    renderAt(<SavedSheetsSettings />);
+    expect(await screen.findByText("reader@proj.iam.gserviceaccount.com")).toBeInTheDocument();
+    expect(screen.getByText(/Private sheets connected/)).toBeInTheDocument();
+  });
+
+  it("shows setup steps when not connected", async () => {
+    mockApi({ "GET /sheets": [], "GET /sheets/access": { service_account: null, key_file: "secrets/google-service-account.json", error: null } });
+    renderAt(<SavedSheetsSettings />);
+    expect(await screen.findByText("Connect private sheets (one-time setup)")).toBeInTheDocument();
+    expect(screen.getByText("backend/secrets/google-service-account.json")).toBeInTheDocument();
   });
 });
