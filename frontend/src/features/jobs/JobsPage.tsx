@@ -2,14 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
+import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, PAGE_SIZE, PageIntro, ADDED_VIA, AddedViaTags } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
-  "source", "status", "posted_after", "experience", "sort", "stale", "has_application"] as const;
+  "source", "status", "posted_after", "experience", "sort", "stale", "has_application", "added_via"] as const;
 
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
@@ -145,7 +145,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     next.delete("page");
     setParams(next);
   };
-  const MORE_KEYS = ["recommendation", "tier", "technology", "location", "work_model", "source", "posted_after", "experience", "has_application", "stale"];
+  const MORE_KEYS = ["recommendation", "tier", "technology", "location", "work_model", "source", "posted_after", "experience", "has_application", "stale"]; // "added_via" is in the main row
   const moreActive = MORE_KEYS.filter((k) => params.get(k)).length;
   const [showMore, setShowMore] = useState(moreActive > 0);
   const sort = params.get("sort") ?? "-match_score";
@@ -168,13 +168,18 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       <StatusTabs active={tab.key} query={query} />
       <Card>
         {/* Main filters stay visible; the rest open with "More filters" (auto-open when one is in use). */}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7">
           <input className="input col-span-2" placeholder="Search job title, company or location" aria-label="Search jobs"
             defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
           <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 70)" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
           {tab.statuses.length > 1 ? <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses} /> : <span className="hidden lg:block" />}
+          <select className="input" aria-label="Added via" value={params.get("added_via") ?? ""} onChange={(e) => set("added_via", e.target.value)}
+            title="How the job came into the app">
+            <option value="">Added via: any</option>
+            {Object.entries(ADDED_VIA).map(([value, t]) => <option key={value} value={value}>Added via: {t.label}</option>)}
+          </select>
           <select className="input" aria-label="Sort" value={params.get("sort") ?? "-match_score"} onChange={(e) => set("sort", e.target.value)}>
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -226,7 +231,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   <SortHeader label="Location" field="location" first="asc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
-                  <th className="th">Sources</th>
+                  <th className="th" title="How the job came in, and the websites it was found on">Added via · Sources</th>
                   <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
                   <th className="th"><span className="sr-only">Actions</span></th>
@@ -245,7 +250,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                       <td className="td text-xs">{j.location ?? "—"}<div className="text-slate-500">{humanize(j.work_model)}</div></td>
                       <td className="td text-xs">{experienceRange(j.experience_min, j.experience_max)}</td>
                       <td className="td text-xs">{salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</td>
-                      <td className="td text-xs">{j.sources.map(humanize).join(", ")}</td>
+                      <td className="td text-xs"><AddedViaTags values={j.added_via} /><div className="mt-0.5 text-slate-500">{j.sources.map(humanize).join(", ")}</div></td>
                       <td className="td text-xs">{formatDate(j.posting_date)}</td>
                       <td className="td"><JobStatusBadge value={j.status} /></td>
                       <td className="td text-right"><DeleteJobButton jobId={j.id} title={j.title} compact /></td>

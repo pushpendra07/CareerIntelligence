@@ -385,8 +385,9 @@ def job_input_from_row(
 
 
 def import_jobs(
-    db: Session, rows: list[dict[str, Any]], source_label: str = "import"
+    db: Session, rows: list[dict[str, Any]], source_label: str = "import", origin: str = "import"
 ) -> dict[str, Any]:
+    """`origin`: "sheet" (Google Sheets) or "import" (uploaded files) — the Added-via tag."""
     stats: dict[str, Any] = {
         "read": 0,
         "created": 0,
@@ -415,6 +416,7 @@ def import_jobs(
             stats["skipped"] += 1
             stats["errors"].append({"row": n, "error": "title and company are required"})
             continue
+        data.origin = origin
         if data.url and (len(owners.get(data.url, set())) > 1 or is_listing_url(data.url)):
             data.url_identifies_job = False
             stats["listing_urls"] += 1

@@ -147,6 +147,7 @@ class JobOut(BaseModel):
     source: str
     source_url: str | None
     sources: list[str] = Field(default_factory=list)
+    added_via: list[str] = Field(default_factory=list)
     location: str | None
     locations: list[str]
     work_model: str

@@ -350,7 +350,10 @@ Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). T
 new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
 Applied+Recruiter contacted+Screening · interview · selected = Offer+Accepted · rejected ·
 not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).
-Counts: `GET /api/v1/jobs/status-counts` (same filters as the list). Inside a tab the Status
+Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).
+Every job has `added_via` (list, in arrival order): `manual` | `sheet` | `scanner` | `career_ops` |
+`file`, set by `ingest_job` from `JobInput.origin` (`manual`, `sheet`, `scan`, `career_ops`,
+`import`); filter with `GET /api/v1/jobs?added_via=<tag>`. New import paths must pass the right origin. Inside a tab the Status
 filter is multi-select (`status=A&status=B`). API: `closed=true|false` separates closed jobs.
 Delete asks for confirmation; jobs with applications need `?force=true`.
 

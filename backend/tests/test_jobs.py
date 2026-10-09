@@ -473,3 +473,29 @@ def test_sort_by_every_column_both_ways(client: TestClient) -> None:
                  "created_at", "-created_at"):
         assert sorted(ids(sort)) == sorted([a["id"], b["id"]])
     assert client.get("/api/v1/jobs", params={"sort": "bogus"}).status_code == 422
+
+
+def test_added_via_tag_and_filter(client: TestClient) -> None:
+    manual = add(client)["job"]
+    assert manual["added_via"] == ["manual"]
+    sheet = client.post("/api/v1/sheets", json={
+        "url": "https://docs.google.com/spreadsheets/d/1iE8Xn7duwizMkvnJJMbfHWLL-DRbIpRlumH_P8aa7Co/edit",
+        "title": "Seen Jobs"}).json()
+    rows = [{"title": "Magento Developer", "company": "Beta Corp", "job_url": "https://jobs.lever.co/beta/1"},
+            # same posting as the manual job: merged, and now tagged with both
+            {"title": "Technical Lead - Adobe Commerce", "company": "Acme Commerce",
+             "job_url": "https://www.linkedin.com/jobs/view/4012345678/"}]
+    client.post(f"/api/v1/sheets/{sheet['id']}/import-rows",
+                json={"tabs": [{"tab": "T", "rows": rows}]})
+    jobs = {j["title"]: j for j in client.get("/api/v1/jobs").json()["items"]}
+    assert jobs["Magento Developer"]["added_via"] == ["sheet"]
+    assert jobs["Technical Lead - Adobe Commerce"]["added_via"] == ["manual", "sheet"]
+
+    def titles(via: str) -> set[str]:
+        items = client.get("/api/v1/jobs", params={"added_via": via}).json()["items"]
+        return {j["title"] for j in items}
+
+    assert titles("sheet") == {"Magento Developer", "Technical Lead - Adobe Commerce"}
+    assert titles("manual") == {"Technical Lead - Adobe Commerce"}
+    assert titles("scanner") == set()
+    assert client.get("/api/v1/jobs", params={"added_via": "bogus"}).status_code == 422

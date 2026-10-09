@@ -87,6 +87,27 @@ export function JobStatusBadge({ value }: { value: string | null | undefined }) 
   );
 }
 
+/** How a job came into the app (the "Added via" tag). */
+export const ADDED_VIA: Record<string, { label: string; cls: string }> = {
+  manual: { label: "Manual", cls: "bg-slate-100 text-slate-700 ring-slate-300" },
+  sheet: { label: "Google Sheet", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  scanner: { label: "Job scanner", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+  career_ops: { label: "Career-Ops", cls: "bg-violet-50 text-violet-700 ring-violet-200" },
+  file: { label: "File import", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
+};
+
+export function AddedViaTags({ values }: { values?: string[] | null }) {
+  if (!values?.length) return <span className="text-slate-400">—</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {values.map((v) => {
+        const t = ADDED_VIA[v] ?? { label: humanize(v), cls: "bg-slate-100 text-slate-600 ring-slate-200" };
+        return <span key={v} title={`Added via ${t.label}`} className={`whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${t.cls}`}>{t.label}</span>;
+      })}
+    </span>
+  );
+}
+
 export function scoreTone(score: number | null | undefined): keyof typeof TONES {
   if (score === null || score === undefined) return "gray";
   if (score >= 90) return "green";

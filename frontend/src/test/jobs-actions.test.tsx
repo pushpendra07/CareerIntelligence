@@ -96,3 +96,14 @@ describe("sorting and page size", () => {
     expect(screen.getByRole("combobox", { name: "Sort" })).toHaveValue("company"); // dropdown in sync
   });
 });
+
+describe("added via", () => {
+  it("shows how each job came in and filters by it", async () => {
+    const api = mockApi({ "GET /jobs": page([{ ...JOB, added_via: ["scanner", "sheet"] }]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    expect(await screen.findByTitle("Added via Job scanner")).toHaveTextContent("Job scanner");
+    expect(screen.getByTitle("Added via Google Sheet")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Added via" }), "career_ops");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("added_via")).toBe("career_ops");
+  });
+});

@@ -67,7 +67,7 @@ def _import_tab(db: Session, label: str, rows: list[dict[str, Any]]) -> dict[str
         return {"kind": None, "read": 0, "created": 0, "merged": 0, "errors": 0}
     kind = detect_kind(rows)
     if kind == "jobs":
-        stats = data_io.import_jobs(db, rows, label)
+        stats = data_io.import_jobs(db, rows, label, origin="sheet")
         return {"kind": kind, "read": stats["read"], "created": stats["created"],
                 "merged": stats["merged"], "deleted_skipped": stats.get("deleted_skipped", 0),
                 "errors": len(stats["errors"])}

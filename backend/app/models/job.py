@@ -128,6 +128,10 @@ class Job(TimestampMixin, Base):
     )
 
     # Career-Ops' own evaluation, preserved as-is (never converted into match_score).
+    # How the job came in, in order: manual | sheet | scanner | career_ops | file.
+    added_via: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
     career_ops_score: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
     career_ops_evaluation: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     career_ops_report: Mapped[str | None] = mapped_column(String(500))

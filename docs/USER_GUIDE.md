@@ -170,6 +170,9 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - Filters: search, minimum score, status (multi-select inside a tab) and sort are always shown;
   **More filters** opens recommendation, company tier, technology, location, work model, source,
   posted after, your years, applied or not and outdated scores. 20 jobs per page.
+- **Added via** tag on every job — how it came into the app: **Manual** (Add Job),
+  **Google Sheet**, **Job scanner**, **Career-Ops** or **File import**. A job found more than
+  one way shows several tags. Filter with **Added via** in the filter row.
 - **Sort by clicking a column title** (Score, Job, Company, Location, Exp, Salary, Posted,
   Status); click again to reverse. ▲/▼ shows the current order.
 - The **score legend** under the filters explains the colours (90+ excellent … below 60 poor),

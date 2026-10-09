@@ -90,9 +90,20 @@ class JobInput:
     recruiter_email: str | None = None
     status: JobStatus = JobStatus.NEW
     raw: dict[str, Any] = field(default_factory=dict)
-    origin: str = "manual"  # "manual" | "career_ops" | "import"
+    origin: str = "manual"  # "manual" | "sheet" | "import" | "career_ops" | "scan"
     # False for search/listing pages: kept as provenance, never used to identify the job.
     url_identifies_job: bool = True
+
+
+# JobInput.origin -> the "Added via" tag stored on the job.
+ADDED_VIA = {"manual": "manual", "sheet": "sheet", "import": "file", "career_ops": "career_ops",
+             "scan": "scanner"}
+
+
+def _tag_origin(job: Job, origin: str) -> None:
+    tag = ADDED_VIA.get(origin, origin)
+    if tag not in (job.added_via or []):
+        job.added_via = [*(job.added_via or []), tag]
 
 
 class DeletedJobError(Exception):
@@ -362,12 +373,13 @@ def ingest_job(
             raise DeletedJobError(f"'{deleted.title}' at {deleted.company_name} was deleted")
         db.delete(deleted)  # added again by hand: imports may update it from now on
     company = find_or_create_by_name(db, data.company_name)
-    manual = _manual_values(data) if data.origin in ("manual", "import") else {}
+    manual = _manual_values(data) if data.origin in ("manual", "import", "sheet") else {}
 
     existing, matched_by = find_duplicate(db, company, data, normalized, source, external_id)
     if existing is not None:
         job = existing
         _attach_source(job, source, data, normalized, external_id)
+        _tag_origin(job, data.origin)
         changed = False
         if data.jd_text.strip() and not job.original_jd.strip():
             job.original_jd = data.jd_text
@@ -437,6 +449,7 @@ def ingest_job(
             setattr(job, name, value)
         db.add(job)
         _attach_source(job, source, data, normalized, external_id)
+        _tag_origin(job, data.origin)
         _apply_parsed(job, parse_jd(job.original_jd, title))
         job.seniority = job.seniority or detect_seniority(title)
         db.flush()
@@ -500,6 +513,7 @@ class JobFilters:
     salary_min: Decimal | None = None
     status: list[str] | None = None
     closed: bool | None = None  # True: only closed positions; False: hide them
+    added_via: str | None = None  # manual | sheet | scanner | career_ops | file
     stale: bool | None = None
     has_application: bool | None = None
     sort: str = "-match_score"
@@ -591,6 +605,8 @@ def filtered_jobs(f: JobFilters) -> Select[Any]:
         stmt = stmt.where(or_(Job.salary_max.is_(None), Job.salary_max >= f.salary_min))
     if f.status:
         stmt = stmt.where(Job.status.in_(f.status))
+    if f.added_via:
+        stmt = stmt.where(Job.added_via.contains(cast([f.added_via], JSONB)))
     if f.closed is not None:
         closed = Job.status == JobStatus.CLOSED.value
         stmt = stmt.where(closed if f.closed else ~closed)

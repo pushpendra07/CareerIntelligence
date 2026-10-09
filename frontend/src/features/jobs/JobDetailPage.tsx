@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, JobStatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
 import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
 import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
 import { DeleteJobButton } from "./DeleteJobButton";
@@ -130,6 +130,7 @@ export function JobDetailPage() {
             {j.company.tier && <StatusBadge value={j.company.tier} />}
             <StatusBadge value={j.company.verification_status} />
             <ScoreBadge score={j.match_score} stale={j.score_stale} />
+            <span className="text-xs text-slate-500">Added via</span> <AddedViaTags values={j.added_via} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

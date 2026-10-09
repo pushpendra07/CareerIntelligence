@@ -170,7 +170,7 @@ def import_google_sheet(db: DB, body: SheetImportIn) -> dict[str, Any]:
     kind = detect_kind(rows) if body.kind == "auto" else body.kind
     label = body.label or "Google Sheet"
     if kind == "jobs":
-        return {"kind": kind, **data_io.import_jobs(db, rows, label)}
+        return {"kind": kind, **data_io.import_jobs(db, rows, label, origin="sheet")}
     summary = import_records(db, records_from_rows(rows, "google_sheet"), "google_sheet")
     return {"kind": kind, **vars(summary)}
 

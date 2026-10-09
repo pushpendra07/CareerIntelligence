@@ -23,6 +23,7 @@ export interface Job {
   source: string;
   source_url: string | null;
   sources: string[];
+  added_via?: string[];
   location: string | null;
   locations: string[];
   work_model: string;
