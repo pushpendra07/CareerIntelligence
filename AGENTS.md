@@ -199,6 +199,10 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 - Add a sheet: paste its URL in the panel (or `POST /api/v1/sheets {"url", "title"}`).
 - Column names are matched flexibly (Job Title/title, Company, Location, Application Link/
   job_url, Status, Match Score, notes…). Company tabs (Company Name, Careers URL) import companies.
+- The two saved sheets, their tabs (Seen Jobs · Job Tracker · Tracked Jobs · Target Companies),
+  every accepted column and the status mapping: `docs/google-sheets.md`.
+- Companies imported from a sheet are **not** searched for jobs until they have a verified job
+  board and job search on — `.agent/workflows/add-company-for-scanning.md`.
 
 ## Other ways to add data
 
@@ -235,6 +239,25 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 | "relation … does not exist" | Migrations not applied: restart (start.sh runs `alembic upgrade head`) |
 | Scores look outdated (yellow *stale*) | Re-analyze from the Dashboard |
 | A job keeps coming back after delete | It shouldn't: deleted jobs are remembered; only Add Job re-adds them |
+
+## Companies and scan coverage
+
+**Which companies are searched for jobs** (exact list, boards, URLs): `docs/scan-coverage.md`.
+Summary on 2026-10-09: 40 companies are scanned — 36 by the built-in scanner (Greenhouse 12,
+SmartRecruiters 10, Lever 4, Workday 3, Ashby 3, Teamtailor 3, Pinpoint 1) and 4 only by
+Career-Ops (HCLTech, Wipro, Birlasoft on SuccessFactors; Zensar on Oracle Cloud). About 80
+tracked companies can't be scanned (own careers site or unsupported system).
+
+A company is searched by the built-in scanner only when **both** are true:
+1. `job_search_enabled` is on (Companies → company → *Job search* checkbox), and
+2. its careers URL is a **supported job board** (see the board table in `docs/scan-coverage.md`).
+
+Check one company: `GET /api/v1/scanner/companies/{id}/board` (`null` = not scannable).
+
+**Adding companies is not the goal — jobs are.** When asked to add companies, follow
+`.agent/workflows/add-company-for-scanning.md`: find and verify the real job board, save it
+with job search on, confirm it is scannable, scan it, and report the jobs found. When asked to
+search for jobs, follow `.agent/workflows/find-jobs.md` and deliver a ranked list of real postings.
 
 ## Checks (run all before saying work is done)
 
@@ -275,7 +298,8 @@ frontend/src/
   api/client.ts             fetch wrapper (api.get/post/patch/put/delete, ApiError)
   features/<area>/          one folder per page area (jobs, companies, scanner, sheets, …)
   test/                     Vitest tests + utils.tsx (renderAt, mockApi)
-docs/                       ARCHITECTURE.md, API.md, career-ops-assessment.md, company-sources.md
+docs/                       ARCHITECTURE.md, API.md, scan-coverage.md, google-sheets.md,
+                            career-ops-assessment.md, company-sources.md
 start.sh / stop.sh / dev.sh run scripts
 ```
 
@@ -309,6 +333,7 @@ Changing profile, preferences, CVs or scoring config marks scores **stale**;
 - Google Sheets (`integrations/saved_sheets.py`): saved sheets in Settings. Public sheets import
   directly; private sheets are imported by an agent that reads rows with a Google connector and
   POSTs them to `/api/v1/sheets/{id}/import-rows` (see `.agent/workflows/import-google-sheets.md`).
+  Sheets, tabs, columns and row mappings for jobs **and** companies: `docs/google-sheets.md`.
 - CSV/JSON uploads and Add Job (manual).
 
 **Jobs UI**: Open jobs and Closed positions are separate tabs (`/jobs`, `/jobs/closed`;

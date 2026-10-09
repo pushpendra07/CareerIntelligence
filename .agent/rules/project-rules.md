@@ -21,3 +21,9 @@ Full guide: `AGENTS.md` at the repo root. Read it before making changes.
 - No browser `alert/confirm/prompt` in the UI; use inline confirmations.
 - Before saying work is done, run the checks in `.agent/workflows/run-checks.md` and report
   real results.
+- When asked to find/search jobs, deliver real job postings (title, company, score, link) using
+  `.agent/workflows/find-jobs.md` — not just a list of companies. Never invent jobs or links.
+- When adding companies, make them scannable (verified job-board URL + job search on) and scan
+  them: `.agent/workflows/add-company-for-scanning.md`. Coverage list: `docs/scan-coverage.md`.
+- Importing from Google Sheets: `.agent/workflows/import-google-sheets.md` and
+  `docs/google-sheets.md`. Never edit the sheets; never commit sheet IDs or sheet contents.
