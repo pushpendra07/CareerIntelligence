@@ -15,7 +15,6 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-164_backend_·_31_frontend-brightgreen)
 
-[Screenshots](#-screenshots) ·
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
 [How matching works](#-how-the-0100-match-score-works) ·
@@ -51,37 +50,6 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **AI is optional.** Parsing, scoring and interview prep work without any API key.
 - **Finds jobs itself.** A built-in scanner searches the Greenhouse, Lever, Ashby, Workday… boards of companies you track.
 - **Optionally works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it.
-
----
-
-## 📸 Screenshots
-
-> Real screens from a running instance. Personal details (applications, follow-ups, notes,
-> sheet links) are blurred.
-
-**Dashboard**: a getting-started checklist, your numbers, best new matches with one-click
-Shortlist / Not relevant, what's coming up and where jobs came from.
-
-![Dashboard](docs/screenshots/dashboard.jpg)
-
-**Jobs**: status tabs with counts, filters (including *Added via*), a score legend and sortable
-columns. Every job is scored 0–100 against your profile.
-
-![Jobs list](docs/screenshots/jobs.jpg)
-
-**Job detail**: the explainable score: nine components, each with the reason behind it.
-
-![Job detail with score breakdown](docs/screenshots/job-detail.jpg)
-
-**Improve your CV**: skills you have that your CV doesn't mention, and skills your jobs ask
-for that you lack, with one-click actions.
-
-![Improve your CV](docs/screenshots/improve-cv.jpg)
-
-**Settings**: the built-in job scanner (Greenhouse, Lever, Workday, SmartRecruiters…) and saved
-Google Sheets.
-
-![Settings: job scanner and Google Sheets](docs/screenshots/settings.jpg)
 
 ---
 
