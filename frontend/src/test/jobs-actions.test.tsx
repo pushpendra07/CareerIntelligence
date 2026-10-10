@@ -48,7 +48,7 @@ describe("status multi-select", () => {
     const cleared = listUrls(api.fn).at(-1)!.searchParams.getAll("status");
     expect(cleared).toContain("NEW");
     expect(cleared).not.toContain("NOT_RELEVANT"); // hidden unless picked
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except Not relevant");
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except applied, rejected, not relevant");
   });
 });
 

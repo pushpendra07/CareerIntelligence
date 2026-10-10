@@ -82,7 +82,7 @@ function SortHeader({ extra, ...props }: SortProps & { extra?: ReactNode }) {
 }
 
 /** Shown only when picked in the Status filter (or in their own tab), like Closed jobs. */
-export const HIDDEN_BY_DEFAULT = ["NOT_RELEVANT"];
+export const HIDDEN_BY_DEFAULT = ["APPLIED", "REJECTED", "NOT_RELEVANT"];
 
 /** The statuses a tab lists when no status is picked. */
 export const defaultStatuses = (tab: { key: string; statuses: string[] }) =>
@@ -182,7 +182,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 70)" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
           {tab.statuses.length > 1 ? <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
-            emptyLabel={tab.key === "all" ? "All except Not relevant" : "All statuses"} /> : <span className="hidden lg:block" />}
+            emptyLabel={tab.key === "all" ? "All except applied, rejected, not relevant" : "All statuses"} /> : <span className="hidden lg:block" />}
           <select className="input" aria-label="Added via" value={params.get("added_via") ?? ""} onChange={(e) => set("added_via", e.target.value)}
             title="How the job came into the app">
             <option value="">Added via: any</option>
