@@ -55,7 +55,7 @@ export const SORT_OPTIONS: [string, string][] = [
   ["company", "Company A–Z"], ["-company", "Company Z–A"], ["location", "Location A–Z"],
   ["-location", "Location Z–A"], ["experience", "Least experience"], ["-experience", "Most experience"],
   ["-salary", "Highest salary"], ["salary", "Lowest salary"], ["status", "Status (pipeline order)"],
-  ["-status", "Status (reverse)"],
+  ["-status", "Status (reverse)"], ["-id", "Job ID (newest first)"], ["id", "Job ID (oldest first)"],
 ];
 
 type SortProps = { label: string; field: string; first: "asc" | "desc"; sort: string; onSort: (v: string) => void };
@@ -233,6 +233,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>
+                  <SortHeader label="ID" field="id" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Score" field="match_score" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
                     extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
@@ -247,6 +248,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
                     <tr key={j.id} className="hover:bg-slate-50">
+                      <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
                       <td className="td">
                         <Link to={`/jobs/${j.id}`} className="font-medium text-slate-800 hover:text-indigo-700">{j.title}</Link>

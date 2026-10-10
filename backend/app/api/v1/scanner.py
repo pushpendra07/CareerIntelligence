@@ -33,6 +33,8 @@ class RunIn(BaseModel):
 @router.get("/status")
 def status(db: DB) -> dict[str, Any]:
     """Which companies the scanner covers, and the latest runs."""
+    disabled = db.scalars(select(Company).where(Company.job_search_enabled.is_(False)))
+    ready_off = [c for c in disabled if service.board_for(c)]
     enabled = list(db.scalars(select(Company).where(Company.job_search_enabled.is_(True))))
     boards = {c.id: service.board_for(c) for c in enabled}
     by_provider = Counter(b.provider for b in boards.values() if b)
@@ -49,7 +51,21 @@ def status(db: DB) -> dict[str, Any]:
         "running": _run_out(running) if running else None,
         "last_run": _run_out(last) if last else None,
         "settings": service.scanner_settings(db),
+        # Companies whose job board is known but that aren't searched yet (Job search off).
+        "boards_not_searched": [{"id": c.id, "name": c.name} for c in ready_off],
     }
+
+
+@router.post("/enable-found")
+def enable_found(db: DB) -> dict[str, Any]:
+    """Turn on Job search for every company whose job board is known."""
+    turned_on = []
+    for c in db.scalars(select(Company).where(Company.job_search_enabled.is_(False))):
+        if service.board_for(c):
+            c.job_search_enabled = True
+            turned_on.append(c.name)
+    db.commit()
+    return {"enabled": len(turned_on), "companies": turned_on}
 
 
 @router.post("/run")

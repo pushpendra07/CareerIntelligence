@@ -49,3 +49,19 @@ describe("company jobs", () => {
     expect(last.searchParams.get("has_jobs")).toBe("true");
   });
 });
+
+describe("company id", () => {
+  it("shows the company ID and sorts by it", async () => {
+    const api = mockApi({
+      "GET /companies": { items: [{ id: 3, name: "Acme", tier: null, verification_status: "VERIFIED", verification_score: 80,
+        india_presence: null, india_locations: [], careers_url: null, ats_provider: null, hiring_status: "UNKNOWN",
+        job_search_enabled: false, company_type: null, industry: null, job_count: 0, open_job_count: 0 }], total: 1, page: 1, size: 10 },
+      "GET /companies/stats": {},
+    });
+    renderAt(<CompaniesPage />, { path: "/companies", route: "/companies" });
+    expect(await screen.findByTitle("Company ID")).toHaveTextContent("#3");
+    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    const last = new URL(String(api.fn.mock.calls.filter((c) => String(c[0]).includes("/companies?")).at(-1)![0]), "http://x");
+    expect(last.searchParams.get("sort")).toBe("-id");
+  });
+});

@@ -81,6 +81,28 @@ The live list is `not_scannable` in `GET /api/v1/scanner/status`.
 For these: run **Find job boards** (may discover a linked board), add jobs from Google Sheets,
 or use **Add Job** with the posting URL + description. Don't invent board URLs.
 
+## How Find job boards works (Settings → Job scanner)
+
+For every company the scanner can't read yet, in this order (first match wins, each checked live):
+
+1. **Careers page from the website** — if a company has a website but no careers URL, the careers
+   link on its homepage is saved (PARTIALLY_VERIFIED, source "careers_link").
+2. **Career-Ops' list** — `career-ops/portals.yml` naming the company's job system.
+3. **Links on the careers page** — to Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable,
+   Recruitee, Pinpoint, Teamtailor, Oracle Cloud or SuccessFactors.
+4. **SuccessFactors on the company's own domain** (e.g. careers.wipro.com) — confirmed by its job
+   listing endpoint answering.
+5. **Job data on the careers page** — schema.org `JobPosting` on the page or on the job pages it
+   links to; the scanner then reads the company's own site (provider `CAREERS_PAGE`).
+6. **Name on job-board listings** — the company name on Greenhouse, Workable, SmartRecruiters,
+   Recruitee (accepted only if the board's own name matches the company), Lever, Ashby, Pinpoint
+   (accepted only if their jobs name the company or its domain).
+
+Found boards are saved on the company (`attributes.scanner_board`: provider, method, evidence URL).
+Companies with a known board but **Job search** off are listed in the scanner panel with
+**Turn on job search for them**. Companies that only post on LinkedIn/Naukri, or with no website and
+no careers URL, still can't be scanned — use Add Job or Google Sheets.
+
 ## Supported job boards (built-in scanner)
 
 | Board | Careers URL looks like | Public API used (check it returns jobs before saving) |
@@ -94,3 +116,6 @@ or use **Add Job** with the posting URL + description. Don't invent board URLs.
 | Recruitee | `<slug>.recruitee.com` | `https://<slug>.recruitee.com/api/offers/` |
 | Pinpoint | `<slug>.pinpointhq.com` | `https://<slug>.pinpointhq.com/postings.json` |
 | Teamtailor | `<slug>.teamtailor.com` or the company's own careers domain | `https://<careers-domain>/jobs.rss` |
+| SAP SuccessFactors | `*.successfactors.com/eu`, `*.jobs2web.com`, or own domain | `GET <base>/tile-search-results/?startrow=0` (older sites) or `POST <base>/services/recruiting/v1/jobs` (newer); descriptions from each job page's JobPosting data |
+| Oracle Cloud HCM | `<tenant>.fa.<region>.oraclecloud.com/hcmUI/CandidateExperience/<lang>/sites/<site>` | `GET https://<host>/hcmRestApi/resources/latest/recruitingCEJobRequisitions?...finder=findReqs;siteNumber=<site>` |
+| Own careers page | any page with schema.org `JobPosting` (on it or on its job pages) | the page itself |

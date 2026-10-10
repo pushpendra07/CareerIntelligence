@@ -186,12 +186,15 @@ merged, never duplicated; jobs the user deleted are skipped.
 
 Searches the public job boards of companies marked **Job search** in the Companies list
 (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee, Pinpoint,
-Teamtailor). Takes 1–3 minutes. No keys, no tokens.
+Teamtailor, SAP SuccessFactors, Oracle Cloud) and company careers pages that publish
+schema.org `JobPosting` data. Takes 1–3 minutes. No keys, no tokens.
 
 - **Scan now:** Settings → Job scanner → Scan now (or `POST /api/v1/scanner/run`, body `{}`).
 - **One company:** company page → **Scan jobs** (`POST /api/v1/scanner/companies/{id}/scan`).
-- **Find job boards:** Settings → Job scanner → Find job boards — reads careers pages to find a
-  supported board for companies that only have a careers URL.
+- **Find job boards:** Settings → Job scanner → Find job boards — for every company not yet
+  scannable: careers link from the website, Career-Ops' list, board links on the careers page,
+  SuccessFactors on own domains, JobPosting data, and the name on job-board listings (verified).
+  Methods and rules: `docs/scan-coverage.md`. Then **Turn on job search for them** for found boards.
 - **Which companies:** tick **Job search** on a company page. A company is scannable when its
   careers URL is (or links to) a supported board; the panel lists the ones that aren't.
 - **Filters:** Settings → Job scanner → *What to keep*: titles to keep, generic titles (kept

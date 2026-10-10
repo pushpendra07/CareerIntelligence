@@ -141,6 +141,7 @@ def job_filters(
         "-match_score", "match_score", "title", "-title", "company", "-company",
         "location", "-location", "experience", "-experience", "salary", "-salary",
         "posting_date", "-posting_date", "status", "-status", "created_at", "-created_at",
+        "id", "-id",
     ] = "-match_score",
 ) -> JobFilters:
     return JobFilters(

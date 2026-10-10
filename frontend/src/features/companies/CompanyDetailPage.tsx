@@ -52,7 +52,7 @@ export function CompanyDetailPage() {
       <BackButton fallback="/companies" label="Back to companies" />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1>{co.name}</h1>
+          <h1>{co.name} <span className="text-base font-normal text-slate-400" title="Company ID">#{co.id}</span></h1>
           <div className="mt-1 flex flex-wrap gap-2 text-sm"><StatusBadge value={co.verification_status} /><Badge>score {co.verification_score}</Badge>{co.tier && <StatusBadge value={co.tier} />}</div>
           {co.aliases.length > 0 && <p className="mt-1 text-xs text-slate-500">Also known as: {co.aliases.join(", ")}</p>}
         </div>

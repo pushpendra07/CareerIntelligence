@@ -68,7 +68,7 @@ export function CompaniesPage() {
             <option value="">Jobs: any</option><option value="true">Has jobs in the app</option><option value="false">No jobs yet</option>
           </select>
           <select className="input" aria-label="Sort companies" value={params.get("sort") ?? "name"} onChange={(e) => set("sort", e.target.value)}>
-            <option value="name">Name</option><option value="-jobs">Most jobs</option><option value="-verification_score">Verification score</option><option value="tier">Tier</option><option value="-updated_at">Recently updated</option>
+            <option value="name">Name</option><option value="-jobs">Most jobs</option><option value="-id">Company ID (newest first)</option><option value="id">Company ID (oldest first)</option><option value="-verification_score">Verification score</option><option value="tier">Tier</option><option value="-updated_at">Recently updated</option>
           </select>
         </div>
       </Card>
@@ -79,10 +79,15 @@ export function CompaniesPage() {
           {!data.items.length ? <Empty>No companies found.</Empty> : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
-                <thead><tr><th className="th">Company</th><th className="th" title="Jobs for this company in Career Intelligence">Jobs</th><th className="th">Tier</th><th className="th">Verification</th><th className="th">India</th><th className="th">Careers</th><th className="th">Hiring</th><th className="th">Search</th></tr></thead>
+                <thead><tr><th className="th" aria-sort={params.get("sort") === "id" ? "ascending" : params.get("sort") === "-id" ? "descending" : "none"}>
+                  <button type="button" aria-label="Sort by id" className={`uppercase tracking-wide hover:text-indigo-700 ${(params.get("sort") ?? "").endsWith("id") ? "text-indigo-700" : ""}`}
+                    onClick={() => set("sort", params.get("sort") === "-id" ? "id" : "-id")}>
+                    ID{params.get("sort") === "id" ? " ▲" : params.get("sort") === "-id" ? " ▼" : " ↕"}
+                  </button></th><th className="th">Company</th><th className="th" title="Jobs for this company in Career Intelligence">Jobs</th><th className="th">Tier</th><th className="th">Verification</th><th className="th">India</th><th className="th">Careers</th><th className="th">Hiring</th><th className="th">Search</th></tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50">
+                      <td className="td text-xs tabular-nums text-slate-500" title="Company ID">#{c.id}</td>
                       <td className="td"><Link className="font-medium hover:text-indigo-700" to={`/companies/${c.id}`}>{c.name}</Link><div className="text-xs text-slate-500">{c.company_type ?? c.industry ?? ""}</div></td>
                       <td className="td text-sm">
                         {c.job_count ? (

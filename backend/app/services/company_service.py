@@ -178,6 +178,8 @@ SORTS: dict[str, Any] = {
     "-verification_score": Company.verification_score.desc(),
     "tier": Company.tier.asc().nulls_last(),
     "-updated_at": Company.updated_at.desc(),
+    "id": Company.id.asc(),
+    "-id": Company.id.desc(),
 }
 
 

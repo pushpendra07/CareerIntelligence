@@ -499,3 +499,13 @@ def test_added_via_tag_and_filter(client: TestClient) -> None:
     assert titles("manual") == {"Technical Lead - Adobe Commerce"}
     assert titles("scanner") == set()
     assert client.get("/api/v1/jobs", params={"added_via": "bogus"}).status_code == 422
+
+
+def test_sort_by_job_id(client: TestClient) -> None:
+    a = add(client)["job"]
+    b = add(client, title="Magento Developer", company="Beta Corp",
+            url="https://jobs.lever.co/beta/2")["job"]
+    def ids(sort: str) -> list[int]:
+        return [j["id"] for j in client.get("/api/v1/jobs", params={"sort": sort}).json()["items"]]
+
+    assert ids("id") == [a["id"], b["id"]] and ids("-id") == [b["id"], a["id"]]

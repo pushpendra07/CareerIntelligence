@@ -354,3 +354,14 @@ def test_company_job_counts_filter_and_sort(client: TestClient) -> None:
     first = client.get("/api/v1/companies", params={"sort": "-jobs"}).json()["items"][0]
     assert first["name"] == "Acme Jobs Co"
     assert client.get(f"/api/v1/companies/{acme['id']}").json()["job_count"] == 2
+
+
+def test_sort_companies_by_id(client: TestClient) -> None:
+    a = client.post("/api/v1/companies", json={"name": "Zeta Sort Co"}).json()
+    b = client.post("/api/v1/companies", json={"name": "Alpha Sort Co"}).json()
+
+    def ids(sort: str) -> list[int]:
+        rows = client.get("/api/v1/companies", params={"sort": sort, "q": "Sort Co"}).json()
+        return [c["id"] for c in rows["items"]]
+
+    assert ids("id") == [a["id"], b["id"]] and ids("-id") == [b["id"], a["id"]]

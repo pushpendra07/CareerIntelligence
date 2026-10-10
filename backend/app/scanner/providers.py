@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 from app.core.html_text import html_to_text
 from app.core.http import FetchResult
@@ -97,10 +97,59 @@ _IGNORED_SLUGS = {"embed", "v1", "boards", "jobs", "api", "www", "careers", "app
                   "help", "support", "status", "blog", "docs", "login", "signup"}
 
 
+_ORACLE = re.compile(
+    r"https?://([a-z0-9-]+\.fa\.(?:[a-z0-9-]+\.)?(?:ocs\.)?oraclecloud(?:[1-9][0-9]?)?\.com)"
+    r"(/[^\s\"'<>]*)?", re.IGNORECASE)
+_SUCCESSFACTORS = re.compile(r"https?://([a-z0-9.-]*(?:successfactors\.(?:eu|com)|jobs2web\.com))"
+                             r"(/[^\s\"'<>?#]*)?", re.IGNORECASE)
+
+
+def _sf_career_site(host: str, path: str) -> bool:
+    """A SuccessFactors career site, not a script/style file on a SuccessFactors server."""
+    if re.search(r"\.(js|css|png|jpe?g|gif|svg|ico|woff2?)$", path, re.IGNORECASE):
+        return False
+    return "jobs2web" in host.lower() or bool(re.search(r"career|/job|/search", path, re.I))
+
+
+def oracle_board(url: str) -> Board | None:
+    m = _ORACLE.search(url)
+    if not m:
+        return None
+    host, path = m.group(1).lower(), m.group(2) or ""
+    segs = [x for x in path.split("/") if x]
+
+    def after(name: str, default: str) -> str:
+        i = segs.index(name) + 1 if name in segs else len(segs)
+        return segs[i] if i < len(segs) else default
+
+    site, lang = after("sites", "CX_1"), after("CandidateExperience", "en")
+    return Board("ORACLE", host, f"https://{host}/hcmUI/CandidateExperience/{lang}/sites/{site}",
+                 {"host": host, "site": site, "lang": lang})
+
+
+def successfactors_board(url: str) -> Board:
+    """SAP SuccessFactors career sites, including ones on the company's own domain."""
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    path = re.sub(r"/(?:search|tile-search-results|services/recruiting/v1/jobs)/?$", "",
+                  re.sub(r"/go/[^/]+/\d+(?:/\d+)?/?$", "", parts.path or "")).rstrip("/")
+    base = f"https://{parts.hostname}{path}"
+    return Board("SUCCESSFACTORS", parts.hostname or "", base, {"base": base})
+
+
+def careers_page_board(url: str) -> Board:
+    """A company's own careers page that publishes JobPosting data (no job board)."""
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    return Board("CAREERS_PAGE", parts.hostname or "", url, {})
+
+
 def resolve_board(url: str | None) -> Board | None:
     """Find a supported job board in a careers URL (or a link found on a careers page)."""
     if not url:
         return None
+    if board := oracle_board(url):
+        return board
+    if (m := _SUCCESSFACTORS.search(url)) and _sf_career_site(m.group(1), m.group(2) or ""):
+        return successfactors_board(url)
     if m := _WORKDAY.search(url):
         tenant, wd, site = m.groups()
         return Board("WORKDAY", tenant, f"https://{tenant}.{wd}.myworkdayjobs.com/{site}",
@@ -329,12 +378,177 @@ def _date_rfc822(value: str | None) -> date | None:
         return None
 
 
+# --- SAP SuccessFactors -------------------------------------------------------------------------
+
+_TILE_RE = re.compile(r'<li class="job-tile job-id-(\d+)\b[\s\S]*?</li>')
+
+
+def _sf_tiles(html: str, origin: str) -> list[ScannedJob]:
+    out = []
+    for m in _TILE_RE.finditer(html):
+        block = m.group(0)
+        url_m = re.search(r'data-url="([^"]+)"', block)
+        title_m = re.search(r'class="jobTitle-link[^"]*"[^>]*>([\s\S]*?)</a>', block)
+        if not url_m or not title_m:
+            continue
+        title = html_to_text(title_m.group(1)).strip()
+        city_m = re.search(r'id="[^"]*-section-city-value">([\s\S]*?)</div>', block)
+        path = html_to_text(url_m.group(1)).strip()
+        url = path if path.startswith("http") else urljoin(origin + "/", path)
+        city = html_to_text(city_m.group(1)).strip() if city_m else None
+        if title:
+            out.append(ScannedJob(title=title, url=url, external_id=m.group(1), location=city,
+                                  needs_detail=True, detail_ref=url))
+    return out
+
+
+def successfactors(board: Board, http: Http) -> list[ScannedJob]:
+    base = board.extra["base"]
+    origin = f"https://{urlsplit(base).hostname}" if urlsplit(base).hostname else base
+    jobs: list[ScannedJob] = []
+    seen: set[str] = set()
+    start = 0
+    for _ in range(40):  # older "RMK" sites: HTML job tiles, 25 per page
+        res = http("GET", f"{base}/tile-search-results/?startrow={start}", None)
+        if res.status != 200:
+            break
+        tiles = [t for t in _sf_tiles(res.text, origin) if t.external_id not in seen]
+        if not tiles:
+            break
+        for t in tiles:
+            seen.add(t.external_id or t.url)
+        jobs += tiles
+        start += len(tiles)
+        if len(jobs) >= 1000:
+            break
+    if jobs:
+        return jobs
+    # Newer "Career Site Builder" sites: JSON search API, 10 per page.
+    for page in range(100):
+        data = _json(http, "POST", f"{base}/services/recruiting/v1/jobs",
+                     {"keywords": "", "locale": "en_US", "location": "", "pageNumber": page,
+                      "sortBy": "recent"})
+        rows = data.get("jobSearchResult") or []
+        for item in rows:
+            r = item.get("response") or {}
+            jid = str(r.get("id") or "")
+            title = html_to_text(str(r.get("unifiedStandardTitle") or r.get("jobTitle") or ""))
+            if not jid or not title or jid in seen:
+                continue
+            seen.add(jid)
+            slug = str(r.get("unifiedUrlTitle") or r.get("urlTitle") or "job")
+            url = f"{base}/job/{slug}/{jid}-en_US"
+            loc = r.get("jobLocationShort")
+            jobs.append(ScannedJob(
+                title=title.strip(), url=url, external_id=jid,
+                location=" / ".join(loc) if isinstance(loc, list) else (loc or None),
+                posted=_sf_date(r.get("unifiedStandardStart")), needs_detail=True, detail_ref=url))
+        total = int(data.get("totalJobs") or 0)
+        if len(rows) < 10 or (total and (page + 1) * 10 >= total):
+            break
+    return jobs
+
+
+def _sf_date(raw: object) -> date | None:
+    m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$", str(raw or "").strip())
+    if not m:
+        return None
+    month, day, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return date(year + 2000 if year < 100 else year, month, day)
+    except ValueError:
+        return None
+
+
+def page_detail(job: ScannedJob, http: Http) -> None:
+    """Description from the job page's JobPosting data (or its main text as a fallback)."""
+    from app.scanner.jsonld import job_postings, to_fields
+
+    res = http("GET", job.detail_ref or job.url, None)
+    if res.status != 200:
+        raise ProviderError(f"HTTP {res.status}")
+    postings = job_postings(res.text)
+    if postings:
+        f = to_fields(postings[0], job.url)
+        job.description = f["description"] or job.description
+        job.posted = f["posted"] or job.posted
+        job.location = job.location or f["location"]
+        job.remote = job.remote or f["remote"]
+        job.employment_type = job.employment_type or f["employment_type"]
+
+
+# --- Oracle Cloud (Fusion HCM Candidate Experience) ---------------------------------------------
+
+def oracle(board: Board, http: Http) -> list[ScannedJob]:
+    host, site, lang = board.extra["host"], board.extra["site"], board.extra.get("lang", "en")
+    jobs: list[ScannedJob] = []
+    for page in range(25):
+        offset = page * 200
+        finder = (f"findReqs;siteNumber={site},limit=200,sortBy=POSTING_DATES_DESC,offset={offset}")
+        url = (f"https://{host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
+               f"&expand=requisitionList.workLocation&finder={finder}&limit=200&offset={offset}")
+        data = _json(http, "GET", url)
+        item = (data.get("items") or [{}])[0]
+        rows = item.get("requisitionList") or []
+        for r in rows:
+            rid = str(r.get("Id") or r.get("RequisitionNumber") or "")
+            if not rid:
+                continue
+            wt = r.get("WorkplaceTypeCode")
+            jobs.append(ScannedJob(
+                title=str(r.get("Title") or "").strip(), external_id=rid,
+                url=r.get("ExternalURL") or
+                f"https://{host}/hcmUI/CandidateExperience/{lang}/sites/{site}/job/{rid}",
+                location=r.get("PrimaryLocation"), remote=wt == "ORA_REMOTE",
+                description=html_to_text(r.get("ShortDescriptionStr")),
+                posted=_date(r.get("PostedDate")), needs_detail=True,
+                detail_ref=(f"https://{host}/hcmRestApi/resources/latest/"
+                            f"recruitingCEJobRequisitionDetails?expand=all&onlyData=true"
+                            f'&finder=ById;Id="{rid}",siteNumber={site}')))
+        total = item.get("TotalJobsCount")
+        if not rows or (isinstance(total, int) and offset + 200 >= total) or len(rows) < 200:
+            break
+    return jobs
+
+
+def oracle_detail(job: ScannedJob, http: Http) -> None:
+    data = _json(http, "GET", job.detail_ref or "")
+    item = (data.get("items") or [{}])[0]
+    parts = [item.get(k) for k in ("ExternalDescriptionStr", "ExternalResponsibilitiesStr",
+                                   "ExternalQualificationsStr")]
+    text = "\n\n".join(html_to_text(p) for p in parts if p)
+    job.description = text or job.description
+
+
+# --- the company's own careers page (schema.org JobPosting) --------------------------------------
+
+def careers_page(board: Board, http: Http) -> list[ScannedJob]:
+    from app.scanner.jsonld import job_links, job_postings, to_fields
+
+    res = http("GET", board.url, None)
+    if res.status != 200:
+        raise ProviderError(f"careers page returned HTTP {res.status}")
+    found = [to_fields(p, board.url) for p in job_postings(res.text)]
+    if not found:  # listing page without data: open the job pages it links to
+        for link in job_links(res.text, board.url):
+            page = http("GET", link, None)
+            if page.status == 200:
+                found += [to_fields(p, link) for p in job_postings(page.text)]
+    jobs: dict[str, ScannedJob] = {}
+    for f in found:
+        if f["title"] and f["url"] not in jobs:
+            jobs[f["url"]] = ScannedJob(**f)
+    return list(jobs.values())
+
+
 PROVIDERS: dict[str, Callable[[Board, Http], list[ScannedJob]]] = {
     "GREENHOUSE": greenhouse, "LEVER": lever, "ASHBY": ashby, "SMARTRECRUITERS": smartrecruiters,
     "WORKDAY": workday, "PINPOINT": pinpoint, "RECRUITEE": recruitee, "WORKABLE": workable,
-    "TEAMTAILOR": teamtailor,
+    "TEAMTAILOR": teamtailor, "SUCCESSFACTORS": successfactors, "ORACLE": oracle,
+    "CAREERS_PAGE": careers_page,
 }
 DETAILS: dict[str, Callable[[ScannedJob, Http], None]] = {
     "SMARTRECRUITERS": smartrecruiters_detail, "WORKDAY": workday_detail,
+    "SUCCESSFACTORS": page_detail, "ORACLE": oracle_detail,
 }
 SUPPORTED = sorted(PROVIDERS)

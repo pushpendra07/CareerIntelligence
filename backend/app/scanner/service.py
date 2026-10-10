@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.companies.verification import Claim, _usable, add_claim, recompute
 from app.core.errors import ConflictError
-from app.core.http import BlockedURLError, FetchResult, safe_get, safe_request
+from app.core.http import BlockedURLError, FetchResult, safe_request
 from app.core.urls import JobSource
 from app.models.company import Company, SourceKind, VerificationStatus
 from app.models.job import JobStatus
@@ -54,7 +54,12 @@ def scanner_settings(db: Session) -> dict[str, Any]:
 
 
 def board_for(company: Company) -> Board | None:
-    """The first supported job board among the company's usable careers URLs."""
+    """The company's job board: one saved by board discovery, else the first supported board
+    among its usable careers URLs."""
+    saved = (company.attributes or {}).get("scanner_board")
+    if isinstance(saved, dict) and saved.get("provider") and saved.get("url"):
+        return Board(str(saved["provider"]), str(saved.get("slug") or ""), str(saved["url"]),
+                     dict(saved.get("extra") or {}))
     urls = [s.value for s in _usable(company, "careers_url") if s.value]
     for url in urls:
         if board := resolve_board(url):
@@ -235,11 +240,29 @@ def detect_board_from_page(html: str) -> Board | None:
     return None
 
 
+def _detect_http(method: str, url: str, json_body: object | None = None) -> FetchResult:
+    return safe_request(method, url, json_body=json_body, timeout=15, max_bytes=3 * 1024 * 1024)
+
+
 def detect_boards(db: Session, company_ids: list[int] | None = None,
                   fetch: Any = None, trigger: str = "manual",
-                  run: ScanRun | None = None) -> ScanRun:
-    """Open each company's careers page and look for a linked/embedded supported job board."""
-    fetch = fetch or (lambda u: safe_get(u, timeout=20, max_bytes=3 * 1024 * 1024))
+                  run: ScanRun | None = None, http: Http | None = None) -> ScanRun:
+    """Find how each not-yet-scannable company publishes jobs (see scanner/discovery.py).
+
+    `fetch` (GET-only, kept for tests) or `http` (GET/POST) does the network calls.
+    """
+    from app.core.config import get_settings
+    from app.core.text import company_key
+    from app.core.urls import registrable_domain
+    from app.scanner import discovery
+
+    if http is None:
+        if fetch is not None:
+            def http(method: str, url: str, json_body: object | None = None) -> FetchResult:
+                return fetch(url) if method == "GET" else FetchResult(url, 405, "")
+        else:
+            http = _detect_http
+    hints = discovery.career_ops_hints(get_settings().career_ops_path)
     if run is None:
         run = ScanRun(kind="DETECT", trigger=trigger, stats={}, companies=[])
         db.add(run)
@@ -250,51 +273,68 @@ def detect_boards(db: Session, company_ids: list[int] | None = None,
     for company in db.scalars(stmt):
         if board_for(company):
             continue  # already scannable
-        urls = [s.value for s in _usable(company, "careers_url") if s.value]
-        if urls:
-            candidates.append((company.id, company.name, urls[0]))
+        careers = [s.value for s in _usable(company, "careers_url") if s.value]
+        websites = [s.value for s in _usable(company, "website") if s.value]
+        domains = [d for d in {registrable_domain(u) for u in [*careers, *websites]} if d]
+        candidates.append((company.id, company.name, careers[0] if careers else None,
+                           websites[0] if websites else None, domains,
+                           hints.get(company_key(company.name))))
 
-    def probe(item: tuple[int, str, str]) -> tuple[int, str, str, Board | None, str | None]:
-        cid, name, url = item
+    def probe(item: tuple[Any, ...]) -> dict[str, Any]:
+        cid, name, careers, website, domains, hint = item
+        out: dict[str, Any] = {"company_id": cid, "company": name, "careers_url": careers,
+                               "found_careers_url": None, "found": None, "error": None}
         try:
-            res = fetch(url)
+            if careers is None and website:
+                careers = discovery.find_careers_url(website, http)
+                out["found_careers_url"] = careers
+            found = (discovery.from_career_ops(hint) if hint else None)
+            if found is None and careers:
+                found = discovery.from_careers_page(careers, http, name)
+            if found is None:
+                found = discovery.probe_name(name, domains, http)
+            out["found"] = found
         except (BlockedURLError, OSError, ValueError) as exc:
-            return cid, name, url, None, str(exc)[:200]
-        if res.status != 200:
-            return cid, name, url, None, f"HTTP {res.status}"
-        board = detect_board_from_page(res.text)
-        if (board is None or board.provider == "TEAMTAILOR") and "teamtailor" in res.text.lower():
-            # Teamtailor career sites usually run on the company's own domain.
-            board = teamtailor_board(res.url)
-        return cid, name, url, board, None
+            out["error"] = str(exc)[:200]
+        return out
 
-    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    with ThreadPoolExecutor(max_workers=12) as pool:
         results = list(pool.map(probe, candidates))
-    rows, found = [], 0
+    rows, found_n, careers_n = [], 0, 0
+    methods: dict[str, int] = {}
     now = datetime.now(UTC)
-    for cid, name, url, board, error in results:
-        row = {"company_id": cid, "company": name, "careers_url": url,
-               "provider": board.provider if board else None,
-               "board": board.url if board else None, "error": error}
-        rows.append(row)
-        if board:
-            found += 1
-            target = db.get(Company, cid)
-            assert target is not None
-            add_claim(target, Claim("careers_url", board.url, SourceKind.OFFICIAL_ATS,
-                                     VerificationStatus.PARTIALLY_VERIFIED, "board_detection",
-                                     url, now, "Linked from the company's careers page"))
-            if board.provider == "TEAMTAILOR":
-                sheet = {**(target.attributes.get("google_sheet") or {}),
-                         "ats_platform": "Teamtailor"}
-                target.attributes = {**target.attributes, "google_sheet": sheet}
-            recompute(target)
-    run.stats = {"checked": len(candidates), "found": found,
-                 "errors": sum(1 for r in rows if r["error"])}
+    for r in results:
+        found = r.pop("found")
+        target = db.get(Company, r["company_id"])
+        assert target is not None
+        if r["found_careers_url"]:
+            careers_n += 1
+            add_claim(target, Claim("careers_url", r["found_careers_url"],
+                                     SourceKind.OFFICIAL_WEBSITE,
+                                     VerificationStatus.PARTIALLY_VERIFIED, "careers_link",
+                                     None, now, "Careers link on the company's website"))
+        if found is not None:
+            found_n += 1
+            methods[found.method] = methods.get(found.method, 0) + 1
+            board = found.board
+            target.attributes = {**(target.attributes or {}), "scanner_board": {
+                "provider": board.provider, "slug": board.slug, "url": board.url,
+                "extra": board.extra, "method": found.method, "evidence": found.evidence,
+                "found_at": now.isoformat()}}
+            if resolve_board(board.url):
+                add_claim(target, Claim("careers_url", board.url, SourceKind.OFFICIAL_ATS,
+                                         VerificationStatus.PARTIALLY_VERIFIED, "board_detection",
+                                         found.evidence, now, f"Job board found ({found.method})"))
+        recompute(target)
+        rows.append({**r, "provider": found.board.provider if found else None,
+                     "board": found.board.url if found else None,
+                     "method": found.method if found else None})
+    run.stats = {"checked": len(candidates), "found": found_n, "careers_urls_found": careers_n,
+                 "by_method": methods, "errors": sum(1 for r in rows if r["error"])}
     run.companies = rows
     run.status = "COMPLETED"
     run.finished_at = now
     record_activity(db, "scanner.boards_detected", "scan_run", run.id,
-                    f"Found job boards for {found} of {len(candidates)} companies", run.stats)
+                    f"Found job boards for {found_n} of {len(candidates)} companies", run.stats)
     db.commit()
     return run

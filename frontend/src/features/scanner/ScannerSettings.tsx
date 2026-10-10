@@ -36,6 +36,7 @@ interface ScannerStatus {
   scannable: number;
   by_provider: Record<string, number>;
   not_scannable: { id: number; name: string; careers_url: string | null }[];
+  boards_not_searched?: { id: number; name: string }[];
   running: ScanRun | null;
   last_run: ScanRun | null;
   settings: ScannerConfig;
@@ -59,10 +60,22 @@ export function num(v: unknown): number {
   return typeof v === "number" ? v : 0;
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  page_link: "linked from the careers page", career_ops: "from Career-Ops' list",
+  successfactors: "SuccessFactors sites", job_posting_data: "careers pages with job data",
+  name_probe: "matched by company name",
+};
+
 export function runSummary(run: ScanRun): string {
   const s = run.stats;
   if (typeof s.error === "string") return s.error;
-  if (run.kind === "DETECT") return `Found job boards for ${num(s.found)} of ${num(s.checked)} companies`;
+  if (run.kind === "DETECT") {
+    const how = (s.by_method ?? {}) as Record<string, number>;
+    const parts = Object.entries(how).map(([k, v]) => `${v} ${METHOD_LABELS[k] ?? k}`);
+    return `Found job boards for ${num(s.found)} of ${num(s.checked)} companies` +
+      (parts.length ? ` (${parts.join(", ")})` : "") +
+      (num(s.careers_urls_found) ? ` · found ${num(s.careers_urls_found)} careers pages on company websites` : "");
+  }
   return `${num(s.new)} new · ${num(s.updated)} updated · ${num(s.found)} postings checked at ${num(s.companies)} ${num(s.companies) === 1 ? "company" : "companies"}` +
     (num(s.errors) ? ` · ${num(s.errors)} board errors` : "");
 }
@@ -165,6 +178,10 @@ export function ScannerSettings() {
     mutationFn: (kind: "run" | "detect-boards") => api.post<ScanRun>(`/scanner/${kind}`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scanner"] }),
   });
+  const enableFound = useMutation({
+    mutationFn: () => api.post<{ enabled: number }>("/scanner/enable-found", {}),
+    onSuccess: () => qc.invalidateQueries(),
+  });
   const s = status.data;
   const [showRun, setShowRun] = useState(false);
   return (
@@ -197,10 +214,18 @@ export function ScannerSettings() {
             </div>
           )}
           {start.data?.kind === "DETECT" && !running && <DetectResult />}
+          {!!s.boards_not_searched?.length && (
+            <div className="flex flex-wrap items-center gap-2 rounded bg-amber-50 p-2 text-amber-900">
+              <span><b>{s.boards_not_searched.length}</b> companies have a known job board but <b>Job search</b> is off, so they aren't scanned.</span>
+              <button className="btn-secondary px-2 py-1 text-xs" disabled={enableFound.isPending} onClick={() => enableFound.mutate()}>
+                {enableFound.isPending ? "Turning on…" : "Turn on job search for them"}
+              </button>
+            </div>
+          )}
           {s.not_scannable.length > 0 && (
             <details>
               <summary className="cursor-pointer text-xs text-slate-600">{s.not_scannable.length} job-search companies without a supported board</summary>
-              <p className="mt-1 text-xs text-slate-500">Click <b>Find job boards</b>, or set the company's careers URL to its Greenhouse / Lever / Ashby / SmartRecruiters / Workday / Workable / Recruitee / Pinpoint / Teamtailor page.</p>
+              <p className="mt-1 text-xs text-slate-500">Click <b>Find job boards</b>: it looks for links to a job board, SuccessFactors / Oracle career sites, job data on the company's own careers pages, Career-Ops' list, and the company's name on the job boards' public listings. Companies whose openings are only on LinkedIn or Naukri can't be scanned — add those jobs with <b>Add Job</b> or a Google Sheet.</p>
               <ul className="mt-1 max-h-48 overflow-auto text-xs">
                 {s.not_scannable.map((c) => <li key={c.id}><Link className="link" to={`/companies/${c.id}`}>{c.name}</Link> <span className="text-slate-400">{c.careers_url ?? "no careers URL"}</span></li>)}
               </ul>
@@ -218,5 +243,5 @@ function DetectResult() {
   const runs = useQuery({ queryKey: ["scanner", "runs"], queryFn: () => api.get<ScanRun[]>("/scanner/runs?limit=5") });
   const last = runs.data?.find((r) => r.kind === "DETECT");
   if (!last) return null;
-  return <p className="rounded bg-emerald-50 p-2 text-emerald-800">{runSummary(last)}. Those companies are now included in Scan now.</p>;
+  return <p className="rounded bg-emerald-50 p-2 text-emerald-800">{runSummary(last)}. Companies with Job search on are now included in Scan now.</p>;
 }

@@ -109,3 +109,15 @@ describe("added via", () => {
     expect(listUrls(api.fn).at(-1)!.searchParams.get("added_via")).toBe("career_ops");
   });
 });
+
+describe("job id", () => {
+  it("shows the job ID and sorts by it", async () => {
+    const api = mockApi({ "GET /jobs": page([JOB]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    expect(await screen.findByTitle("Job ID")).toHaveTextContent("#7");
+    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-id");
+    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("id");
+  });
+});

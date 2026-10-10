@@ -38,7 +38,9 @@ def list_companies(
     job_search_enabled: bool | None = None,
     hiring_status: str | None = None,
     has_jobs: bool | None = None,
-    sort: Literal["name", "-verification_score", "tier", "-updated_at", "-jobs"] = "name",
+    sort: Literal[
+        "name", "-verification_score", "tier", "-updated_at", "-jobs", "id", "-id"
+    ] = "name",
 ) -> Page[CompanyOut]:
     items, total = company_service.list_companies(
         db,

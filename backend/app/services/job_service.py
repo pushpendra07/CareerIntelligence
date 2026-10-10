@@ -551,6 +551,8 @@ SORTS: dict[str, Any] = {
     "status": (STATUS_ORDER.asc(), Job.match_score.desc().nulls_last(), Job.id),
     "-status": (STATUS_ORDER.desc(), Job.match_score.desc().nulls_last(), Job.id.desc()),
     "created_at": (Job.created_at.asc(), Job.id),
+    "id": (Job.id.asc(),),
+    "-id": (Job.id.desc(),),
     "-created_at": (Job.created_at.desc(), Job.id.desc()),
 }
 

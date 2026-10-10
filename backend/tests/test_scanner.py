@@ -223,7 +223,8 @@ def test_detect_boards_from_careers_page(db: Session) -> None:
     cid = company(db, "Plain Co", "https://plain.example.com/careers")
     page = '<a href="https://jobs.lever.co/plainco">Open roles</a>'
     run = service.detect_boards(db, [cid], fetch=lambda url: FetchResult(url, 200, page))
-    assert run.stats == {"checked": 1, "found": 1, "errors": 0}
+    assert (run.stats["checked"], run.stats["found"], run.stats["errors"]) == (1, 1, 0)
+    assert run.stats["by_method"] == {"page_link": 1}
     target = service.scan_targets(db, [cid])
     assert [(b.provider, b.slug) for _, b in target] == [("LEVER", "plainco")]
 

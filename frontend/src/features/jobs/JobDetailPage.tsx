@@ -124,7 +124,7 @@ export function JobDetailPage() {
       {dup && <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">This job already existed — the new source was added to it (matched by {humanize((location.state as { matchedBy?: string }).matchedBy)}).</div>}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1>{j.title}</h1>
+          <h1>{j.title} <span className="text-base font-normal text-slate-400" title="Job ID">#{j.id}</span></h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <Link className="link" to={`/companies/${j.company.id}`}>{j.company.name}</Link>
             {j.company.tier && <StatusBadge value={j.company.tier} />}

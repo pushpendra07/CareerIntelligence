@@ -141,7 +141,9 @@ Sidebar → **Companies**.
 - A company is **scanned for jobs only if** *Job search* is on **and** its careers URL is a
   supported job board (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee,
   Pinpoint, Teamtailor). The company page shows **Job board: …** or *not detected*.
-  Settings → Job scanner → **Find job boards** looks for boards on careers pages automatically.
+  Settings → Job scanner → **Find job boards** finds boards automatically (careers links on the
+  website, SuccessFactors/Oracle sites, job data on own careers pages, the name on job boards),
+  then **Turn on job search for them** includes those companies in scans.
   Full list of scanned companies: [scan-coverage.md](scan-coverage.md).
 
 ## 6. Get jobs into the app
