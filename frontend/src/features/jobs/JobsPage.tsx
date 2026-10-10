@@ -9,7 +9,7 @@ import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
-  "source", "status", "posted_after", "experience", "sort", "stale", "has_application", "added_via"] as const;
+  "source", "status", "posted_after", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
 
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",

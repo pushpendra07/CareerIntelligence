@@ -125,6 +125,8 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
 
 Sidebar → **Companies**.
 
+- The list's **Jobs** column shows *open / total* jobs in the app per company; filter **Has jobs
+  in the app** and sort by **Most jobs**.
 - **Add** a company with the name box at the top, or bulk-import from research files
   (see README → *bulk-import companies*) or from a Google Sheet tab with a *Company Name* column.
 - On a company page:
@@ -133,7 +135,9 @@ Sidebar → **Companies**.
   - **Scan jobs** — search its job board now.
   - **Run verification check** — checks the website/careers/LinkedIn links really work.
   - **Verification evidence** — every value with its source and status; add evidence by hand.
-  - **Jobs**, **Recruiters** — everything linked to the company.
+  - **Jobs in Career Intelligence** (top of the page) — this company's jobs from every source: score,
+    status, location, Added via, posted date; *Open only* by default, 10 per page.
+  - **Recruiters** — people linked to the company.
 - A company is **scanned for jobs only if** *Job search* is on **and** its careers URL is a
   supported job board (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee,
   Pinpoint, Teamtailor). The company page shows **Job board: …** or *not detected*.

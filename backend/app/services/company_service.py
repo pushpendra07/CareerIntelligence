@@ -150,6 +150,29 @@ def import_records(db: Session, records: Iterable[CompanyRecord], source: str) -
 
 # --- queries ---------------------------------------------------------------------------------
 
+def _job_count() -> Any:
+    from app.models.job import Job
+
+    return (select(func.count(Job.id)).where(Job.company_id == Company.id)
+            .correlate(Company).scalar_subquery())
+
+
+# Jobs you're still pursuing: everything except closed / not relevant / rejected / withdrawn.
+INACTIVE_JOB_STATUSES = ("CLOSED", "NOT_RELEVANT", "REJECTED", "WITHDRAWN")
+
+
+def job_counts(db: Session, company_ids: list[int]) -> dict[int, tuple[int, int]]:
+    """company id -> (all jobs in the app, open jobs) for these companies."""
+    from app.models.job import Job
+
+    if not company_ids:
+        return {}
+    open_ = func.count(Job.id).filter(Job.status.not_in(INACTIVE_JOB_STATUSES))
+    rows = db.execute(select(Job.company_id, func.count(Job.id), open_)
+                      .where(Job.company_id.in_(company_ids)).group_by(Job.company_id))
+    return {cid: (int(total), int(op)) for cid, total, op in rows}
+
+
 SORTS: dict[str, Any] = {
     "name": Company.name.asc(),
     "-verification_score": Company.verification_score.desc(),
@@ -168,9 +191,12 @@ def list_companies(
     india_presence: bool | None = None,
     job_search_enabled: bool | None = None,
     hiring_status: str | None = None,
+    has_jobs: bool | None = None,
     sort: str = "name",
 ) -> tuple[list[Company], int]:
     stmt: Select[Any] = select(Company)
+    if has_jobs is not None:
+        stmt = stmt.where(_job_count() > 0 if has_jobs else _job_count() == 0)
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -190,7 +216,8 @@ def list_companies(
         stmt = stmt.where(Company.job_search_enabled.is_(job_search_enabled))
     if hiring_status:
         stmt = stmt.where(Company.hiring_status == hiring_status)
-    stmt = stmt.order_by(SORTS.get(sort, SORTS["name"]), Company.id)
+    order = _job_count().desc() if sort == "-jobs" else SORTS.get(sort, SORTS["name"])
+    stmt = stmt.order_by(order, Company.name.asc(), Company.id)
     return paginate(db, stmt, params)
 
 

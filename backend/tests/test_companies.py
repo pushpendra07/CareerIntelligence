@@ -330,3 +330,27 @@ def test_recruiter_status_activity(client: TestClient, db: Session) -> None:
     assert c["company_name"] == "Zeta" and c["status"] == "NOT_CONTACTED"
     client.patch(f"/api/v1/recruiters/{c['id']}", json={"status": "CONTACTED"})
     assert db.query(ActivityLog).filter_by(action="recruiter.contacted").count() == 1
+
+
+def test_company_job_counts_filter_and_sort(client: TestClient) -> None:
+    acme = client.post("/api/v1/companies", json={"name": "Acme Jobs Co"}).json()
+    client.post("/api/v1/companies", json={"name": "Quiet Co"})
+    for i, title in enumerate(["Magento Lead", "PHP Developer"]):
+        r = client.post("/api/v1/jobs", json={"title": title, "company": "Acme Jobs Co",
+                                              "url": f"https://jobs.lever.co/acmejobs/{i}",
+                                              "jd": f"{title}. PHP, Magento 2. Pune."})
+        assert r.status_code == 201, r.text
+    job = client.get("/api/v1/jobs", params={"company_id": acme["id"]}).json()["items"][0]
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "NOT_RELEVANT"})
+
+    rows = {c["name"]: c for c in client.get("/api/v1/companies").json()["items"]}
+    assert (rows["Acme Jobs Co"]["job_count"], rows["Acme Jobs Co"]["open_job_count"]) == (2, 1)
+    assert rows["Quiet Co"]["job_count"] == 0
+    with_jobs = client.get("/api/v1/companies", params={"has_jobs": True}).json()["items"]
+    assert [c["name"] for c in with_jobs] == ["Acme Jobs Co"]
+    without_rows = client.get("/api/v1/companies", params={"has_jobs": False}).json()["items"]
+    without = {c["name"] for c in without_rows}
+    assert "Quiet Co" in without and "Acme Jobs Co" not in without
+    first = client.get("/api/v1/companies", params={"sort": "-jobs"}).json()["items"][0]
+    assert first["name"] == "Acme Jobs Co"
+    assert client.get(f"/api/v1/companies/{acme['id']}").json()["job_count"] == 2

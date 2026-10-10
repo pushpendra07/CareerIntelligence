@@ -12,7 +12,7 @@ export function CompaniesPage() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const page = Number(params.get("page") ?? 1);
-  const filters = Object.fromEntries(["q", "tier", "verification_status", "india_presence", "job_search_enabled", "hiring_status", "sort"]
+  const filters = Object.fromEntries(["q", "tier", "verification_status", "india_presence", "job_search_enabled", "hiring_status", "has_jobs", "sort"]
     .map((k) => [k, params.get(k) ?? undefined]));
   const { data, isLoading, error } = useQuery({
     queryKey: ["companies", filters, page],
@@ -49,7 +49,7 @@ export function CompaniesPage() {
         </p>
       )}
       <Card>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-8">
           <input className="input col-span-2" placeholder="Search name, domain, alias" aria-label="Search companies" defaultValue={params.get("q") ?? ""}
             onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)} />
           <select className="input" aria-label="Tier" value={params.get("tier") ?? ""} onChange={(e) => set("tier", e.target.value)}>
@@ -64,8 +64,11 @@ export function CompaniesPage() {
           <select className="input" aria-label="Job search" value={params.get("job_search_enabled") ?? ""} onChange={(e) => set("job_search_enabled", e.target.value)}>
             <option value="">Job search: any</option><option value="true">Enabled</option><option value="false">Disabled</option>
           </select>
+          <select className="input" aria-label="Jobs in app" value={params.get("has_jobs") ?? ""} onChange={(e) => set("has_jobs", e.target.value)}>
+            <option value="">Jobs: any</option><option value="true">Has jobs in the app</option><option value="false">No jobs yet</option>
+          </select>
           <select className="input" aria-label="Sort companies" value={params.get("sort") ?? "name"} onChange={(e) => set("sort", e.target.value)}>
-            <option value="name">Name</option><option value="-verification_score">Verification score</option><option value="tier">Tier</option><option value="-updated_at">Recently updated</option>
+            <option value="name">Name</option><option value="-jobs">Most jobs</option><option value="-verification_score">Verification score</option><option value="tier">Tier</option><option value="-updated_at">Recently updated</option>
           </select>
         </div>
       </Card>
@@ -76,11 +79,18 @@ export function CompaniesPage() {
           {!data.items.length ? <Empty>No companies found.</Empty> : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
-                <thead><tr><th className="th">Company</th><th className="th">Tier</th><th className="th">Verification</th><th className="th">India</th><th className="th">Careers</th><th className="th">Hiring</th><th className="th">Search</th></tr></thead>
+                <thead><tr><th className="th">Company</th><th className="th" title="Jobs for this company in Career Intelligence">Jobs</th><th className="th">Tier</th><th className="th">Verification</th><th className="th">India</th><th className="th">Careers</th><th className="th">Hiring</th><th className="th">Search</th></tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50">
                       <td className="td"><Link className="font-medium hover:text-indigo-700" to={`/companies/${c.id}`}>{c.name}</Link><div className="text-xs text-slate-500">{c.company_type ?? c.industry ?? ""}</div></td>
+                      <td className="td text-sm">
+                        {c.job_count ? (
+                          <Link className="link" to={`/companies/${c.id}#jobs`} title={`${c.open_job_count ?? 0} open · ${c.job_count} in total`}>
+                            {c.open_job_count ?? 0}<span className="text-xs text-slate-400"> / {c.job_count}</span>
+                          </Link>
+                        ) : <span className="text-slate-300">0</span>}
+                      </td>
                       <td className="td"><StatusBadge value={c.tier} /></td>
                       <td className="td"><StatusBadge value={c.verification_status} /> <span className="text-xs text-slate-500">{c.verification_score}</span></td>
                       <td className="td text-xs">{c.india_presence === null ? "—" : c.india_presence ? (c.india_locations.join(", ") || "Yes") : "No"}</td>

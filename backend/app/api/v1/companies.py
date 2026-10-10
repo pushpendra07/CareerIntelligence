@@ -37,7 +37,8 @@ def list_companies(
     india_presence: bool | None = None,
     job_search_enabled: bool | None = None,
     hiring_status: str | None = None,
-    sort: Literal["name", "-verification_score", "tier", "-updated_at"] = "name",
+    has_jobs: bool | None = None,
+    sort: Literal["name", "-verification_score", "tier", "-updated_at", "-jobs"] = "name",
 ) -> Page[CompanyOut]:
     items, total = company_service.list_companies(
         db,
@@ -48,10 +49,17 @@ def list_companies(
         india_presence=india_presence,
         job_search_enabled=job_search_enabled,
         hiring_status=hiring_status,
+        has_jobs=has_jobs,
         sort=sort,
     )
+    counts = company_service.job_counts(db, [c.id for c in items])
+    out = []
+    for c in items:
+        row = CompanyOut.model_validate(c)
+        row.job_count, row.open_job_count = counts.get(c.id, (0, 0))
+        out.append(row)
     return Page(
-        items=[CompanyOut.model_validate(c) for c in items],
+        items=out,
         total=total,
         page=params.page,
         size=params.size,
@@ -108,6 +116,8 @@ def detail(db: DB, company_id: int) -> CompanyDetail:
     company = company_service.get_company(db, company_id)
     out = CompanyDetail.model_validate(company)
     out.stats = company_service.company_detail_stats(db, company_id)
+    out.job_count, out.open_job_count = company_service.job_counts(db, [company_id]).get(
+        company_id, (0, 0))
     return out
 
 

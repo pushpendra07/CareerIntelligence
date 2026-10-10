@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, PAGE_SIZE } from "../../components/ui";
-import type { CompanyDetail, Contact, Job, Page } from "../../types/api";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge } from "../../components/ui";
+import type { CompanyDetail, Contact, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 import { type ScanRun, num, runSummary } from "../scanner/ScannerSettings";
+import { CompanyJobs } from "./CompanyJobs";
 import { VERIFICATION } from "./CompaniesPage";
 
 const FIELDS = ["website", "careers_url", "linkedin_url", "headquarters", "industry", "company_type", "employee_range", "india_locations", "india_presence", "legal_name"];
@@ -35,7 +36,6 @@ export function CompanyDetailPage() {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries();
   const c = useQuery({ queryKey: ["company", id], queryFn: () => api.get<CompanyDetail>(`/companies/${id}`) });
-  const jobs = useQuery({ queryKey: ["jobs", { company_id: id }], queryFn: () => api.get<Page<Job>>("/jobs", { company_id: id, sort: "-match_score", size: PAGE_SIZE }) });
   const contacts = useQuery({ queryKey: ["recruiters", { company_id: id }], queryFn: () => api.get<Page<Contact>>("/recruiters", { company_id: id }) });
   const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/companies/${id}`, body), onSuccess: refresh });
   const check = useMutation({ mutationFn: () => api.post<{ results: Record<string, string> }>(`/companies/${id}/check`), onSuccess: refresh });
@@ -76,6 +76,8 @@ export function CompanyDetailPage() {
       {check.data && <div className="rounded bg-slate-50 p-2 text-xs">{Object.entries(check.data.results).map(([k, v]) => <div key={k}>{k}: {v}</div>)}</div>}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
+          <CompanyJobs companyId={co.id} companyName={co.name} total={co.job_count ?? 0} open={co.open_job_count ?? 0}
+            onScan={() => scan.mutate()} scanning={scan.isPending} />
           <Card title="Overview">
             <KeyValue items={[
               ["Website", co.website ? <a className="link" href={co.website} target="_blank" rel="noopener noreferrer">{co.website}</a> : "—"],
@@ -110,10 +112,6 @@ export function CompanyDetailPage() {
           </Card>
         </div>
         <div className="space-y-4">
-          <Card title={`Jobs (${jobs.data?.total ?? 0})`}
-            actions={(jobs.data?.total ?? 0) > PAGE_SIZE ? <Link className="link text-sm" to={`/jobs?q=${encodeURIComponent(co.name)}`}>See all</Link> : undefined}>
-            {jobs.data?.items.map((j) => <div key={j.id} className="flex justify-between gap-2 py-0.5 text-sm"><Link className="link truncate" to={`/jobs/${j.id}`}>{j.title}</Link><ScoreBadge score={j.match_score} /></div>)}
-          </Card>
           <Card title="Recruiters">
             {contacts.data?.items.length ? contacts.data.items.map((r) => <div key={r.id} className="text-sm">{r.name} <span className="text-xs text-slate-500">{r.job_title}</span> <StatusBadge value={r.status} /></div>)
               : <p className="text-sm text-slate-500">None</p>}

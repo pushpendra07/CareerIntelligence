@@ -55,6 +55,9 @@ class CompanyOut(BaseModel):
     verification_override: str | None
     verification_score: int
     last_verified_at: datetime | None
+    # Jobs for this company in Career Intelligence (all statuses / still being pursued).
+    job_count: int = 0
+    open_job_count: int = 0
     notes: str | None
     created_at: datetime
     updated_at: datetime
