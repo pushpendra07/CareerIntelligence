@@ -91,7 +91,7 @@ describe("job status tabs", () => {
     expect(list.searchParams.get("closed")).toBe("true");
     expect(list.searchParams.getAll("status")).toEqual(["CLOSED"]);
     const tab = async (name: RegExp) => screen.findByRole("tab", { name });
-    expect(await tab(/All open\s*417/)).toHaveAttribute("href", "/jobs?q=magento");
+    expect(await tab(/All open\s*412/)).toHaveAttribute("href", "/jobs?q=magento");
     expect(await tab(/^New\s*400/)).toHaveAttribute("href", "/jobs?tab=new&q=magento");
     expect(await tab(/Pending\s*2/)).toHaveAttribute("href", "/jobs?tab=pending&q=magento");
     expect(await tab(/Applied\s*4/)).toBeInTheDocument();
@@ -123,7 +123,15 @@ describe("job status tabs", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
     expect(listRequest(api.fn).searchParams.get("closed")).toBe("false");
+    // Not relevant is hidden until picked in the Status filter.
+    const sent = listRequest(api.fn).searchParams.getAll("status");
+    expect(sent).toContain("NEW");
+    expect(sent).not.toContain("NOT_RELEVANT");
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except Not relevant");
     await userEvent.click(screen.getByRole("button", { name: "Status" }));
-    expect(screen.getByRole("listbox", { name: "Job statuses" })).not.toHaveTextContent("Closed");
+    const box = screen.getByRole("listbox", { name: "Job statuses" });
+    expect(box).not.toHaveTextContent("Closed");
+    await userEvent.click(within(box).getByLabelText("Not Relevant"));
+    expect(listRequest(api.fn, true).searchParams.getAll("status")).toEqual(["NOT_RELEVANT"]);
   });
 });

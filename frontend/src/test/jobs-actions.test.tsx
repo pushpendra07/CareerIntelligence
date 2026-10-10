@@ -45,8 +45,10 @@ describe("status multi-select", () => {
     expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent(`${all.length - 1} statuses`);
 
     await userEvent.click(within(box).getByRole("button", { name: "Clear" }));
-    expect(listUrls(api.fn).at(-1)!.searchParams.getAll("status")).toEqual([]);
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All statuses");
+    const cleared = listUrls(api.fn).at(-1)!.searchParams.getAll("status");
+    expect(cleared).toContain("NEW");
+    expect(cleared).not.toContain("NOT_RELEVANT"); // hidden unless picked
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except Not relevant");
   });
 });
 

@@ -3,10 +3,12 @@ import { JobStatusBadge } from "../../components/ui";
 import { humanize } from "../../utils/format";
 
 /** Pick any number of job statuses; none selected = all statuses. */
-export function StatusMultiSelect({ options, value, onChange }: {
+export function StatusMultiSelect({ options, value, onChange, emptyLabel = "All statuses" }: {
   options: string[];
   value: string[];
   onChange: (next: string[]) => void;
+  /** Button text when nothing is picked (e.g. when some statuses are hidden by default). */
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -19,7 +21,7 @@ export function StatusMultiSelect({ options, value, onChange }: {
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
   }, [open]);
   const toggle = (s: string) => onChange(value.includes(s) ? value.filter((v) => v !== s) : options.filter((o) => o === s || value.includes(o)));
-  const label = value.length === 0 || value.length === options.length ? "All statuses"
+  const label = value.length === 0 ? emptyLabel : value.length === options.length ? "All statuses"
     : value.length === 1 ? humanize(value[0])
     : `${value.length} statuses`;
   return (

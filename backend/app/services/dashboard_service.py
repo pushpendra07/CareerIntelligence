@@ -35,7 +35,8 @@ def _count(db: Session, stmt: Any) -> int:
 def summary(db: Session) -> dict[str, int]:
     all_jobs = select(func.count()).select_from(Job)
     # Job cards open the "Open jobs" tab, so closed positions are counted separately.
-    jobs = all_jobs.where(Job.status != JobStatus.CLOSED.value)
+    # Same set as the "All open" tab: closed and not-relevant jobs are left out.
+    jobs = all_jobs.where(Job.status.not_in([JobStatus.CLOSED.value, JobStatus.NOT_RELEVANT.value]))
     today = date.today()
     return {
         "total_jobs": _count(db, jobs),

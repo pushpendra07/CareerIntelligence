@@ -81,6 +81,13 @@ function SortHeader({ extra, ...props }: SortProps & { extra?: ReactNode }) {
   );
 }
 
+/** Shown only when picked in the Status filter (or in their own tab), like Closed jobs. */
+export const HIDDEN_BY_DEFAULT = ["NOT_RELEVANT"];
+
+/** The statuses a tab lists when no status is picked. */
+export const defaultStatuses = (tab: { key: string; statuses: string[] }) =>
+  tab.key === "all" ? tab.statuses.filter((s) => !HIDDEN_BY_DEFAULT.includes(s)) : tab.statuses;
+
 const tabHref = (key: string) => (key === "closed" ? "/jobs/closed" : key === "all" ? "/jobs" : `/jobs?tab=${key}`);
 
 /** Tabs with counts; search and filters (except status) carry over between tabs. */
@@ -101,7 +108,7 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
     <div role="tablist" aria-label="Job status" className="flex gap-1 overflow-x-auto border-b border-slate-200">
       {JOB_TABS.map((t) => {
         const on = t.key === active;
-        const n = counts ? t.statuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
+        const n = counts ? defaultStatuses(t).reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
         return (
           <Link key={t.key} to={withFilters(tabHref(t.key))} role="tab" aria-selected={on}
             className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${on ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
@@ -126,8 +133,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   }
   // The tab limits the statuses; the Status filter can narrow further inside the tab.
   const picked = params.getAll("status").filter((s) => tab.statuses.includes(s));
-  const statuses = picked.length ? picked : tab.statuses;
-  const listQuery = { ...query, status: tab.key === "all" && !picked.length ? undefined : statuses, closed: String(closed) };
+  const statuses = picked.length ? picked : defaultStatuses(tab);
+  const listQuery = { ...query, status: statuses, closed: String(closed) };
   const { data, isLoading, error } = useQuery({
     queryKey: ["jobs", listQuery, page],
     queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: PAGE_SIZE }),
@@ -174,7 +181,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
           <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 70)" aria-label="Min score"
             defaultValue={params.get("min_score") ?? ""} onBlur={(e) => set("min_score", e.target.value)} />
-          {tab.statuses.length > 1 ? <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses} /> : <span className="hidden lg:block" />}
+          {tab.statuses.length > 1 ? <StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
+            emptyLabel={tab.key === "all" ? "All except Not relevant" : "All statuses"} /> : <span className="hidden lg:block" />}
           <select className="input" aria-label="Added via" value={params.get("added_via") ?? ""} onChange={(e) => set("added_via", e.target.value)}
             title="How the job came into the app">
             <option value="">Added via: any</option>
