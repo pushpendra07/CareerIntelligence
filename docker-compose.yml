@@ -23,7 +23,7 @@ services:
       STORAGE_PATH: /data/storage
     volumes:
       # Career-Ops is mounted read-only: this app never writes to it.
-      - ${CAREER_OPS_PATH:?set CAREER_OPS_PATH in .env}:/career-ops:ro
+      - ${CAREER_OPS_PATH:-./career-ops}:/career-ops:ro
       - storage:/data/storage
     expose:
       - "8000"

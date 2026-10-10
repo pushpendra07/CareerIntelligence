@@ -249,3 +249,17 @@ def test_sync_runs_scan_then_import_and_one_at_a_time(
     assert client.get("/api/v1/career-ops/status").json()["running"]["id"] == busy.id
     assert client.post("/api/v1/career-ops/sync").status_code == 409
     assert db.get(CareerOpsImport, busy.id) is not None
+
+
+def test_career_ops_location(database_url: str) -> None:
+    from app.core import config
+
+    rel = Settings(  # type: ignore[call-arg]
+        _env_file=None, environment="test", database_url=database_url,
+        career_ops_path="../career-ops",
+    )
+    assert rel.career_ops_path == (config.BACKEND_DIR / "../career-ops").resolve()
+    off = Settings(  # type: ignore[call-arg]
+        _env_file=None, environment="test", database_url=database_url
+    )
+    assert off.career_ops_path is None  # tests never pick up a real install

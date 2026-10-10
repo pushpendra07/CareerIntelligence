@@ -13,7 +13,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-164_backend_·_31_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-165_backend_·_31_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
@@ -241,7 +241,7 @@ export DATABASE_URL=$(uv run python scripts/devdb.py)   # bundled dev database
 uv run python -m app.cli import-companies \
   --research-csv /path/to/company_master.csv \
   --myjob-db     /path/to/jobs.db \
-  --career-ops   /path/to/careerops
+  --career-ops   ../career-ops
 ```
 
 Every source is read-only. Placeholders such as "Not verified" or "Unknown" become empty
@@ -290,7 +290,7 @@ VITE_API_TARGET=http://127.0.0.1:8010 npm run dev   # http://127.0.0.1:5173
 ## 🐳 Run with Docker (optional)
 
 ```bash
-cp .env.example .env          # set POSTGRES_PASSWORD and CAREER_OPS_PATH
+cp .env.example .env          # set POSTGRES_PASSWORD (Career-Ops: ./scripts/setup-career-ops.sh)
 docker compose up -d          # postgres + backend + frontend
 open http://127.0.0.1:8080
 ```
@@ -398,6 +398,9 @@ unmodified. Career Intelligence connects through a **read-only file adapter**:
 
 - Career-Ops' **own 1–5 evaluation is kept separately** and shown next to the 0–100 score. It is never converted into it.
 - Imports are idempotent: re-importing updates existing jobs instead of duplicating them.
+- **Lives inside this project.** `./scripts/setup-career-ops.sh` clones Career-Ops into `career-ops/`
+  (git-ignored: it holds your CV, tracker and reports) and installs it; the app finds it automatically.
+  `--from /old/careerops` copies your data from an existing install; `--update` pulls the latest version.
 - **No token cost.** The app only ever runs Career-Ops' `scan.mjs` and `fetch-jd.mjs`, which call public
   job-board APIs and no AI model. Career-Ops' AI evaluations (`/career-ops pipeline`, `*-eval.mjs`) are
   never started by this app; if you run them yourself, their reports are imported.
@@ -416,7 +419,7 @@ Never commit it.
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | bundled dev DB | PostgreSQL connection (`postgresql+psycopg://…`) |
-| `CAREER_OPS_PATH` | — | Path to your Career-Ops checkout (read-only) |
+| `CAREER_OPS_PATH` | `career-ops/` in the project | Career-Ops checkout (read-only); leave empty to use the in-project copy |
 | `CAREER_OPS_DATA_PATH` | — | Separate Career-Ops data root, if you use one |
 | `CAREER_OPS_SCAN_ENABLED` | `false` | Allow **Scan + import** to run Career-Ops' scanner |
 | `AI_PROVIDER` | `none` | `none`, `anthropic`, `openai`, `gemini` or `ollama` |
@@ -581,7 +584,7 @@ Any other agent: tell it *"Read AGENTS.md first."*
 - **The app must be running** (`./start.sh`) — the agent searches through the app's API.
 - **Private Google Sheets:** connect the service account once (Settings → Google Sheets), or give
   the agent a Google Sheets/Drive connector.
-- **Career-Ops** is optional; set `CAREER_OPS_PATH` and `CAREER_OPS_SCAN_ENABLED=true` to use it.
+- **Career-Ops** is optional: `./scripts/setup-career-ops.sh`, then `CAREER_OPS_SCAN_ENABLED=true`.
 - **Safety built in:** the rules tell agents never to commit personal data or credentials, never to
   add AI co-author lines to commits, to ask before pushing or deleting, never to edit your
   Career-Ops folder or Google Sheets, and never to invent jobs, companies or links.

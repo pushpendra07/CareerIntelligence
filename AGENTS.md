@@ -70,7 +70,7 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | dev DB from `scripts/devdb.py` | PostgreSQL URL (`postgresql+psycopg://…`) |
-| `CAREER_OPS_PATH` | — | Absolute path to a local Career-Ops checkout (read-only for this app) |
+| `CAREER_OPS_PATH` | `career-ops/` in the project, if present | Career-Ops checkout (read-only for this app); leave empty for the in-project copy |
 | `CAREER_OPS_DATA_PATH` | — | Only if Career-Ops keeps its data outside the checkout; leave empty otherwise |
 | `CAREER_OPS_SCAN_ENABLED` | `false` | `true` allows **Scan + import** to run Career-Ops' `scan.mjs` |
 | `AI_PROVIDER` | `none` | Optional AI: `none`, `openai`, `anthropic`, `gemini`, `ollama` |
@@ -118,11 +118,21 @@ discarded → Closed, skip → Not relevant.
 
 ### Setup (once)
 
-1. Have a Career-Ops checkout with its dependencies installed:
-   `cd /path/to/careerops && npm install` (Node.js must be on `PATH`).
-2. In `backend/.env`:
+Career-Ops lives **inside this project** at `career-intelligence/career-ops/` (a fresh clone of
+https://github.com/career-ops-hq/career-ops, git-ignored because it holds personal data).
+
+1. Set it up (Node.js must be on `PATH`):
+   ```bash
+   ./scripts/setup-career-ops.sh                    # fresh clone + npm install + starter files
+   ./scripts/setup-career-ops.sh --from /old/careerops   # also copy your data from an old install
+   ./scripts/setup-career-ops.sh --update           # later: pull the latest Career-Ops
    ```
-   CAREER_OPS_PATH=/absolute/path/to/careerops
+   Your data stays in `career-ops/`: `portals.yml` (companies to scan), `cv.md`,
+   `config/profile.yml`, `data/` (tracker, pipeline, scan history), `reports/`, `jds/`, `output/`.
+2. In `backend/.env` (empty path = use `career-ops/` inside the project; relative paths are
+   relative to `backend/`):
+   ```
+   CAREER_OPS_PATH=
    CAREER_OPS_DATA_PATH=
    CAREER_OPS_SCAN_ENABLED=true
    ```
@@ -150,7 +160,7 @@ curl -X POST http://127.0.0.1:8010/api/v1/career-ops/import        # import only
 
 **C. In the Career-Ops folder, then import:**
 ```bash
-cd /path/to/careerops
+cd career-ops                  # inside this project
 npm run scan                  # or: node scan.mjs ; preview without writing: npm run scan -- --dry-run
 ```
 Then Settings → Career-Ops → **Import now** (or `POST /api/v1/career-ops/import`).
@@ -167,7 +177,7 @@ merged, never duplicated; jobs the user deleted are skipped.
 | Counts are all 0, `data_root` is `.` | Data path misconfigured; leave `CAREER_OPS_DATA_PATH=` empty or set it to the real folder, restart |
 | "Scanning is disabled" (422) | Set `CAREER_OPS_SCAN_ENABLED=true`, restart |
 | "Node.js is not installed or not on PATH" | Install Node.js; make sure `node` works in the shell that runs `./start.sh` |
-| "scan.mjs not found" | `CAREER_OPS_PATH` points to the wrong folder |
+| "scan.mjs not found" / not configured | Run `./scripts/setup-career-ops.sh`, or fix `CAREER_OPS_PATH` |
 | "scan.mjs timed out after 2700s" | A portal hung; run `npm run scan` in the Career-Ops folder to see which, then Import now |
 | "already running" (409) | Wait for the current scan; it appears under `running` in the status |
 | Run stuck as RUNNING after a restart | Auto-closed as FAILED after 1 hour; start a new one |
@@ -217,7 +227,7 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 - **Company research files (CLI):**
   ```bash
   cd backend && uv run python -m app.cli import-companies \
-      --research-csv /path/master.csv --myjob-db /path/portal.sqlite --career-ops /path/to/careerops
+      --research-csv /path/master.csv --myjob-db /path/portal.sqlite --career-ops ../career-ops
   ```
 - **Export:** Settings → Import & export → export CSV/JSON (`GET /api/v1/export/{entity}`, `/export/all`).
 
@@ -310,6 +320,7 @@ frontend/src/
 docs/                       USER_GUIDE.md, ARCHITECTURE.md, API.md, scan-coverage.md, google-sheets.md,
                             career-ops-assessment.md, company-sources.md
 start.sh / stop.sh / dev.sh run scripts
+scripts/setup-career-ops.sh  set up Career-Ops inside the project (career-ops/, git-ignored)
 ```
 
 ## Core flows (how things connect)
@@ -384,7 +395,8 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
    **Never add `Co-Authored-By`, "Generated with …", or any AI/agent attribution** to commit
    messages or PR descriptions.
 3. **Ask before pushing**, force-pushing, rewriting history or deleting data.
-4. **Never modify the external Career-Ops folder** (`CAREER_OPS_PATH`); only read it.
+4. **Never modify Career-Ops' code** (`career-ops/`); the app only reads its files. Its personal data
+   (`portals.yml`, `cv.md`, `data/`, `reports/`…) is the user's — never commit or delete it.
 5. **Never fabricate data** (companies, jobs, salaries, verification). Unknown stays unknown.
 6. Don't kill processes or free ports you didn't start (port 8000 is another app).
 7. Keep scores deterministic: no randomness or wall-clock dependence in `matching/`.

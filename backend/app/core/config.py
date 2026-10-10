@@ -4,8 +4,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+# Career-Ops cloned inside the project by scripts/setup-career-ops.sh (git-ignored).
+BUNDLED_CAREER_OPS = BACKEND_DIR.parent / "career-ops"
 
 
 class Settings(BaseSettings):
@@ -60,6 +64,19 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [o.strip() for o in value.split(",") if o.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _career_ops_location(self) -> "Settings":
+        """Relative Career-Ops paths are relative to backend/; with none set, use the copy
+        inside the project (career-intelligence/career-ops) when it exists."""
+        for name in ("career_ops_path", "career_ops_data_path"):
+            value = getattr(self, name)
+            if value is not None and not value.is_absolute():
+                object.__setattr__(self, name, (BACKEND_DIR / value).resolve())
+        if (self.career_ops_path is None and self.environment != "test"
+                and (BUNDLED_CAREER_OPS / "scan.mjs").is_file()):
+            object.__setattr__(self, "career_ops_path", BUNDLED_CAREER_OPS)
+        return self
 
     @property
     def career_ops_data_root(self) -> Path | None:

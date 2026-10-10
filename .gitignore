@@ -71,3 +71,6 @@ secrets/
 backend/secrets/
 *service-account*.json
 google-credentials*.json
+
+# Career-Ops (separate project, cloned by scripts/setup-career-ops.sh; holds personal data)
+/career-ops/

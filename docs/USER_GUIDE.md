@@ -151,7 +151,7 @@ Every way below goes through the same pipeline: duplicates are merged (one job c
 | **Add Job** | Sidebar → Add Job: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
 | **CSV / JSON** | Settings → Import & export → import jobs | One-off lists |
-| **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now** | If you also use Career-Ops (no AI, no tokens) |
+| **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now** (set up once with `./scripts/setup-career-ops.sh`) | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
 
 Job scanner setup (once): Settings → Job scanner → *What to keep*:
 titles to keep (e.g. magento, adobe commerce, php), generic titles that need your stack in the
