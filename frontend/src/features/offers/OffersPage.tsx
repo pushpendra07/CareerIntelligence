@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge, PageIntro } from "../../components/ui";
+import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Pagination, Spinner, StatusBadge, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { Job, Offer, Page } from "../../types/api";
 import { formatDate, formatMoney, humanize } from "../../utils/format";
 
@@ -58,7 +58,8 @@ function OfferCard({ o }: { o: Offer }) {
 
 export function OffersPage() {
   const qc = useQueryClient();
-  const offers = useQuery({ queryKey: ["offers"], queryFn: () => api.get<Page<Offer>>("/offers", { size: 100 }) });
+  const [page, setPage] = useState(1);
+  const offers = useQuery({ queryKey: ["offers", page], queryFn: () => api.get<Page<Offer>>("/offers", { page, size: PAGE_SIZE }) });
   const compare = useQuery({ queryKey: ["offers", "compare"], queryFn: () => api.get<Comparison>("/offers/compare") });
   const jobs = useQuery({ queryKey: ["jobs", "offer-candidates"], queryFn: () => api.get<Page<Job>>("/jobs", { status: ["INTERVIEW", "OFFER", "SCREENING"], size: 100 }) });
   const [form, setForm] = useState({ job_id: "", base_salary: "", variable_pay: "", bonus: "", equity: "", currency: "INR", joining_date: "", expiry_date: "", location: "", work_model: "", benefits: "" });
@@ -108,6 +109,7 @@ export function OffersPage() {
       )}
       {offers.isLoading && <Spinner />}
       {offers.data && (!offers.data.items.length ? <Empty>No offers yet.</Empty> : <div className="grid gap-4 lg:grid-cols-2">{offers.data.items.map((o) => <OfferCard key={o.id} o={o} />)}</div>)}
+      {offers.data && offers.data.total > PAGE_SIZE && <Pagination page={page} size={PAGE_SIZE} total={offers.data.total} onPage={setPage} />}
     </div>
   );
 }

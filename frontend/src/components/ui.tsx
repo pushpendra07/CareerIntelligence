@@ -152,7 +152,7 @@ export function Field({ label, children, hint, error }: { label: string; childre
 }
 
 /** Rows per page on every paginated list. */
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 10;
 
 export function Pagination({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (p: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / size));

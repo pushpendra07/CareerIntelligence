@@ -81,11 +81,11 @@ describe("delete job", () => {
 });
 
 describe("sorting and page size", () => {
-  it("sorts by clicking column headers and shows 20 per page", async () => {
+  it("sorts by clicking column headers and shows 10 per page", async () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     await screen.findByText("Magento Lead");
-    expect(listUrls(api.fn).at(-1)!.searchParams.get("size")).toBe("20");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("size")).toBe("10");
 
     await userEvent.click(screen.getByRole("button", { name: "Sort by posted" }));
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-posting_date"); // newest first

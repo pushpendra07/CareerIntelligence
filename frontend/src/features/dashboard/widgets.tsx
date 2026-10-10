@@ -60,7 +60,7 @@ export function GettingStarted({ totalJobs }: { totalJobs: number }) {
 /** Top new jobs you haven't applied to, with one-click triage. */
 export function BestMatches() {
   const qc = useQueryClient();
-  const query = { status: ["NEW", "DISCOVERED"], min_score: 70, has_application: "false", closed: "false", sort: "-match_score", size: 8 };
+  const query = { status: ["NEW", "DISCOVERED"], min_score: 70, has_application: "false", closed: "false", sort: "-match_score", size: 10 };
   const jobs = useQuery({ queryKey: ["jobs", "best-matches"], queryFn: () => api.get<Page<Job>>("/jobs", query) });
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => api.post(`/jobs/${id}/status`, { status }),

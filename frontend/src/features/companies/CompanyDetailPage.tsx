@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, PAGE_SIZE } from "../../components/ui";
 import type { CompanyDetail, Contact, Job, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 import { type ScanRun, num, runSummary } from "../scanner/ScannerSettings";
@@ -35,7 +35,7 @@ export function CompanyDetailPage() {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries();
   const c = useQuery({ queryKey: ["company", id], queryFn: () => api.get<CompanyDetail>(`/companies/${id}`) });
-  const jobs = useQuery({ queryKey: ["jobs", { company_id: id }], queryFn: () => api.get<Page<Job>>("/jobs", { company_id: id, size: 20 }) });
+  const jobs = useQuery({ queryKey: ["jobs", { company_id: id }], queryFn: () => api.get<Page<Job>>("/jobs", { company_id: id, sort: "-match_score", size: PAGE_SIZE }) });
   const contacts = useQuery({ queryKey: ["recruiters", { company_id: id }], queryFn: () => api.get<Page<Contact>>("/recruiters", { company_id: id }) });
   const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/companies/${id}`, body), onSuccess: refresh });
   const check = useMutation({ mutationFn: () => api.post<{ results: Record<string, string> }>(`/companies/${id}/check`), onSuccess: refresh });
@@ -110,7 +110,8 @@ export function CompanyDetailPage() {
           </Card>
         </div>
         <div className="space-y-4">
-          <Card title={`Jobs (${jobs.data?.total ?? 0})`}>
+          <Card title={`Jobs (${jobs.data?.total ?? 0})`}
+            actions={(jobs.data?.total ?? 0) > PAGE_SIZE ? <Link className="link text-sm" to={`/jobs?q=${encodeURIComponent(co.name)}`}>See all</Link> : undefined}>
             {jobs.data?.items.map((j) => <div key={j.id} className="flex justify-between gap-2 py-0.5 text-sm"><Link className="link truncate" to={`/jobs/${j.id}`}>{j.title}</Link><ScoreBadge score={j.match_score} /></div>)}
           </Card>
           <Card title="Recruiters">

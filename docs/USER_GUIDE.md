@@ -169,7 +169,7 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   Rejected · Not pursuing · Closed**, each with a count.
 - Filters: search, minimum score, status (multi-select inside a tab) and sort are always shown;
   **More filters** opens recommendation, company tier, technology, location, work model, source,
-  posted after, your years, applied or not and outdated scores. 20 jobs per page.
+  posted after, your years, applied or not and outdated scores. 10 jobs per page.
 - **Added via** tag on every job — how it came into the app: **Manual** (Add Job),
   **Google Sheet**, **Job scanner**, **Career-Ops** or **File import**. A job found more than
   one way shows several tags. Filter with **Added via** in the filter row.

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Spinner, StatusBadge, PageIntro } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Pagination, Spinner, StatusBadge, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { Interview, Job, Page } from "../../types/api";
 import { formatDateTime, humanize } from "../../utils/format";
 
@@ -11,9 +11,10 @@ export const ROUNDS = ["RECRUITER_SCREEN", "HR", "TECHNICAL", "CODING", "SYSTEM_
 export function InterviewsPage() {
   const [params] = useSearchParams();
   const [upcoming, setUpcoming] = useState(params.get("upcoming") !== "false");
+  const [page, setPage] = useState(1);
   const list = useQuery({
-    queryKey: ["interviews", upcoming],
-    queryFn: () => api.get<Page<Interview>>("/interviews", { upcoming: upcoming || undefined, sort: upcoming ? "scheduled_at" : "-scheduled_at", size: 100 }),
+    queryKey: ["interviews", upcoming, page],
+    queryFn: () => api.get<Page<Interview>>("/interviews", { upcoming: upcoming || undefined, sort: upcoming ? "scheduled_at" : "-scheduled_at", page, size: PAGE_SIZE }),
   });
   return (
     <div className="space-y-4">
@@ -21,7 +22,7 @@ export function InterviewsPage() {
         <div><h1>Interviews</h1><PageIntro>Your interview rounds. Open one for details, the prep sheet, and to record how it went.</PageIntro></div>
         <Link className="btn-primary" to="/interviews/new">Schedule interview</Link>
       </div>
-      <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} />Upcoming only</label>}>
+      <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={upcoming} onChange={(e) => { setUpcoming(e.target.checked); setPage(1); }} />Upcoming only</label>}>
         {list.isLoading && <Spinner />}
         {list.data && (!list.data.items.length ? <Empty>No interviews {upcoming ? "coming up" : "yet"}.</Empty> : (
           <table className="min-w-full divide-y divide-slate-100">
@@ -40,6 +41,7 @@ export function InterviewsPage() {
             </tbody>
           </table>
         ))}
+        {list.data && list.data.total > PAGE_SIZE && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>
     </div>
   );

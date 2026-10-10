@@ -2,16 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, Field, Spinner, PageIntro } from "../../components/ui";
+import { Badge, Card, Empty, ErrorBox, Field, Pagination, Spinner, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { FollowUp, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 
 export function FollowupsPage() {
   const qc = useQueryClient();
   const [showDone, setShowDone] = useState(false);
+  const [page, setPage] = useState(1);
   const list = useQuery({
-    queryKey: ["followups", showDone],
-    queryFn: () => api.get<Page<FollowUp>>("/followups", { completed: showDone ? undefined : false, size: 200 }),
+    queryKey: ["followups", showDone, page],
+    queryFn: () => api.get<Page<FollowUp>>("/followups", { completed: showDone ? undefined : false, page, size: PAGE_SIZE }),
   });
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({ title: "", kind: "OTHER", due_date: today, notes: "" });
@@ -44,7 +45,7 @@ export function FollowupsPage() {
         {create.error && <div className="mt-2"><ErrorBox error={new Error(errorMessage(create.error))} /></div>}
         <button className="btn-primary mt-3" disabled={!form.title || create.isPending} onClick={() => create.mutate()}>Add reminder</button>
       </Card>
-      <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />Show completed</label>}>
+      <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDone} onChange={(e) => { setShowDone(e.target.checked); setPage(1); }} />Show completed</label>}>
         {list.isLoading && <Spinner />}
         {list.data && (!list.data.items.length ? <Empty>No pending follow-ups.</Empty> : (
           <ul className="divide-y divide-slate-100">
@@ -70,6 +71,7 @@ export function FollowupsPage() {
             ))}
           </ul>
         ))}
+        {list.data && list.data.total > PAGE_SIZE && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>
     </div>
   );
