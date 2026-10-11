@@ -7,6 +7,7 @@ import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner
 import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
 import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
 import { DeleteJobButton } from "./DeleteJobButton";
+import { JobComments } from "./JobComments";
 import { JOB_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -155,6 +156,7 @@ export function JobDetailPage() {
               ["Experience", experienceRange(j.experience_min, j.experience_max)],
               ["Salary", j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)],
               ["Posted", formatDate(j.posting_date)], ["Deadline", formatDate(j.application_deadline)],
+              ["Added", formatDateTime(j.created_at)],
             ]} />
           </Card>
           <Card title="Parsed requirements">
@@ -202,6 +204,7 @@ export function JobDetailPage() {
               <div key={iv.id} className="text-sm"><Link className="link" to={`/interviews/${iv.id}`}>Round {iv.round_number}: {humanize(iv.round_type)}</Link> <StatusBadge value={iv.status} /><div className="text-xs text-slate-500">{formatDateTime(iv.scheduled_at)}</div></div>
             )) : <p className="text-sm text-slate-500">None</p>}
           </Card>
+          <JobComments jobId={j.id} comments={j.comments ?? []} />
           {j.notes && <Card title="Notes"><p className="whitespace-pre-wrap text-sm">{j.notes}</p></Card>}
           <Card title="Activity">
             <ul className="space-y-1 text-xs">

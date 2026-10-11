@@ -14,6 +14,8 @@ from app.models.activity_log import ActivityLog
 from app.models.cv import CV
 from app.models.job import Job
 from app.schemas.job import (
+    JobCommentIn,
+    JobCommentOut,
     JobCreate,
     JobCreateOut,
     JobDetail,
@@ -67,6 +69,9 @@ def detail(db: DB, job: Job) -> JobDetail:
             .order_by(ActivityLog.occurred_at.desc())
             .limit(50)
         )
+    ]
+    out.comments = [
+        JobCommentOut.model_validate(c) for c in job_service.list_comments(db, job.id)
     ]
     co = [s.raw.get("career_ops") for s in job.source_links if s.raw.get("career_ops")]
     out.career_ops = co[0] if co else None
@@ -218,6 +223,16 @@ def add_source(db: DB, job_id: int, body: SourceIn) -> JobDetail:
 @router.post("/jobs/{job_id}/merge", response_model=JobDetail)
 def merge(db: DB, job_id: int, body: MergeJobsIn) -> JobDetail:
     return detail(db, job_service.merge_jobs(db, job_id, body.merge_id))
+
+
+@router.post("/jobs/{job_id}/comments", response_model=JobCommentOut, status_code=201)
+def add_comment(db: DB, job_id: int, body: JobCommentIn) -> JobCommentOut:
+    return JobCommentOut.model_validate(job_service.add_comment(db, job_id, body.body))
+
+
+@router.delete("/jobs/{job_id}/comments/{comment_id}", status_code=204)
+def delete_comment(db: DB, job_id: int, comment_id: int) -> None:
+    job_service.delete_comment(db, job_id, comment_id)
 
 
 @router.post("/jobs/{job_id}/reparse", response_model=JobDetail)

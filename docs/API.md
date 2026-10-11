@@ -69,6 +69,8 @@ Conventions:
 - `POST /api/v1/jobs/{job_id}/status`
 - `POST /api/v1/jobs/{job_id}/sources`
 - `POST /api/v1/jobs/{job_id}/merge`
+- `POST /api/v1/jobs/{job_id}/comments` (`{"body"}`) — add a dated comment; `GET /jobs/{id}` returns `comments`, newest first
+- `DELETE /api/v1/jobs/{job_id}/comments/{comment_id}`
 - `POST /api/v1/jobs/{job_id}/reparse`
 - `POST /api/v1/matches/jobs/{job_id}`
 - `GET /api/v1/matches/jobs/{job_id}/history`

@@ -77,3 +77,4 @@ google-credentials*.json
 
 # Graphify knowledge graph (generated)
 /graphify-out/
+scratch/

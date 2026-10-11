@@ -242,6 +242,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
                   <th className="th" title="How the job came in, and the websites it was found on">Added via · Sources</th>
                   <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Added" field="created_at" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
                   <th className="th"><span className="sr-only">Actions</span></th>
                 </tr></thead>
@@ -262,6 +263,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                       <td className="td text-xs">{salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</td>
                       <td className="td text-xs"><AddedViaTags values={j.added_via} /><div className="mt-0.5 text-slate-500">{j.sources.map(humanize).join(", ")}</div></td>
                       <td className="td text-xs">{formatDate(j.posting_date)}</td>
+                      <td className="td text-xs" title="Date this job was added to the system">{formatDate(j.created_at)}</td>
                       <td className="td"><JobStatusBadge value={j.status} /></td>
                       <td className="td text-right"><DeleteJobButton jobId={j.id} title={j.title} compact /></td>
                     </tr>

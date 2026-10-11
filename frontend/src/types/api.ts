@@ -49,6 +49,12 @@ export interface Job {
   updated_at: string;
 }
 
+export interface JobComment {
+  id: number;
+  body: string;
+  created_at: string;
+}
+
 export interface MatchComponent {
   key: string;
   label: string;
@@ -107,6 +113,7 @@ export interface JobDetail extends Job {
   recommended_cv: { id: number; name: string; target_role: string | null; version_id: number } | null;
   recruiter: { id: number; name: string; email: string | null; linkedin_url: string | null; status: string } | null;
   activity: { action: string; summary: string | null; occurred_at: string }[];
+  comments?: JobComment[];
   career_ops: Record<string, unknown> | null;
   career_ops_score: string | null;
   career_ops_evaluation: Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any

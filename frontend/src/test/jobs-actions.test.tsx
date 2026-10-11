@@ -1,6 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { JobComments } from "../features/jobs/JobComments";
 import { JobsPage } from "../features/jobs/JobsPage";
 import { mockApi, renderAt } from "./utils";
 
@@ -119,5 +120,31 @@ describe("job id", () => {
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-id");
     await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("id");
+  });
+});
+
+describe("job comments", () => {
+  const COMMENTS = [{ id: 3, body: "Called the recruiter", created_at: "2026-10-11T09:30:00Z" }];
+
+  it("adds a comment and shows existing ones with their date", async () => {
+    const api = mockApi({ "POST /jobs/7/comments": { id: 4, body: "Follow up Monday", created_at: "2026-10-11T10:00:00Z" } });
+    renderAt(<JobComments jobId={7} comments={COMMENTS} />, { path: "/jobs/:id", route: "/jobs/7" });
+    expect(screen.getByText("Called the recruiter")).toBeInTheDocument();
+    expect(screen.getByText(/11 Oct/)).toBeInTheDocument();
+    const add = screen.getByRole("button", { name: "Add comment" });
+    expect(add).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("New comment"), "  Follow up Monday ");
+    await userEvent.click(add);
+    expect(api.calls.find((c) => c.method === "POST")).toMatchObject({ path: "/jobs/7/comments", body: { body: "Follow up Monday" } });
+    expect(screen.getByLabelText("New comment")).toHaveValue("");
+  });
+
+  it("asks before deleting a comment", async () => {
+    const api = mockApi({ "DELETE /jobs/7/comments/3": () => new Response(null, { status: 204 }) });
+    renderAt(<JobComments jobId={7} comments={COMMENTS} />, { path: "/jobs/:id", route: "/jobs/7" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete comment" }));
+    expect(api.calls).toHaveLength(0);
+    await userEvent.click(screen.getByRole("button", { name: "Yes" }));
+    expect(api.calls.map((c) => `${c.method} ${c.path}`)).toEqual(["DELETE /jobs/7/comments/3"]);
   });
 });

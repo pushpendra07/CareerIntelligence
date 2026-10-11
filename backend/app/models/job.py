@@ -192,6 +192,21 @@ class JobSourceLink(Base):
     )
 
 
+class JobComment(Base):
+    """A dated comment the user wrote on a job (newest shown first)."""
+
+    __tablename__ = "job_comments"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    job_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class DeletedJob(Base):
     """A job the user deleted: imports and scans skip it instead of adding it back."""
 

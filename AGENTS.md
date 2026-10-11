@@ -224,7 +224,7 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 
 ## Other ways to add data
 
-- **Add Job** (sidebar): paste a job URL and description → live preview → Save & analyze.
+- **Add Job** (button on Jobs / Dashboard): paste a job URL and description → live preview → Save & analyze.
   Use this for LinkedIn / Naukri / Indeed (they can't be scanned).
 - **CSV / JSON upload:** Settings → Import & export → import jobs or recruiters (`POST /api/v1/import/{jobs|recruiters}`).
 - **Company research files (CLI):**
@@ -275,6 +275,9 @@ A company is searched by the built-in scanner only when **both** are true:
 2. its careers URL is a **supported job board** (see the board table in `docs/scan-coverage.md`).
 
 Check one company: `GET /api/v1/scanner/companies/{id}/board` (`null` = not scannable).
+
+To find careers pages / job boards for companies that can't be scanned yet (web research, then
+save via the API), use the ready prompt `docs/prompts/find-company-job-boards.md`.
 
 **Adding companies is not the goal — jobs are.** When asked to add companies, follow
 `.agent/workflows/add-company-for-scanning.md`: find and verify the real job board, save it

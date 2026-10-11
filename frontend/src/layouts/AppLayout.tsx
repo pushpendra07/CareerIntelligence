@@ -10,8 +10,6 @@ const NAV: { section: string | null; items: NavItem[] }[] = [
   ] },
   { section: "Find jobs", items: [
     { to: "/jobs", label: "Jobs", hint: "Every job, scored 0–100, in status tabs" },
-    { to: "/jobs/new", label: "Add Job", hint: "Paste a job link and description (LinkedIn, Naukri…)" },
-    { to: "/jobs/closed", label: "Closed Jobs", hint: "Postings that were taken down" },
     { to: "/companies", label: "Companies", hint: "Companies you track; tick Job search to scan them" },
   ] },
   { section: "Track progress", items: [

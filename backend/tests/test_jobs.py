@@ -509,3 +509,25 @@ def test_sort_by_job_id(client: TestClient) -> None:
         return [j["id"] for j in client.get("/api/v1/jobs", params={"sort": sort}).json()["items"]]
 
     assert ids("id") == [a["id"], b["id"]] and ids("-id") == [b["id"], a["id"]]
+
+
+def test_job_comments(client: TestClient) -> None:
+    job = add(client)["job"]
+    url = f"/api/v1/jobs/{job['id']}/comments"
+    first = client.post(url, json={"body": "  Called the recruiter, waiting to hear back  "})
+    assert first.status_code == 201
+    assert first.json()["body"] == "Called the recruiter, waiting to hear back"
+    assert first.json()["created_at"]
+    client.post(url, json={"body": "Second round next week"})
+    assert client.post(url, json={"body": "   "}).status_code == 422
+
+    comments = client.get(f"/api/v1/jobs/{job['id']}").json()["comments"]
+    assert [c["body"] for c in comments] == [
+        "Second round next week", "Called the recruiter, waiting to hear back"
+    ]
+
+    assert client.delete(f"{url}/{first.json()['id']}").status_code == 204
+    assert client.delete(f"{url}/{first.json()['id']}").status_code == 404
+    comments = client.get(f"/api/v1/jobs/{job['id']}").json()["comments"]
+    assert [c["body"] for c in comments] == ["Second round next week"]
+    assert client.post("/api/v1/jobs/999999/comments", json={"body": "x"}).status_code == 404

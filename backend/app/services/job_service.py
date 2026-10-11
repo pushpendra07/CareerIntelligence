@@ -34,7 +34,7 @@ from app.jobs.jd_parser import (
     parse_salary,
 )
 from app.models.company import Company, Contact
-from app.models.job import DeletedJob, Job, JobSourceLink, JobStatus, WorkModel
+from app.models.job import DeletedJob, Job, JobComment, JobSourceLink, JobStatus, WorkModel
 from app.services.activity import record_activity
 from app.services.company_service import find_or_create_by_name
 from app.skills.catalog import normalize_skill_list
@@ -683,6 +683,34 @@ def update_job(db: Session, job_id: int, changes: dict[str, Any]) -> Job:
     analyze_job(db, job)
     db.commit()
     return get_job(db, job_id)
+
+
+def list_comments(db: Session, job_id: int) -> list[JobComment]:
+    return list(db.scalars(
+        select(JobComment).where(JobComment.job_id == job_id)
+        .order_by(JobComment.created_at.desc(), JobComment.id.desc())
+    ))
+
+
+def add_comment(db: Session, job_id: int, body: str) -> JobComment:
+    job = get_job(db, job_id)
+    cleaned = body.strip()
+    if not cleaned:
+        raise DomainValidationError("Comment is empty")
+    comment = JobComment(job_id=job.id, body=cleaned)
+    db.add(comment)
+    db.flush()
+    record_activity(db, "job.commented", "job", job.id, cleaned[:200], {"comment_id": comment.id})
+    db.commit()
+    return comment
+
+
+def delete_comment(db: Session, job_id: int, comment_id: int) -> None:
+    comment = db.get(JobComment, comment_id)
+    if comment is None or comment.job_id != job_id:
+        raise NotFoundError(f"Comment {comment_id} not found on job {job_id}")
+    db.delete(comment)
+    db.commit()
 
 
 def reparse_job(db: Session, job_id: int) -> Job:

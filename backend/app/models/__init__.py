@@ -7,7 +7,7 @@ from app.models.career_ops import CareerOpsImport
 from app.models.company import Company, CompanyFieldSource, Contact
 from app.models.cv import CV, CVVersion
 from app.models.interview import Interview, InterviewQuestion
-from app.models.job import DeletedJob, Job, JobSourceLink
+from app.models.job import DeletedJob, Job, JobComment, JobSourceLink
 from app.models.match import JobMatch, ScoringConfigRow
 from app.models.offer import Offer
 from app.models.profile import ProfessionalProfile, TargetProfile
@@ -31,6 +31,7 @@ __all__ = [
     "DeletedJob",
     "Job",
     "JobMatch",
+    "JobComment",
     "JobSourceLink",
     "Offer",
     "ProfessionalProfile",

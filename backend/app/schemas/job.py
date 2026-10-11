@@ -173,6 +173,18 @@ class JobOut(BaseModel):
     updated_at: datetime
 
 
+class JobCommentIn(BaseModel):
+    body: str = Field(min_length=1, max_length=10_000)
+
+
+class JobCommentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    body: str
+    created_at: datetime
+
+
 class JobDetail(JobOut):
     original_jd: str
     parsed_jd: dict[str, Any]
@@ -189,6 +201,7 @@ class JobDetail(JobOut):
     recommended_cv: dict[str, Any] | None = None
     recruiter: dict[str, Any] | None = None
     activity: list[dict[str, Any]] = Field(default_factory=list)
+    comments: list[JobCommentOut] = Field(default_factory=list)
     career_ops: dict[str, Any] | None = None
     career_ops_score: Decimal | None = None
     career_ops_evaluation: dict[str, Any] | None = None
