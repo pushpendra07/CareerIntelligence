@@ -1,8 +1,10 @@
 import type { Bar } from "../types/api";
+import { humanize } from "../utils/format";
 
 /** Minimal dependency-free horizontal bar chart. */
-export function BarChart({ data = [], color = "bg-indigo-500", empty = "No data yet", format }: {
-  data?: Bar[]; color?: string; empty?: string; format?: (b: Bar) => string;
+/** `codes`: labels are stored codes like COMPANY_CAREERS, shown as "Company Careers". */
+export function BarChart({ data = [], color = "bg-indigo-500", empty = "No data yet", format, codes = false }: {
+  data?: Bar[]; color?: string; empty?: string; format?: (b: Bar) => string; codes?: boolean;
 }) {
   if (!data.length || data.every((d) => d.value === 0)) {
     return <p className="py-4 text-center text-sm text-slate-400">{empty}</p>;
@@ -12,7 +14,7 @@ export function BarChart({ data = [], color = "bg-indigo-500", empty = "No data 
     <ul className="space-y-1.5" aria-label="bar chart">
       {data.map((d) => (
         <li key={d.label} className="grid grid-cols-[minmax(0,10rem)_1fr_3rem] items-center gap-2 text-xs">
-          <span className="truncate text-slate-600" title={d.label}>{d.label}</span>
+          <span className="truncate text-slate-600" title={d.label}>{codes ? humanize(d.label) : d.label}</span>
           <span className="h-3 rounded bg-slate-100">
             <span className={`block h-3 rounded ${color}`} style={{ width: `${(d.value / max) * 100}%` }} />
           </span>

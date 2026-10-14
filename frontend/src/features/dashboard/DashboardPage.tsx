@@ -53,7 +53,9 @@ export function TodaysPriorities({ items }: { items: Priority[] }) {
 
 export function DashboardPage() {
   const qc = useQueryClient();
-  const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<Dashboard>("/dashboard") });
+  // While scores are being refreshed in the background, poll so the numbers update by themselves.
+  const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<Dashboard>("/dashboard"),
+    refetchInterval: (q) => (q.state.data?.summary.stale_scores ? 5000 : false) });
   const charts = useQuery({ queryKey: ["dashboard", "charts"], queryFn: () => api.get<Record<string, Bar[]>>("/dashboard/charts") });
   const reanalyze = useMutation({
     mutationFn: () => api.post("/matches/reanalyze", { only_stale: true }, { wait: true }),
@@ -68,12 +70,16 @@ export function DashboardPage() {
       <div className="flex items-center justify-between">
         <div><h1>Dashboard</h1><PageIntro>What to do today, and how your job search is going. Click any number to see those jobs.</PageIntro></div>
         <div className="flex gap-2">
-          {s.stale_scores > 0 && (
-            <button className="btn-secondary" disabled={reanalyze.isPending} onClick={() => reanalyze.mutate()}>
-              {reanalyze.isPending ? "Re-analyzing…" : `Re-analyze ${s.stale_scores} stale`}
-            </button>
-          )}
-          <Link className="btn-primary" to="/jobs/new">Add Job</Link>
+          {s.stale_scores > 0 && (s.scores_updating || reanalyze.isPending ? (
+            <span className="flex items-center gap-2 rounded-md px-3 text-sm text-slate-500" role="status">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />Updating scores… {s.stale_scores} left
+            </span>
+          ) : (
+            <button className="btn-secondary" title="Scores also update by themselves within a minute"
+              onClick={() => reanalyze.mutate()}>Update {s.stale_scores} scores now</button>
+          ))}
+          {s.new_jobs > 0 && <Link className="btn-primary" to="/jobs/review">Review {s.new_jobs} new jobs</Link>}
+          <Link className="btn-secondary" to="/jobs/new">Add Job</Link>
         </div>
       </div>
       <GettingStarted totalJobs={s.total_jobs + (s.closed_jobs ?? 0)} />
@@ -128,13 +134,13 @@ export function DashboardPage() {
       <h2 className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Insights</h2>
       {c && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Card title="Jobs by score"><BarChart data={c.jobs_by_score} color="bg-emerald-500" /></Card>
-          <Card title="Jobs by source"><BarChart data={c.jobs_by_source} /></Card>
-          <Card title="Applications by status"><BarChart data={c.applications_by_status} color="bg-sky-500" /></Card>
+          <Card title="All jobs by score (incl. applied and closed)"><BarChart data={c.jobs_by_score} color="bg-emerald-500" /></Card>
+          <Card title="Jobs by source"><BarChart data={c.jobs_by_source} codes /></Card>
+          <Card title="Applications by status"><BarChart data={c.applications_by_status} codes color="bg-sky-500" /></Card>
           <Card title="Interviews over time"><BarChart data={c.interviews_over_time} color="bg-emerald-500" /></Card>
           <Card title="Applications by company"><BarChart data={c.applications_by_company} color="bg-sky-500" /></Card>
           <Card title="Jobs by location"><BarChart data={c.jobs_by_location} /></Card>
-          <Card title="Jobs by work model"><BarChart data={c.jobs_by_work_model} /></Card>
+          <Card title="Jobs by work model"><BarChart data={c.jobs_by_work_model} codes /></Card>
           <Card title="Top companies (avg score)">
             <BarChart data={c.top_companies} format={(b) => `${b.avg_score ?? "—"} (${b.value})`} color="bg-violet-500" />
           </Card>

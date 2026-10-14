@@ -27,7 +27,7 @@ from app.schemas.job import (
     SourceIn,
     StatusIn,
 )
-from app.services import job_service, match_service
+from app.services import freshness, job_service, match_service
 from app.services.job_service import JobFilters, JobInput
 
 router = APIRouter(tags=["jobs"])
@@ -276,7 +276,10 @@ class ReanalyzeIn(BaseModel):
 
 def _reanalyze_in_background(only_stale: bool, job_ids: list[int] | None) -> None:
     with get_sessionmaker()() as db:
-        match_service.reanalyze(db, only_stale=only_stale, job_ids=job_ids)
+        if only_stale and job_ids is None:
+            freshness.refresh(db)  # shares the background refresher's lock
+        else:
+            match_service.reanalyze(db, only_stale=only_stale, job_ids=job_ids)
 
 
 @router.post("/matches/reanalyze")

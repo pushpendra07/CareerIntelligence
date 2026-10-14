@@ -22,13 +22,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         # Optional "scan every N hours" (Settings -> Job scanner); idle when N is 0.
-        stop = None
+        # Scores and JD parses are also kept current in the background (services/freshness.py).
+        stops = []
         if settings.environment != "test":
             from app.scanner.runner import start_scheduler
+            from app.services.freshness import start_refresher
 
-            stop = start_scheduler()
+            stops = [start_scheduler(), start_refresher()]
         yield
-        if stop:
+        for stop in stops:
             stop.set()
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)

@@ -122,7 +122,7 @@ export function ScoreBadge({ score, stale }: { score: number | null; stale?: boo
   return (
     <span className="inline-flex items-center gap-1">
       <Badge tone={scoreTone(score)}>{score}</Badge>
-      {stale && <Badge tone="amber" title="Profile or preferences changed since this score">stale</Badge>}
+      {stale && <Badge tone="amber" title="Profile or preferences changed since this score; it updates by itself shortly">updating</Badge>}
     </span>
   );
 }

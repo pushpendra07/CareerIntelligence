@@ -20,7 +20,7 @@ function MatchPanel({ job }: { job: JobDetail }) {
   return (
     <Card title={<span>Match <span className="text-2xl font-bold text-indigo-700">{m.score}</span><span className="text-slate-400"> / 100</span></span>}
       actions={<div className="flex items-center gap-1"><StatusBadge value={m.recommendation} /><Badge tone="indigo">{humanize(m.action)}</Badge></div>}>
-      {job.score_stale && <p className="mb-2 rounded bg-amber-50 p-2 text-xs text-amber-800">This score is stale — your profile, preferences or scoring changed. Re-analyze to refresh it.</p>}
+      {job.score_stale && <p className="mb-2 rounded bg-amber-50 p-2 text-xs text-amber-800">Your profile, preferences or scoring changed since this score. It updates by itself within a minute.</p>}
       {m.confidence !== "HIGH" && <p className="mb-2 rounded bg-slate-50 p-2 text-xs text-slate-600">Confidence: {humanize(m.confidence)} — {m.confidence === "LOW" ? "add the job description for a reliable score." : "the job has limited detail."}</p>}
       <ScoreBreakdown components={m.components} />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -17,6 +17,7 @@ from app.models.interview import Interview, InterviewResult, InterviewStatus
 from app.models.job import Job, JobSourceLink, JobStatus
 from app.models.match import JobMatch
 from app.models.offer import Offer, OfferStatus
+from app.services import freshness
 from app.skills.catalog import SKILLS
 
 UNAPPLIED = [
@@ -52,6 +53,8 @@ def summary(db: Session) -> dict[str, int]:
         "jobs_90_plus": _count(db, jobs.where(Job.match_score >= 90)),
         "jobs_80_plus": _count(db, jobs.where(Job.match_score >= 80)),
         "stale_scores": _count(db, all_jobs.where(Job.score_stale.is_(True))),
+        # 1 while the background refresher is re-scoring (services/freshness.py).
+        "scores_updating": int(freshness.is_running()),
         "shortlisted": _count(db, jobs.where(Job.status == JobStatus.SHORTLISTED.value)),
         "applications": _count(db, select(func.count()).select_from(Application)),
         "interviews": _count(db, select(func.count()).select_from(Interview)),
@@ -424,8 +427,8 @@ def priorities(db: Session, limit: int = 12) -> list[dict[str, Any]]:
             {
                 "type": "REANALYZE",
                 "rank": 5,
-                "title": f"Re-analyze {stale} jobs",
-                "detail": "Scores are stale after profile/preference changes",
+                "title": f"Updating {stale} scores",
+                "detail": "Your profile or preferences changed; scores refresh automatically",
                 "due": None,
                 "link": {"entity": "reanalyze", "id": None},
             }

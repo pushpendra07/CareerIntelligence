@@ -15,6 +15,7 @@ export const routes: RouteObject[] = [
       { index: true, ...page(() => import("../features/dashboard/DashboardPage"), (m) => m.DashboardPage) },
       { path: "jobs", ...page(() => import("../features/jobs/JobsPage"), (m) => m.JobsPage) },
       { path: "jobs/closed", ...page(() => import("../features/jobs/JobsPage"), (m) => () => <m.JobsPage view="closed" />) },
+      { path: "jobs/review", ...page(() => import("../features/jobs/ReviewPage"), (m) => m.ReviewPage) },
       { path: "jobs/new", ...page(() => import("../features/jobs/AddJobPage"), (m) => m.AddJobPage) },
       { path: "jobs/:id", ...page(() => import("../features/jobs/JobDetailPage"), (m) => m.JobDetailPage) },
       { path: "jobs/:id/prep", ...page(() => import("../features/interviews/PrepPage"), (m) => () => <m.PrepPage kind="job" />) },

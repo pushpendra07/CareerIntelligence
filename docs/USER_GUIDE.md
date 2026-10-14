@@ -66,8 +66,8 @@ open jobs ask for with your profile and your active CV:
   higher), **Which jobs?** (examples) and **Hide** (stop suggesting it; *show* brings it back).
 - Only jobs with a description list their skills — add descriptions for better advice.
 
-> Uploading or activating a CV marks all job scores **stale** (the best CV may change).
-> Re-analyze from the Dashboard afterwards (step 7).
+> Uploading or activating a CV changes job scores (the best CV may change). Scores update by
+> themselves in the background within a minute; jobs show *updating* until then.
 
 ## 2. Review your Professional Profile
 
@@ -83,7 +83,7 @@ Tips:
 - **Core skills** weigh most in matching — keep them to what you really use (e.g. Magento 2,
   Adobe Commerce, PHP, MySQL, GraphQL, AWS).
 - Years matter: the experience component compares your years with each job's requirement.
-- Save, then check the yellow *stale* hint on the Dashboard.
+- Save; scores update by themselves within a minute.
 
 ## 3. Set your Target Profile (what you want)
 
@@ -97,7 +97,7 @@ Sidebar → **Target Profile**. Every score is "how well does this job fit what 
 | **Work model, experience & salary** | Remote / Hybrid / Onsite OK, Min and Max experience, Notice period (days), Minimum salary (annual), Target salary (annual), Currency |
 
 Set the **salary targets** — until you do, salary is scored as "unknown".
-Saving marks scores stale; re-analyze afterwards.
+Saving updates every score by itself within a minute.
 
 ## 4. Check the scoring settings (optional)
 
@@ -170,7 +170,10 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 
 ## 7. Work through your jobs
 
-- **Re-analyze stale scores** first if the Dashboard shows *Re-analyze N stale*.
+- **Fastest way to triage: Review new jobs** (sidebar, or the button on the Dashboard). It shows
+  new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
+  description. **Shortlist** (`S`), **Not relevant** (`N`), **Skip for now** (`K`),
+  **Open posting** (`O`), **Undo** (`U`). Pick *Score 70+* to see only strong matches.
 - Sidebar → **Jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected ·
   Rejected · Not pursuing · Closed**, each with a count.
 - Filters: search, minimum score, status (multi-select inside a tab) and sort are always shown;
@@ -182,7 +185,7 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - **Sort by clicking a column title** (Score, Job, Company, Location, Exp, Salary, Posted,
   Status); click again to reverse. ▲/▼ shows the current order.
 - The **score legend** under the filters explains the colours (90+ excellent … below 60 poor),
-  *stale* (re-analyze) and *no JD* (no description, less certain score).
+  *updating* (score refreshing after a profile change) and *no JD* (no description, less certain score).
 - Open a job to see:
   - **Match** — score, recommendation, the 9-component breakdown with reasons, blockers,
     confidence, recommended CV;
@@ -268,9 +271,9 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
 
 1. Open the **Dashboard** → do **Today's Priorities**.
 2. If the scanner isn't scheduled: Settings → Job scanner → **Scan now**; import new sheet rows.
-3. **Jobs → New** tab, sorted by score: open the strong ones, shortlist or mark *Not relevant*.
+3. **Review new jobs**: shortlist the strong ones, mark the rest *Not relevant* (keys `S` / `N`).
 4. Apply to shortlisted jobs with the recommended CV; add a follow-up reminder.
 5. Update application and interview statuses as things happen.
-6. After changing your CV or profile, **Re-analyze**.
+6. After changing your CV or profile, scores update by themselves.
 
 Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI coding agents*.

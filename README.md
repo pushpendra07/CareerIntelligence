@@ -86,6 +86,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 <tr><td valign="top">
 
 ### 💼 Jobs
+- **Review new jobs**: new jobs one at a time, best match first, with why it fits, what's
+  missing and the description; Shortlist / Not relevant / Skip with one key (S / N / K).
 - **Built-in job scanner**: one click (or every N hours) searches the job boards of companies
   marked *Job search* and adds relevant jobs, with full descriptions, already scored.
 - **Add Job**: paste a URL and a JD and save. A **live preview** shows the detected source, skills,
@@ -113,7 +115,7 @@ CV ─▶ Professional Profile ─▶ Target Profile
   (an unknown salary is not heavily penalized), company tier and other requirements.
 - **Blocker detection**: mandatory certification, language, work authorization, minimum
   experience, notice period. Blockers are shown, and only auto-reject when you turn on hard rules.
-- **Recommended CV** for each job. Scores go **stale** when your inputs change, and one click re-analyzes them.
+- **Recommended CV** for each job. When your inputs change, scores refresh by themselves in the background.
 
 </td></tr>
 <tr><td valign="top">
@@ -282,7 +284,7 @@ VITE_API_TARGET=http://127.0.0.1:8010 npm run dev   # http://127.0.0.1:5173
 | Web UI exited during start | Check `.run/logs/frontend.log`. Make sure your Node.js version is 20.19+ or 22.12+. |
 | "This sheet is not public" | Share the Google Sheet as *Anyone with the link → Viewer*, or download it as CSV and import the file. |
 | CV parsed with little text | It is probably a scanned/image PDF. OCR is not supported, so upload a DOCX or text-based PDF. |
-| Scores show **stale** | Your profile, preferences, CVs or scoring changed. Click **Re-analyze** on the dashboard. |
+| Scores show **updating** | Your profile, preferences, CVs or scoring changed; they refresh within a minute. |
 </details>
 
 ---
@@ -349,7 +351,7 @@ Technical Lead – Adobe Commerce                         93 / 100  HIGHLY RECOM
 - **Deterministic and auditable**: each result stores a SHA-256 hash of its inputs, the scoring
   version and the profile/target versions. Re-scoring identical inputs creates no new history entry.
 - **Never silently stale**: changing your profile, preferences, CVs or weights flags existing scores as
-  stale until they are re-analyzed.
+  stale, and the background refresher re-scores them within a minute.
 - **Honest about missing data**: a job without a description gets **low confidence**, and its skills
   credit is capped, so a title alone can't produce a top score.
 

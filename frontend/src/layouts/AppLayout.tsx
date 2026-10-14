@@ -9,6 +9,7 @@ const NAV: { section: string | null; items: NavItem[] }[] = [
     { to: "/", label: "Dashboard", hint: "Today's priorities and your numbers at a glance" },
   ] },
   { section: "Find jobs", items: [
+    { to: "/jobs/review", label: "Review new jobs", hint: "New jobs one at a time, best match first: shortlist or skip" },
     { to: "/jobs", label: "Jobs", hint: "Every job, scored 0–100, in status tabs" },
     { to: "/companies", label: "Companies", hint: "Companies you track; tick Job search to scan them" },
   ] },

@@ -167,7 +167,7 @@ Then Settings → Career-Ops → **Import now** (or `POST /api/v1/career-ops/imp
 
 Which companies, titles and locations Career-Ops scans is configured in Career-Ops itself
 (`portals.yml`: `tracked_companies`, `title_filter`, `location_filter`, posting age) — not here.
-Imported jobs show **Source → Career Ops** in the Jobs filters; jobs already in the app are
+Imported jobs are found in Jobs with **Added via → Career-Ops** (or More filters → Source → Career Ops); jobs already in the app are
 merged, never duplicated; jobs the user deleted are skipped.
 
 ### Troubleshooting Career-Ops
@@ -248,8 +248,10 @@ asks how to do something in the app, answer from it.
    breakdown, set status, **Apply** (creates an application), or **Delete**.
    Closed postings: set status *Closed* → they move to the **Closed positions** tab.
 5. **Applications / Interviews / Offers / Follow-ups** track the pipeline.
-6. After uploading a new CV or changing profile/preferences/scoring, scores become **stale**:
-   Dashboard → **Re-analyze** (or `POST /api/v1/matches/reanalyze` with `{"only_stale": true}`).
+6. After uploading a new CV or changing profile/preferences/scoring, scores become **stale** and
+   are re-scored automatically in the background within a minute (`services/freshness.py`).
+   To force it now: `POST /api/v1/matches/reanalyze` with `{"only_stale": true}`.
+7. **Review new jobs** (`/jobs/review`): new jobs one at a time, best first; keys S/N/K/O/U.
 
 ## Troubleshooting (general)
 
@@ -259,7 +261,7 @@ asks how to do something in the app, answer from it.
 | Port 8010 or 5173 busy | Another copy is running: `./stop.sh`, then start again (never touch port 8000) |
 | New backend code not visible | The API doesn't auto-reload: restart it |
 | "relation … does not exist" | Migrations not applied: restart (start.sh runs `alembic upgrade head`) |
-| Scores look outdated (yellow *stale*) | Re-analyze from the Dashboard |
+| Scores look outdated (*updating*) | They refresh within a minute; if not, check the API is running and `backend.log` |
 | A job keeps coming back after delete | It shouldn't: deleted jobs are remembered; only Add Job re-adds them |
 
 ## Companies and scan coverage
@@ -346,7 +348,10 @@ Never insert `Job` rows directly.
 (role 20, skills 25, experience 15, domain 10, location 10, seniority 5, salary 5, company 5,
 other 5), blockers, confidence, `inputs_hash`. Scoring config is versioned (Settings → Scoring).
 Changing profile, preferences, CVs or scoring config marks scores **stale**;
-`match_service.reanalyze` re-scores. If you change engine logic, bump `ENGINE_VERSION`.
+`match_service.reanalyze` re-scores. The background refresher (`services/freshness.py`, started
+in `main.py`) re-scores stale jobs every minute and re-parses JDs parsed by an older
+`JD_PARSER_VERSION` / `CATALOG_VERSION` — so bump `CATALOG_VERSION` when you add skills.
+If you change engine logic, bump `ENGINE_VERSION`.
 
 **Job sources**
 - Built-in scanner (`scanner/`): scans job boards (Greenhouse, Lever, Ashby, SmartRecruiters,

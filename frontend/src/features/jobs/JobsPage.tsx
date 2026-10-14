@@ -42,7 +42,7 @@ function ScoreLegend() {
     <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
       <span className="font-medium text-slate-600">Score:</span>
       {items.map(([dot, label]) => <span key={label} className="inline-flex items-center gap-1"><span aria-hidden className={`h-2 w-2 rounded-full ${dot}`} />{label}</span>)}
-      <span><span className="rounded bg-amber-50 px-1 text-amber-800 ring-1 ring-amber-200">stale</span> = profile changed, re-analyze</span>
+      <span><span className="rounded bg-amber-50 px-1 text-amber-800 ring-1 ring-amber-200">updating</span> = profile changed, score refreshes by itself</span>
       <span><span className="rounded bg-amber-50 px-1 text-amber-800 ring-1 ring-amber-200">no JD</span> = no description, score less certain</span>
     </p>
   );
@@ -170,7 +170,10 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
           <PageIntro>Every job from every source, scored 0–100 for how well it fits you. Use the tabs to see each stage; click a column title to sort.</PageIntro>
         </div>
-        <Link className="btn-primary" to="/jobs/new">Add Job</Link>
+        <div className="flex gap-2">
+          <Link className="btn-secondary" to="/jobs/review" title="New jobs one at a time, best match first">Review one by one</Link>
+          <Link className="btn-primary" to="/jobs/new">Add Job</Link>
+        </div>
       </div>
       <StatusTabs active={tab.key} query={query} />
       <Card>
