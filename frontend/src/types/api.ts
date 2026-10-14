@@ -298,6 +298,8 @@ export interface FollowUp {
   due_date: string;
   job_id: number | null;
   job_title: string | null;
+  job_status?: string | null;
+  job_url?: string | null;
   company_name: string | null;
   contact_name: string | null;
   application_id: number | null;

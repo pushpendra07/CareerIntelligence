@@ -113,6 +113,10 @@ def test_followups_crud(client: TestClient) -> None:
     assert r.status_code == 201
     f = r.json()
     assert f["overdue"] is True and f["company_name"] == "Acme"
+    assert f["job_status"] == job["status"] and f["job_title"] == "Technical Lead"
+    by_job = client.get("/api/v1/followups", params={"job_id": job["id"]}).json()
+    assert [x["id"] for x in by_job["items"]] == [f["id"]]
+    assert client.get("/api/v1/followups", params={"job_id": 999999}).json()["total"] == 0
     assert (
         client.get("/api/v1/followups", params={"due_before": str(date.today())}).json()["total"]
         == 1

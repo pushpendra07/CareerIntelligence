@@ -68,7 +68,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1>Dashboard</h1><PageIntro>What to do today, and how your job search is going. Click any number to see those jobs.</PageIntro></div>
+        <div><h1>Today</h1><PageIntro>What to do today, and how your job search is going. Click any number to see those jobs.</PageIntro></div>
         <div className="flex gap-2">
           {s.stale_scores > 0 && (s.scores_updating || reanalyze.isPending ? (
             <span className="flex items-center gap-2 rounded-md px-3 text-sm text-slate-500" role="status">

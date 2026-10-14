@@ -32,6 +32,7 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     s = d["summary"]
     assert (s["total_jobs"], s["applications"], s["interviews"]) == (2, 1, 1)
     assert s["pending_followups"] == 2 and s["overdue_followups"] == 1
+    assert s["due_followups"] == 1  # overdue counts; the application one is due later
 
     client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "CLOSED"})
     closed = client.get("/api/v1/dashboard").json()["summary"]

@@ -6,6 +6,17 @@ from an empty database to scored jobs, applications and interviews.
 > First install and start the app: see the README → *Run locally* (`./start.sh`).
 > Everything below happens in the browser; nothing needs an API key.
 
+**The menu** has six entries; related pages are tabs at the top of each one:
+
+| Menu | Tabs |
+|---|---|
+| **Today** | Today (your dashboard) · Insights (analytics) |
+| **Jobs** (number = new jobs to review) | Review new · All jobs · Companies |
+| **Pipeline** | Applications · Interviews · Offers · Recruiters |
+| **Follow-ups** (number = due today or late) | — |
+| **My profile** | Profile · Target roles · CVs · Question bank |
+| **Settings** | — |
+
 ## Contents
 
 1. [Upload your CV](#1-upload-your-cv)
@@ -27,7 +38,7 @@ from an empty database to scored jobs, applications and interviews.
 
 ## 1. Upload your CV
 
-Sidebar → **CVs** → *Upload a CV*.
+**My profile → CVs** → *Upload a CV*.
 
 | Field | What to enter |
 |---|---|
@@ -71,7 +82,7 @@ open jobs ask for with your profile and your active CV:
 
 ## 2. Review your Professional Profile
 
-Sidebar → **Profile** (what you *are*). This is what jobs are scored against, so correct it.
+**My profile → Profile** (what you *are*). This is what jobs are scored against, so correct it.
 
 | Section | Fields |
 |---|---|
@@ -87,7 +98,7 @@ Tips:
 
 ## 3. Set your Target Profile (what you want)
 
-Sidebar → **Target Profile**. Every score is "how well does this job fit what I want".
+**My profile → Target roles**. Every score is "how well does this job fit what I want".
 
 | Section | Fields |
 |---|---|
@@ -123,7 +134,7 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
 
 ## 5. Add companies
 
-Sidebar → **Companies**.
+**Jobs → Companies**.
 
 - The list's **Jobs** column shows *open / total* jobs in the app per company; filter **Has jobs
   in the app** and sort by **Most jobs**.
@@ -154,7 +165,7 @@ Every way below goes through the same pipeline: duplicates are merged (one job c
 | Way | Where | Best for |
 |---|---|---|
 | **Built-in job scanner** | Settings → Job scanner → **Scan now** (or company page → Scan jobs) | Companies on supported job boards — full descriptions, 1–3 min |
-| **Add Job** | Sidebar → Add Job: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
+| **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
 | **CSV / JSON** | Settings → Import & export → import jobs | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now** (set up once with `./scripts/setup-career-ops.sh`) | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
@@ -170,31 +181,40 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 
 ## 7. Work through your jobs
 
-- **Fastest way to triage: Review new jobs** (sidebar, or the button on the Dashboard). It shows
+- **Fastest way to triage: Jobs → Review new** (or the button on Today). It shows
   new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
   description. **Shortlist** (`S`), **Not relevant** (`N`), **Skip for now** (`K`),
   **Open posting** (`O`), **Undo** (`U`). Pick *Score 70+* to see only strong matches.
-- Sidebar → **Jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected ·
-  Rejected · Not pursuing · Closed**, each with a count.
-- Filters: search, minimum score, status (multi-select inside a tab) and sort are always shown;
-  **More filters** opens recommendation, company tier, technology, location, work model, source,
-  posted after, your years, applied or not and outdated scores. 10 jobs per page.
+- **Jobs → All jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected** and,
+  on the right for finished jobs, **Rejected · Not pursuing · Closed**, each with a count.
+- Filters: search, status (multi-select inside a tab) and sort, then one-click buttons for
+  **Score** (60+ / 70+ / 80+), **Work** (remote / hybrid / on-site), **Posted** (last 7 / 14 /
+  30 days) and **Added via**. **More filters** opens exact minimum score, recommendation,
+  company tier, technology, location, source, your years and applied or not. 10 jobs per page.
+- **Your sort and filters are remembered** in this browser until you change them or press
+  **Reset**. A link that brings its own filters (e.g. a Dashboard card) uses those instead; your
+  sort still applies.
+- **Next step** on every row: **★ Shortlist** / **✕** for new jobs, **Apply** for shortlisted
+  ones, **Follow up** for jobs you applied to.
 - **Added via** tag on every job — how it came into the app: **Manual** (Add Job),
   **Google Sheet**, **Job scanner**, **Career-Ops** or **File import**. A job found more than
   one way shows several tags. Filter with **Added via** in the filter row.
 - **Sort by clicking a column title** (Score, Job, Company, Location, Exp, Salary, Posted,
-  Status); click again to reverse. ▲/▼ shows the current order.
-- The **score legend** under the filters explains the colours (90+ excellent … below 60 poor),
-  *updating* (score refreshing after a profile change) and *no JD* (no description, less certain score).
-- Open a job to see:
-  - **Match** — score, recommendation, the 9-component breakdown with reasons, blockers,
-    confidence, recommended CV;
-  - **Parsed requirements** and the **Original job description**;
-  - **Sources** (every place this job was found), **Recruiter**, **Notes**, **Activity**;
-  - **Career-Ops evaluation** if it came from Career-Ops.
-- Actions on a job: change **status** (New → Reviewing → Shortlisted → Ready to apply…),
-  **Re-analyze**, **Interview prep**, **Apply**, **Delete** (asks first; deleted jobs never come
-  back through imports), **Fetch via Career-Ops** when the description is missing.
+  Status) or with the Sort menu (also Job ID, recently added); click again to reverse.
+- The line above the table explains the score colours and *no JD* (no description, so the score
+  is a rough guess).
+- Open a job. From top to bottom:
+  - the job's key facts, its score and status;
+  - **Next step** — what to do now: *Shortlist / Not relevant* for new jobs; *Apply on the
+    site* then *Record that I applied* for shortlisted ones; *Plan a follow-up* or *Got an
+    interview* once applied; *Interview prep* when interviewing;
+  - **Does it fit you?** — why it fits, what to watch out for, missing skills, the best CV, and
+    *How the score was calculated* (full breakdown) when you want it;
+  - **Job description** — with **Fetch description** when it's missing;
+  - **Follow-ups** for this job (add one with *tomorrow / in 3 days / in a week*), your
+    applications and interviews, comments, the recruiter;
+  - **More details** (folded): seniority, skills, where it was found, notes, history,
+    **Interview prep** and **Delete** (asks first; deleted jobs never come back through imports).
 - A posting taken down → set status **Closed**; it moves to the Closed tab.
 
 ## 8. Apply and track applications
@@ -225,8 +245,10 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
 - **Offers**: *Record an offer* for a **Job** (CTC, **Joining date**, **Offer expires**,
   **Work model**, **Benefits**); negotiate (**Counter CTC**, **Negotiation note**); accept or
   decline with **Decision notes**; and *Compare open offers* side by side.
-- **Follow-ups**: *New reminder* — **What**, **Kind** (recruiter, application, interview…),
-  **Due** date, **Notes**. Overdue ones show on the Dashboard.
+- **Follow-ups**: grouped into **Late · Today · This week · Later**. Each one links to its job
+  and shows the job's status; **✓ Done**, or push it **+1 day / +3 days / +1 week**. If the job
+  is already rejected or closed, it says so and offers **Dismiss**. Applying plans a follow-up
+  for you; add more from the job page or **+ New reminder**.
 - **Recruiters**: contacts with company, role, channel and notes; link them to jobs.
 
 ## 11. Dashboard and analytics

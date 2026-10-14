@@ -86,7 +86,7 @@ Conventions:
 - `PATCH /api/v1/applications/{application_id}`
 - `POST /api/v1/applications/{application_id}/status`
 - `POST /api/v1/applications/{application_id}/notes`
-- `GET /api/v1/followups`
+- `GET /api/v1/followups` — filters: `completed`, `due_before`, `kind`, `application_id`, `job_id`; each item has `job_title`, `job_status`, `job_url`
 - `POST /api/v1/followups`
 - `PATCH /api/v1/followups/{followup_id}`
 - `POST /api/v1/followups/{followup_id}/complete`

@@ -2,12 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Chips, ErrorBox, PageIntro, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { Badge, Card, ErrorBox, PageIntro, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { JobDetail, Page, Job } from "../../types/api";
-import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
+import { humanize } from "../../utils/format";
+import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
 
 const MIN_SCORES = [0, 60, 70, 80] as const;
-const JD_PREVIEW = 1500;
 
 type Done = { id: number; title: string; from: string; to: string };
 
@@ -24,7 +24,6 @@ export function ReviewPage() {
   const minScore = Number(params.get("min_score") ?? 0);
   const [skipped, setSkipped] = useState<number[]>([]);
   const [done, setDone] = useState<Done[]>([]);
-  const [showFullJd, setShowFullJd] = useState(false);
 
   const query = { status: ["NEW", "DISCOVERED"], closed: "false", has_application: "false", sort: "-match_score",
     size: 50, ...(minScore ? { min_score: minScore } : {}) };
@@ -40,7 +39,6 @@ export function ReviewPage() {
   useEffect(() => {
     if (nextId !== undefined) void qc.prefetchQuery({ queryKey: ["job", nextId], queryFn: () => api.get<JobDetail>(`/jobs/${nextId}`) });
   }, [nextId, qc]);
-  useEffect(() => setShowFullJd(false), [currentId]);
 
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; title: string; from: string; status: string }) =>
@@ -65,7 +63,7 @@ export function ReviewPage() {
     if (current && !busy) setStatus.mutate({ id: current.id, title: current.title, from: current.status, status });
   }, [current, busy, setStatus]);
   const skip = useCallback(() => { if (current) setSkipped((s) => [...s, current.id]); }, [current]);
-  const postingUrl = current?.source_url ?? current?.source_links.find((l) => l.original_url)?.original_url ?? null;
+  const postingLink = current ? postingUrl(current) : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,14 +74,14 @@ export function ReviewPage() {
       if (k === KEYS.shortlist) decide("SHORTLISTED");
       else if (k === KEYS.notRelevant) decide("NOT_RELEVANT");
       else if (k === KEYS.skip || e.key === "ArrowRight") skip();
-      else if (k === KEYS.open && postingUrl) window.open(postingUrl, "_blank", "noopener");
+      else if (k === KEYS.open && postingLink) window.open(postingLink, "_blank", "noopener");
       else if (k === KEYS.undo && done[0] && !busy) undo.mutate(done[0]);
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [decide, skip, postingUrl, done, busy, undo]);
+  }, [decide, skip, postingLink, done, busy, undo]);
 
   const left = Math.max((list.data?.total ?? 0) - skipped.length, 0);
   return (
@@ -130,7 +128,7 @@ export function ReviewPage() {
             )}
           </div>
           {setStatus.error && <p className="text-sm text-rose-600">{errorMessage(setStatus.error)}</p>}
-          {!current ? <Spinner /> : <ReviewCard job={current} showFullJd={showFullJd} onToggleJd={() => setShowFullJd((v) => !v)} />}
+          {!current ? <Spinner /> : <ReviewCard job={current} />}
           <div className="sticky bottom-0 -mx-2 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50/95 px-2 py-3 backdrop-blur">
             <button className="btn-primary" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
               ★ Shortlist <kbd className="kbd">S</kbd>
@@ -142,8 +140,8 @@ export function ReviewPage() {
               Skip for now <kbd className="kbd">K</kbd>
             </button>
             <span className="flex-1" />
-            {postingUrl && (
-              <a className="btn-secondary" href={postingUrl} target="_blank" rel="noopener noreferrer">
+            {postingLink && (
+              <a className="btn-secondary" href={postingLink} target="_blank" rel="noopener noreferrer">
                 Open posting ↗ <kbd className="kbd">O</kbd>
               </a>
             )}
@@ -155,19 +153,7 @@ export function ReviewPage() {
   );
 }
 
-function ReviewCard({ job, showFullJd, onToggleJd }: { job: JobDetail; showFullJd: boolean; onToggleJd: () => void }) {
-  const m = job.match;
-  const jd = job.original_jd.trim();
-  const facts: [string, string][] = [
-    ["Location", [job.location, job.work_model !== "UNKNOWN" ? humanize(job.work_model) : null].filter(Boolean).join(" · ") || "—"],
-    ["Experience", experienceRange(job.experience_min, job.experience_max)],
-    ["Salary", job.salary_text || salaryRange(job.salary_min, job.salary_max, job.salary_currency)],
-    ["Posted", formatDate(job.posting_date)],
-  ];
-  // The strongest and weakest parts of the score, in plain words.
-  const parts = [...(m?.components ?? [])].filter((c) => c.weight > 0);
-  const good = parts.filter((c) => c.factor >= 0.8).sort((a, b) => b.weight - a.weight).slice(0, 3);
-  const weak = parts.filter((c) => c.factor < 0.5).sort((a, b) => b.weight - a.weight).slice(0, 3);
+function ReviewCard({ job }: { job: JobDetail }) {
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -180,47 +166,14 @@ function ReviewCard({ job, showFullJd, onToggleJd }: { job: JobDetail; showFullJ
         </div>
         <div className="flex items-center gap-2">
           <ScoreBadge score={job.match_score} stale={job.score_stale} />
-          {m && <StatusBadge value={m.recommendation} />}
+          {job.match && <StatusBadge value={job.match.recommendation} />}
         </div>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-        {facts.map(([k, v]) => (
-          <div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="text-slate-800">{v}</dd></div>
-        ))}
-      </dl>
-      {m && (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="label">Why it fits</div>
-            <ul className="space-y-1 text-sm text-slate-700">
-              {good.length ? good.map((c) => <li key={c.key}>✓ {c.reasons[0] ?? c.label}</li>) : <li className="text-slate-500">Nothing stands out</li>}
-            </ul>
-            {m.strong_matches.length > 0 && <div className="mt-2"><Chips items={m.strong_matches} tone="green" /></div>}
-          </div>
-          <div>
-            <div className="label">Watch out for</div>
-            <ul className="space-y-1 text-sm text-slate-700">
-              {m.blockers.map((b) => <li key={b.message} className="text-rose-700">✗ {b.message}</li>)}
-              {weak.map((c) => <li key={c.key}>– {c.reasons[0] ?? c.label}</li>)}
-              {!m.blockers.length && !weak.length && !m.missing.length && <li className="text-slate-500">No concerns</li>}
-              {m.missing.length > 0 && <li>Skills it asks for that you don't list:</li>}
-            </ul>
-            {m.missing.length > 0 && <div className="mt-1"><Chips items={m.missing} tone="red" /></div>}
-          </div>
-        </div>
-      )}
+      <div className="mt-3"><KeyFacts job={job} /></div>
+      {job.match && <div className="mt-4"><FitSummary job={job} /></div>}
       <div className="mt-4">
         <div className="label">Job description</div>
-        {jd ? (
-          <>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
-              {showFullJd || jd.length <= JD_PREVIEW ? jd : `${jd.slice(0, JD_PREVIEW)}…`}
-            </p>
-            {jd.length > JD_PREVIEW && <button className="link mt-1 text-sm" onClick={onToggleJd}>{showFullJd ? "Show less" : "Show the full description"}</button>}
-          </>
-        ) : (
-          <p className="text-sm text-slate-500">No description saved — the score is a rough guess from the title. Open the posting to read it.</p>
-        )}
+        <JobDescription key={job.id} text={job.original_jd} />
       </div>
     </Card>
   );

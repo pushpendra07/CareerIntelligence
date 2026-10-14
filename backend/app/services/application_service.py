@@ -305,6 +305,7 @@ def list_followups(
     due_before: date | None = None,
     kind: str | None = None,
     application_id: int | None = None,
+    job_id: int | None = None,
 ) -> tuple[list[FollowUp], int]:
     stmt: Select[Any] = select(FollowUp).options(
         selectinload(FollowUp.job), selectinload(FollowUp.company), selectinload(FollowUp.contact)
@@ -317,6 +318,8 @@ def list_followups(
         stmt = stmt.where(FollowUp.kind == kind)
     if application_id:
         stmt = stmt.where(FollowUp.application_id == application_id)
+    if job_id:
+        stmt = stmt.where(FollowUp.job_id == job_id)
     stmt = stmt.order_by(FollowUp.completed, FollowUp.due_date, FollowUp.id)
     return paginate(db, stmt, params)
 

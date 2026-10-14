@@ -1,41 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, ScoreBadge, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
-import type { Application, CV, Interview, JobDetail, Page } from "../../types/api";
-import { experienceRange, formatDate, formatDateTime, humanize, salaryRange } from "../../utils/format";
+import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
+import type { Application, CV, FollowUp, Interview, JobDetail, Page } from "../../types/api";
+import { formatDate, formatDateTime, humanize } from "../../utils/format";
+import { FollowUpRow, QuickFollowUp } from "../followups/FollowUpParts";
+import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobComments } from "./JobComments";
-import { JOB_STATUSES } from "./JobsPage";
+import { APPLIED_STATUSES, JOB_STATUSES, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
   EXACT_MATCH: "green", PARTIAL_MATCH: "blue", RELATED: "amber", MISSING: "red", NICE_TO_HAVE: "gray",
 };
 
-function MatchPanel({ job }: { job: JobDetail }) {
+/** The full scoring detail, for when the summary isn't enough. */
+function ScoreDetails({ job }: { job: JobDetail }) {
   const m = job.match;
-  if (!m) return <Card title="Match"><p className="text-sm text-slate-500">Not analyzed yet.</p></Card>;
+  if (!m) return null;
   return (
-    <Card title={<span>Match <span className="text-2xl font-bold text-indigo-700">{m.score}</span><span className="text-slate-400"> / 100</span></span>}
-      actions={<div className="flex items-center gap-1"><StatusBadge value={m.recommendation} /><Badge tone="indigo">{humanize(m.action)}</Badge></div>}>
-      {job.score_stale && <p className="mb-2 rounded bg-amber-50 p-2 text-xs text-amber-800">Your profile, preferences or scoring changed since this score. It updates by itself within a minute.</p>}
-      {m.confidence !== "HIGH" && <p className="mb-2 rounded bg-slate-50 p-2 text-xs text-slate-600">Confidence: {humanize(m.confidence)} — {m.confidence === "LOW" ? "add the job description for a reliable score." : "the job has limited detail."}</p>}
-      <ScoreBreakdown components={m.components} />
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div><div className="label">Strong matches</div><Chips items={m.strong_matches} tone="green" /></div>
-        <div><div className="label">Missing / weak</div><Chips items={m.missing} tone="red" empty="None" /></div>
-      </div>
-      <div className="mt-3">
-        <div className="label">Blockers</div>
-        {m.blockers.length ? (
-          <ul className="list-disc pl-5 text-sm text-rose-700">{m.blockers.map((b) => <li key={b.message}>{b.message}{b.severity === "HARD" && " (hard rule)"}</li>)}</ul>
-        ) : <span className="text-sm text-slate-500">None</span>}
-      </div>
-      <details className="mt-3 text-sm">
-        <summary className="cursor-pointer text-slate-600">Skill-by-skill</summary>
-        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+    <details className="text-sm">
+      <summary className="cursor-pointer text-slate-600">How the score was calculated</summary>
+      <div className="mt-3 space-y-3">
+        <ScoreBreakdown components={m.components} />
+        <ul className="grid gap-1 sm:grid-cols-2">
           {m.skills.map((s) => (
             <li key={`${s.importance}-${s.skill}`} className="flex items-center justify-between gap-2 text-xs">
               <span>{s.skill} <span className="text-slate-400">({s.importance.toLowerCase()})</span></span>
@@ -43,12 +33,9 @@ function MatchPanel({ job }: { job: JobDetail }) {
             </li>
           ))}
         </ul>
-      </details>
-      <p className="mt-3 text-xs text-slate-400">Fit: {humanize(m.experience_fit)} · Salary {humanize(m.salary_status)} · Location {humanize(m.location_fit)} · {job.score_version} · analyzed {formatDateTime(job.analyzed_at)}</p>
-      {job.recommended_cv && (
-        <p className="mt-2 text-sm">Recommended CV: <Link className="link" to={`/cvs/${job.recommended_cv.id}`}>{job.recommended_cv.name}</Link></p>
-      )}
-    </Card>
+        <p className="text-xs text-slate-400">Fit: {humanize(m.experience_fit)} · Salary {humanize(m.salary_status)} · Location {humanize(m.location_fit)} · {job.score_version} · scored {formatDateTime(job.analyzed_at)}</p>
+      </div>
+    </details>
   );
 }
 
@@ -102,114 +89,201 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
   );
 }
 
+/** The one thing to do next, depending on where the job is in your search. */
+function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: () => void; setStatus: (s: string) => void; busy: boolean }) {
+  const url = postingUrl(job);
+  const posting = url && <a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a>;
+  let text: string;
+  let actions: ReactNode;
+  if (NEW_STATUSES.includes(job.status) || job.status === "REVIEWING") {
+    text = "Is this worth applying to?";
+    actions = <>
+      <button className="btn-primary" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
+      <button className="btn-secondary" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
+      {posting}
+    </>;
+  } else if (PENDING_STATUSES.includes(job.status)) {
+    text = job.recommended_cv ? `Ready to apply — send your “${job.recommended_cv.name}” CV.` : "Ready to apply.";
+    actions = <>
+      {url && <a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">1. Apply on the site ↗</a>}
+      <button className="btn-primary" onClick={onApply}>{url ? "2. Record that I applied" : "Record application"}</button>
+    </>;
+  } else if (["APPLIED", "RECRUITER_CONTACTED", "SCREENING"].includes(job.status)) {
+    text = "Applied — waiting for a reply. Keep a follow-up date so it doesn't go quiet.";
+    actions = <>
+      <a className="btn-secondary" href="#follow-ups">Plan a follow-up</a>
+      <Link className="btn-secondary" to={`/interviews/new?job_id=${job.id}`}>Got an interview</Link>
+      {posting}
+    </>;
+  } else if (job.status === "INTERVIEW") {
+    text = "Interviewing — prepare for the next round.";
+    actions = <>
+      <Link className="btn-primary" to={`/jobs/${job.id}/prep`}>Interview prep</Link>
+      <Link className="btn-secondary" to={`/interviews/new?job_id=${job.id}`}>Add a round</Link>
+    </>;
+  } else if (["OFFER", "ACCEPTED"].includes(job.status)) {
+    text = "You have an offer.";
+    actions = <Link className="btn-primary" to="/offers">Compare offers</Link>;
+  } else {
+    text = `This job is ${humanize(job.status).toLowerCase()}.`;
+    actions = <button className="btn-secondary" disabled={busy} onClick={() => setStatus("REVIEWING")}>Look at it again</button>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+      <span className="text-sm font-medium text-indigo-900">Next step: <span className="font-normal">{text}</span></span>
+      <span className="flex-1" />
+      <span className="flex flex-wrap gap-2">{actions}</span>
+    </div>
+  );
+}
+
 export function JobDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [search, setSearch] = useSearchParams();
   const qc = useQueryClient();
-  const [applying, setApplying] = useState(false);
+  const applying = search.get("apply") === "1";
+  const setApplying = (on: boolean) => { const n = new URLSearchParams(search); if (on) n.set("apply", "1"); else n.delete("apply"); setSearch(n, { replace: true }); };
   const job = useQuery({ queryKey: ["job", id], queryFn: () => api.get<JobDetail>(`/jobs/${id}`) });
   const apps = useQuery({ queryKey: ["applications", { job_id: id }], queryFn: () => api.get<Page<Application>>("/applications", { job_id: id }) });
   const ivs = useQuery({ queryKey: ["interviews", { job_id: id }], queryFn: () => api.get<Page<Interview>>("/interviews", { job_id: id }) });
+  const followups = useQuery({ queryKey: ["followups", { job_id: id }], queryFn: () => api.get<Page<FollowUp>>("/followups", { job_id: id, completed: false }) });
   const refresh = () => qc.invalidateQueries();
   const status = useMutation({ mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }), onSuccess: refresh });
-  const analyze = useMutation({ mutationFn: () => api.post(`/matches/jobs/${id}`), onSuccess: refresh });
   const fetchJd = useMutation({ mutationFn: () => api.post(`/career-ops/jobs/${id}/fetch-jd`), onSuccess: refresh });
+  // Arriving from "Follow up" in the list: jump to the follow-ups card.
+  const loaded = !!job.data;
+  useEffect(() => {
+    if (loaded && location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView?.({ block: "start" });
+  }, [loaded, location.hash]);
   if (job.isLoading) return <Spinner />;
   if (job.error) return <ErrorBox error={job.error} />;
   const j = job.data!;
   const dup = (location.state as { duplicate?: boolean; matchedBy?: string } | null)?.duplicate;
+  const applied = APPLIED_STATUSES.includes(j.status) || (apps.data?.items.length ?? 0) > 0;
   return (
     <div className="space-y-4">
       <BackButton fallback="/jobs" label="Back to jobs" />
       {dup && <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">This job already existed — the new source was added to it (matched by {humanize((location.state as { matchedBy?: string }).matchedBy)}).</div>}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1>{j.title} <span className="text-base font-normal text-slate-400" title="Job ID">#{j.id}</span></h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            <Link className="link" to={`/companies/${j.company.id}`}>{j.company.name}</Link>
-            {j.company.tier && <StatusBadge value={j.company.tier} />}
-            <StatusBadge value={j.company.verification_status} />
-            <ScoreBadge score={j.match_score} stale={j.score_stale} />
-            <span className="text-xs text-slate-500">Added via</span> <AddedViaTags values={j.added_via} />
+      <Card>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1>{j.title} <span className="text-base font-normal text-slate-400" title="Job ID">#{j.id}</span></h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <Link className="link" to={`/companies/${j.company.id}`}>{j.company.name}</Link>
+              {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
+              <AddedViaTags values={j.added_via} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {j.match_score !== null && (
+              <span className="text-right" title="How well this job fits you, 0–100">
+                <span className="text-3xl font-bold text-indigo-700">{j.match_score}</span><span className="text-slate-400">/100</span>
+                {j.match && <div><StatusBadge value={j.match.recommendation} /></div>}
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-3"><KeyFacts job={j} /></div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm">
+          <span className="text-slate-500">Status</span>
           <JobStatusBadge value={j.status} />
-          <select className="input w-48" aria-label="Job status" value={j.status} onChange={(e) => status.mutate(e.target.value)}>
+          <select className="input w-auto py-1 text-xs" aria-label="Job status" value={j.status} onChange={(e) => status.mutate(e.target.value)}>
             {JOB_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
           </select>
-          <button className="btn-secondary" onClick={() => analyze.mutate()} disabled={analyze.isPending}>Re-analyze</button>
-          <Link className="btn-secondary" to={`/jobs/${j.id}/prep`}>Interview prep</Link>
-          <button className="btn-primary" onClick={() => setApplying((a) => !a)}>Apply</button>
-          <DeleteJobButton jobId={j.id} title={j.title} onDeleted={() => navigate(j.status === "CLOSED" ? "/jobs/closed" : "/jobs")} />
+          {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
         </div>
-      </div>
+      </Card>
+      <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <MatchPanel job={j} />
-          <Card title="Job information">
-            <KeyValue items={[
-              ["Location", j.location ?? j.locations.join(", ")], ["Work model", humanize(j.work_model)],
-              ["Employment", j.employment_type ?? "—"], ["Seniority", humanize(j.seniority)],
-              ["Experience", experienceRange(j.experience_min, j.experience_max)],
-              ["Salary", j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)],
-              ["Posted", formatDate(j.posting_date)], ["Deadline", formatDate(j.application_deadline)],
-              ["Added", formatDateTime(j.created_at)],
-            ]} />
+          <Card title="Does it fit you?">
+            {j.match && j.match.confidence !== "HIGH" && (
+              <p className="mb-3 rounded bg-amber-50 p-2 text-xs text-amber-800">
+                {j.match.confidence === "LOW" ? "No job description, so this score is a rough guess from the title. Add the description for a reliable score." : "The job has limited detail, so the score is less certain."}
+              </p>
+            )}
+            <FitSummary job={j} />
+            {j.recommended_cv && <p className="mt-3 text-sm">Best CV for this job: <Link className="link" to={`/cvs/${j.recommended_cv.id}`}>{j.recommended_cv.name}</Link></p>}
+            <div className="mt-3"><ScoreDetails job={j} /></div>
           </Card>
-          <Card title="Parsed requirements">
-            <div className="space-y-3 text-sm">
-              <div><div className="label">Required skills</div><Chips items={j.required_skills} tone="indigo" /></div>
-              <div><div className="label">Preferred skills</div><Chips items={j.preferred_skills} /></div>
-              {j.responsibilities.length > 0 && <div><div className="label">Responsibilities</div><ul className="list-disc pl-5">{j.responsibilities.map((r) => <li key={r}>{r}</li>)}</ul></div>}
-              {j.qualifications.length > 0 && <div><div className="label">Qualifications</div><ul className="list-disc pl-5">{j.qualifications.map((r) => <li key={r}>{r}</li>)}</ul></div>}
-              {(j.parsed_jd.certifications ?? []).length > 0 && <div><div className="label">Certifications</div><Chips items={j.parsed_jd.certifications ?? []} /></div>}
-              {j.manual_fields.length > 0 && <p className="text-xs text-slate-400">Entered manually (kept over JD parsing): {j.manual_fields.join(", ")}</p>}
-            </div>
-          </Card>
-          <Card title="Original job description" actions={j.jd_status !== "OK" ? (
-            <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending}>Fetch via Career-Ops</button>) : undefined}>
+          <Card title="Job description" actions={j.jd_status !== "OK" ? (
+            <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending} title="Download the description from the posting">
+              {fetchJd.isPending ? "Fetching…" : "Fetch description"}</button>) : undefined}>
             {fetchJd.error && <ErrorBox error={new Error(errorMessage(fetchJd.error))} />}
-            {j.original_jd ? <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap text-xs text-slate-700">{j.original_jd}</pre>
-              : <p className="text-sm text-slate-500">No JD stored. Edit the job to paste it, or fetch it via Career-Ops.</p>}
+            <JobDescription text={j.original_jd} empty="No description saved yet. Fetch it from the posting, or edit the job to paste it." />
           </Card>
         </div>
         <div className="space-y-4">
-          <CareerOpsPanel job={j} />
-          <Card title="Sources">
-            <ul className="space-y-2 text-sm">
-              {j.source_links.map((s) => (
-                <li key={s.id}>
-                  <Badge tone="indigo">{humanize(s.source)}</Badge> {s.detail && <span className="text-xs text-slate-500">{s.detail}</span>}
-                  {s.original_url && <a className="link block truncate text-xs" href={s.original_url} target="_blank" rel="noopener noreferrer">{s.original_url}</a>}
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <Card title="Recruiter">
-            {j.recruiter ? <div className="text-sm">{j.recruiter.name} <StatusBadge value={j.recruiter.status} />
-              {j.recruiter.email && <div className="text-xs">{j.recruiter.email}</div>}
-              {j.recruiter.linkedin_url && <a className="link text-xs" href={j.recruiter.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>}
-            </div> : <p className="text-sm text-slate-500">None linked</p>}
-          </Card>
-          <Card title="Applications">
-            {apps.data?.items.length ? apps.data.items.map((a) => (
-              <div key={a.id} className="text-sm"><Link className="link" to={`/applications/${a.id}`}>Applied {formatDate(a.applied_on)}</Link> <StatusBadge value={a.status} /><div className="text-xs text-slate-500">{a.cv_name ?? "CV not recorded"}</div></div>
-            )) : <p className="text-sm text-slate-500">Not applied yet</p>}
-          </Card>
-          <Card title="Interviews" actions={<Link className="btn-secondary" to={`/interviews/new?job_id=${j.id}`}>Schedule</Link>}>
-            {ivs.data?.items.length ? ivs.data.items.map((iv) => (
-              <div key={iv.id} className="text-sm"><Link className="link" to={`/interviews/${iv.id}`}>Round {iv.round_number}: {humanize(iv.round_type)}</Link> <StatusBadge value={iv.status} /><div className="text-xs text-slate-500">{formatDateTime(iv.scheduled_at)}</div></div>
-            )) : <p className="text-sm text-slate-500">None</p>}
-          </Card>
+          <div id="follow-ups" className="scroll-mt-16">
+            <Card title="Follow-ups">
+              {followups.data?.items.length ? (
+                <ul className="mb-3 divide-y divide-slate-100">{followups.data.items.map((f) => <FollowUpRow key={f.id} f={f} showJob={false} />)}</ul>
+              ) : <p className="mb-3 text-sm text-slate-500">{applied ? "No follow-up planned. Add one so this doesn't go quiet." : "Nothing planned."}</p>}
+              <QuickFollowUp key={j.id} jobId={j.id} jobTitle={j.title} applied={applied} />
+            </Card>
+          </div>
+          {(apps.data?.items.length || ivs.data?.items.length) ? (
+            <Card title="Your progress">
+              <ul className="space-y-2 text-sm">
+                {apps.data?.items.map((a) => (
+                  <li key={`a${a.id}`}><Link className="link" to={`/applications/${a.id}`}>Applied {formatDate(a.applied_on)}</Link> <StatusBadge value={a.status} />
+                    <div className="text-xs text-slate-500">{a.cv_name ?? "CV not recorded"} · {humanize(a.method)}</div></li>
+                ))}
+                {ivs.data?.items.map((iv) => (
+                  <li key={`i${iv.id}`}><Link className="link" to={`/interviews/${iv.id}`}>Round {iv.round_number}: {humanize(iv.round_type)}</Link> <StatusBadge value={iv.status} />
+                    <div className="text-xs text-slate-500">{formatDateTime(iv.scheduled_at)}</div></li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
           <JobComments jobId={j.id} comments={j.comments ?? []} />
-          {j.notes && <Card title="Notes"><p className="whitespace-pre-wrap text-sm">{j.notes}</p></Card>}
-          <Card title="Activity">
-            <ul className="space-y-1 text-xs">
-              {j.activity.map((a, i) => <li key={i}><span className="text-slate-400">{formatDateTime(a.occurred_at)}</span> {humanize(a.action.replace(".", "_"))} {a.summary && <span className="text-slate-500">— {a.summary}</span>}</li>)}
-            </ul>
+          {j.recruiter && (
+            <Card title="Recruiter">
+              <div className="text-sm">{j.recruiter.name} <StatusBadge value={j.recruiter.status} />
+                {j.recruiter.email && <div className="text-xs"><a className="link" href={`mailto:${j.recruiter.email}`}>{j.recruiter.email}</a></div>}
+                {j.recruiter.linkedin_url && <a className="link text-xs" href={j.recruiter.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>}
+              </div>
+            </Card>
+          )}
+          <CareerOpsPanel job={j} />
+          <Card>
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">More details</summary>
+              <div className="mt-3 space-y-4 text-sm">
+                <KeyValue items={[
+                  ["Employment", j.employment_type ?? "—"], ["Seniority", humanize(j.seniority)],
+                  ["Deadline", formatDate(j.application_deadline)], ["Added", formatDateTime(j.created_at)],
+                ]} />
+                <div><div className="label">Required skills</div><Chips items={j.required_skills} tone="indigo" /></div>
+                <div><div className="label">Preferred skills</div><Chips items={j.preferred_skills} /></div>
+                {j.manual_fields.length > 0 && <p className="text-xs text-slate-400">Entered by hand (kept over the description): {j.manual_fields.join(", ")}</p>}
+                <div>
+                  <div className="label">Found on</div>
+                  <ul className="space-y-1">
+                    {j.source_links.map((s) => (
+                      <li key={s.id}>
+                        <Badge tone="indigo">{humanize(s.source)}</Badge> {s.detail && <span className="text-xs text-slate-500">{s.detail}</span>}
+                        {s.original_url && <a className="link block truncate text-xs" href={s.original_url} target="_blank" rel="noopener noreferrer">{s.original_url}</a>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {j.notes && <div><div className="label">Notes</div><p className="whitespace-pre-wrap">{j.notes}</p></div>}
+                <div>
+                  <div className="label">History</div>
+                  <ul className="space-y-1 text-xs">
+                    {j.activity.map((a, i) => <li key={i}><span className="text-slate-400">{formatDateTime(a.occurred_at)}</span> {humanize(a.action.replace(".", "_"))} {a.summary && <span className="text-slate-500">— {a.summary}</span>}</li>)}
+                  </ul>
+                </div>
+                <div className="flex gap-2 border-t border-slate-100 pt-3">
+                  <Link className="btn-secondary" to={`/jobs/${j.id}/prep`}>Interview prep</Link>
+                  <DeleteJobButton jobId={j.id} title={j.title} onDeleted={() => navigate(j.status === "CLOSED" ? "/jobs/closed" : "/jobs")} />
+                </div>
+              </div>
+            </details>
           </Card>
         </div>
       </div>

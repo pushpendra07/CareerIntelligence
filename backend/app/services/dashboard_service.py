@@ -72,6 +72,13 @@ def summary(db: Session) -> dict[str, int]:
             .select_from(FollowUp)
             .where(FollowUp.completed.is_(False), FollowUp.due_date < today),
         ),
+        # Due today or earlier: the number shown next to Follow-ups in the menu.
+        "due_followups": _count(
+            db,
+            select(func.count())
+            .select_from(FollowUp)
+            .where(FollowUp.completed.is_(False), FollowUp.due_date <= today),
+        ),
         "companies": _count(db, select(func.count()).select_from(Company)),
         # Last 7 days, for "this week" on the dashboard.
         "new_this_week": _count(

@@ -116,10 +116,74 @@ describe("job id", () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByTitle("Job ID")).toHaveTextContent("#7");
-    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "-id");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-id");
-    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "id");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("id");
+  });
+});
+
+describe("remembered sort and filters", () => {
+  it("keeps the sort and filters you picked until Reset", async () => {
+    const api = mockApi({ "GET /jobs": page([JOB]) });
+    const first = renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await screen.findByText("Magento Lead");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-match_score");
+    await userEvent.click(screen.getByRole("button", { name: "Sort by posted" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Score" })).getByRole("button", { name: "70+" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Work" })).getByRole("button", { name: "Remote" }));
+    first.unmount();
+
+    // Coming back later: same sort and filters, without anything in the link.
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await screen.findByText("Magento Lead");
+    let last = listUrls(api.fn).at(-1)!;
+    expect(last.searchParams.get("sort")).toBe("-posting_date");
+    expect(last.searchParams.get("min_score")).toBe("70");
+    expect(last.searchParams.get("work_model")).toBe("REMOTE");
+    expect(within(screen.getByRole("group", { name: "Score" })).getByRole("button", { name: "70+" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+    last = listUrls(api.fn).at(-1)!;
+    expect(last.searchParams.get("sort")).toBe("-match_score");
+    expect(last.searchParams.get("min_score")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+  });
+
+  it("a link with filters wins, but your sort still applies", async () => {
+    window.localStorage.setItem("jobs.sort.v1", "company");
+    window.localStorage.setItem("jobs.filters.v1", "work_model=ONSITE");
+    const api = mockApi({ "GET /jobs": page([JOB]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?min_score=80" });
+    await screen.findByText("Magento Lead");
+    const last = listUrls(api.fn).at(-1)!;
+    expect(last.searchParams.get("min_score")).toBe("80");
+    expect(last.searchParams.get("work_model")).toBeNull();
+    expect(last.searchParams.get("sort")).toBe("company");
+  });
+
+  it("posted-within sends a date", async () => {
+    const api = mockApi({ "GET /jobs": page([JOB]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await screen.findByText("Magento Lead");
+    await userEvent.click(within(screen.getByRole("group", { name: "Posted" })).getByRole("button", { name: "7 days" }));
+    const after = listUrls(api.fn).at(-1)!.searchParams.get("posted_after")!;
+    const days = (Date.now() - new Date(after).getTime()) / 86_400_000;
+    expect(days).toBeGreaterThan(6);
+    expect(days).toBeLessThan(8.5);
+  });
+});
+
+describe("next step in the list", () => {
+  it("new jobs can be shortlisted; shortlisted ones lead to Apply", async () => {
+    const api = mockApi({
+      "GET /jobs": page([JOB, { ...JOB, id: 8, title: "PHP Lead", status: "SHORTLISTED" }]),
+      "POST /jobs/7/status": { ok: true },
+    });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click(await screen.findByRole("button", { name: "Shortlist Magento Lead" }));
+    expect(api.calls.find((c) => c.method === "POST")).toMatchObject({ path: "/jobs/7/status", body: { status: "SHORTLISTED" } });
+    expect(screen.getByRole("link", { name: "Apply to PHP Lead" })).toHaveAttribute("href", "/jobs/8?apply=1");
   });
 });
 

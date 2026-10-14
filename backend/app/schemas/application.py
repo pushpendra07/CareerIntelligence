@@ -126,6 +126,8 @@ class FollowUpOut(BaseModel):
     remind_at: datetime | None
     job_id: int | None
     job_title: str | None = None
+    job_status: str | None = None
+    job_url: str | None = None
     company_id: int | None
     company_name: str | None = None
     contact_id: int | None

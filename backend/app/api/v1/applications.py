@@ -99,6 +99,8 @@ def add_note(db: DB, application_id: int, body: NoteIn) -> ApplicationOut:
 def fu_out(f: FollowUp) -> FollowUpOut:
     out = FollowUpOut.model_validate(f)
     out.job_title = f.job.title if f.job else None
+    out.job_status = f.job.status if f.job else None
+    out.job_url = f.job.source_url if f.job else None
     out.company_name = f.company.name if f.company else None
     out.contact_name = f.contact.name if f.contact else None
     out.overdue = not f.completed and f.due_date < date.today()
@@ -113,6 +115,7 @@ def list_followups(
     due_before: date | None = None,
     kind: str | None = None,
     application_id: int | None = None,
+    job_id: int | None = None,
 ) -> Page[FollowUpOut]:
     items, total = svc.list_followups(
         db,
@@ -121,6 +124,7 @@ def list_followups(
         due_before=due_before,
         kind=kind,
         application_id=application_id,
+        job_id=job_id,
     )
     return Page(items=[fu_out(f) for f in items], total=total, page=params.page, size=params.size)
 
