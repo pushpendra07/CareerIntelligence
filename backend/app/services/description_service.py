@@ -91,6 +91,7 @@ def fetch_descriptions(
                 stats["fetched_jobs"].append({"id": job.id, "title": job.title})
             else:
                 stats["failed"] += 1
+                stats.setdefault("failed_jobs", []).append({"id": job.id, "title": job.title})
         if not text and url and not not_fetched_reason(url):
             job.jd_status = "FETCH_FAILED"  # tried; the next run moves on to other jobs
         stats["checked"] += 1

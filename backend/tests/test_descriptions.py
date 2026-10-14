@@ -58,6 +58,14 @@ def test_bulk_fetch_best_first_and_moves_on(db: Session, settings: Settings) -> 
     assert ok.jd_status == "OK" and "Magento 2" in ok.original_jd
     assert "Adobe Commerce" in ok.required_skills
     assert fails.jd_status == "FETCH_FAILED"  # not retried next time
+    assert run.stats["failed_jobs"] == [{"id": fails.id, "title": "PHP Lead"}]
+    # Re-parsing (e.g. after a skill-list update) keeps the "already tried" marker.
+    from app.services import freshness
+    fails.parsed_jd = {**fails.parsed_jd, "catalog_version": "old"}
+    db.commit()
+    freshness.refresh(db)
+    db.refresh(fails)
+    assert fails.jd_status == "FETCH_FAILED"
     assert linkedin.jd_status == "MISSING"  # never fetched; the user pastes it
     assert not any("linkedin" in url for _, url in http.calls)
     status = description_service.status(db)

@@ -223,7 +223,10 @@ def _apply_parsed(job: Job, parsed: ParsedJD) -> None:
         job.locations = [job.location]
     if not job.location and job.locations:
         job.location = ", ".join(job.locations[:3])
-    job.jd_status = "OK" if job.original_jd.strip() else "MISSING"
+    if job.original_jd.strip():
+        job.jd_status = "OK"
+    elif job.jd_status != "FETCH_FAILED":  # keep "already tried": re-parsing doesn't change that
+        job.jd_status = "MISSING"
 
 
 def find_duplicate(
