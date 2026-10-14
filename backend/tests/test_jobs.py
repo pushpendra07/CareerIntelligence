@@ -531,3 +531,8 @@ def test_job_comments(client: TestClient) -> None:
     comments = client.get(f"/api/v1/jobs/{job['id']}").json()["comments"]
     assert [c["body"] for c in comments] == ["Second round next week"]
     assert client.post("/api/v1/jobs/999999/comments", json={"body": "x"}).status_code == 404
+
+
+def test_cms_and_language_skills_detected() -> None:
+    p = parse_jd("Drupal 10 or WordPress developer. PHP, Laravel and Python required.", "CMS Dev")
+    assert {"Drupal", "WordPress", "PHP", "Laravel", "Python"} <= set(p.required_skills)

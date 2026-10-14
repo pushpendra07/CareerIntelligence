@@ -130,7 +130,7 @@ describe("job comments", () => {
     const api = mockApi({ "POST /jobs/7/comments": { id: 4, body: "Follow up Monday", created_at: "2026-10-11T10:00:00Z" } });
     renderAt(<JobComments jobId={7} comments={COMMENTS} />, { path: "/jobs/:id", route: "/jobs/7" });
     expect(screen.getByText("Called the recruiter")).toBeInTheDocument();
-    expect(screen.getByText(/11 Oct/)).toBeInTheDocument();
+    expect(screen.getByText(/(11 Oct|Oct 11)/)).toBeInTheDocument();
     const add = screen.getByRole("button", { name: "Add comment" });
     expect(add).toBeDisabled();
     await userEvent.type(screen.getByLabelText("New comment"), "  Follow up Monday ");

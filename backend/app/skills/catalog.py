@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-CATALOG_VERSION = "skills/1"
+CATALOG_VERSION = "skills/2"
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,9 @@ SKILLS: tuple[Skill, ...] = (
     S("Symfony", "framework", ["symfony"], related=["Laravel"]),
     S("CodeIgniter", "framework", ["codeigniter"], related=["Laravel"]),
     S("Zend Framework", "framework", ["zend", "zend framework", "laminas"]),
-    S("WordPress", "platform", ["wordpress"], related=["WooCommerce"]),
+    S("WordPress", "platform", ["wordpress"], related=["WooCommerce", "Drupal"]),
+    S("Drupal", "platform", ["drupal", "drupal 8", "drupal 9", "drupal 10", "drupal 11"],
+      related=["WordPress", "Symfony"]),
     S("WooCommerce", "platform", ["woocommerce"], related=["Magento"]),
     S("Shopify", "platform", ["shopify", "shopify plus", "liquid"], related=["Magento"]),
     S("BigCommerce", "platform", ["bigcommerce"], related=["Magento"]),
