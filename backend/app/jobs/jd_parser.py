@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from app.cv.extract import normalize_text
 from app.skills.catalog import CATALOG_VERSION, find_domains, find_skills
 
-JD_PARSER_VERSION = "jd-parser/1"
+JD_PARSER_VERSION = "jd-parser/2"
 
 SECTION_PATTERNS: dict[str, tuple[str, ...]] = {
     "responsibilities": (
@@ -337,6 +337,12 @@ def _to_float(s: str) -> float:
     return float(s)
 
 
+# "15 years full time education" is schooling, not work experience.
+NOT_EXPERIENCE = re.compile(
+    r"\s*(?:of\s+)?(?:full[\s-]?time\s+|regular\s+|formal\s+)?(?:education|schooling|studies)",
+    re.I)
+
+
 def parse_experience(text: str) -> tuple[float | None, float | None, dict[str, float]]:
     """Overall min/max years, plus per-skill years ("3+ years of AWS")."""
     per_skill: dict[str, float] = {}
@@ -345,7 +351,7 @@ def parse_experience(text: str) -> tuple[float | None, float | None, dict[str, f
     for line in text.split("\n"):
         for m in YEARS_RANGE.finditer(line):
             lo, hi = _to_float(m.group(1)), _to_float(m.group(2))
-            if lo <= hi <= 40:
+            if lo <= hi <= 40 and not NOT_EXPERIENCE.match(line, m.end()):
                 tail = line[m.end() : m.end() + 60]
                 skills = find_skills(tail)
                 if skills and not re.match(
@@ -359,11 +365,14 @@ def parse_experience(text: str) -> tuple[float | None, float | None, dict[str, f
                 else:
                     overall_min.append(lo)
                     overall_max.append(hi)
-        for m in YEARS_MIN.finditer(YEARS_RANGE.sub(" ", line)):
+        rest = YEARS_RANGE.sub(" ", line)  # ranges were handled above
+        for m in YEARS_MIN.finditer(rest):
             years = _to_float(m.group(1))
             if years > 40:
                 continue
-            tail = line[m.end() : m.end() + 60]
+            tail = rest[m.end() : m.end() + 60]
+            if NOT_EXPERIENCE.match(tail):
+                continue
             skills = find_skills(tail)
             if skills and not re.match(
                 r"\s*(of\s+)?(overall|total|relevant|professional|"

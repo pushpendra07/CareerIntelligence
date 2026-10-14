@@ -102,6 +102,16 @@ class TargetFacts(BaseModel):
     excluded_roles: list[str] = Field(default_factory=list)
     excluded_technologies: list[str] = Field(default_factory=list)
     excluded_industries: list[str] = Field(default_factory=list)
+    # Skills you want to work with (Target roles); a job built on them is not off-stack.
+    wanted_skills: list[str] = Field(default_factory=list)
+
+
+# Soft skills count for less than technologies; "main technologies" decide whether the job is
+# in your stack at all.
+SOFT_CATEGORIES = {"leadership", "practice"}
+# Skills that say nothing about the technology: a job listing only these isn't a skills match.
+GENERIC_SKILLS = {"System Design"}
+CORE_CATEGORIES = {"language", "framework", "platform", "erp"}
 
 
 # ---------------------------------------------------------------------- outputs
@@ -331,7 +341,7 @@ def _skills(
     def evaluate(skills: list[str], importance: str) -> float | None:
         if not skills:
             return None
-        total = 0.0
+        total = weights = 0.0
         for s in skills:
             match, via = classify_skill(s, have)
             if match == SkillMatch.MISSING and importance == "PREFERRED":
@@ -342,8 +352,10 @@ def _skills(
             if need and got is not None and got < need and value > 0:
                 value *= f.insufficient_years
             details.append(SkillDetail(skill=s, importance=importance, match=match, via=via))
-            total += value
-        return total / len(skills)
+            weight = f.soft_weight if skill_category(s) in SOFT_CATEGORIES else 1.0
+            total += value * weight
+            weights += weight
+        return total / weights if weights else None
 
     required = evaluate(job.required_skills, "REQUIRED")
     preferred = evaluate(job.preferred_skills, "PREFERRED")
@@ -356,6 +368,12 @@ def _skills(
         factor = required
     else:
         factor = f.required_share * required + (1 - f.required_share) * preferred
+    generic = all(skill_category(d.skill) in SOFT_CATEGORIES or d.skill in GENERIC_SKILLS
+                  for d in details)
+    if generic and factor > cfg.no_skills_factor:
+        factor = cfg.no_skills_factor
+        reasons.append(
+            "Only general skills found (leadership, design) — the technology is unknown")
     req = [d for d in details if d.importance == "REQUIRED"]
     if req:
         hit = sum(1 for d in req if d.match == SkillMatch.EXACT_MATCH)
@@ -737,10 +755,27 @@ def score_match(
     raw = round(sum(c.points for c in components), 2)
     score = max(0, min(100, _round_half_up(raw)))
 
+    # A job built on technologies you don't have can't be a strong match, however well the
+    # rest (level, location, company) fits.
+    core = [d for d in details
+            if d.importance == "REQUIRED" and skill_category(d.skill) in CORE_CATEGORIES]
+    wanted = set(target.wanted_skills)
+    if job.has_jd and core and not any(
+        d.match in (SkillMatch.EXACT_MATCH, SkillMatch.PARTIAL_MATCH) or d.skill in wanted
+        for d in core
+    ):
+        names = ", ".join(d.skill for d in core[:3])
+        capped = score > cfg.stack_mismatch_cap
+        score = min(score, cfg.stack_mismatch_cap)
+        blockers.append(Blocker(
+            type="DIFFERENT_STACK",
+            message=f"Main technology ({names}) isn't in your profile"
+            + (f" — score capped at {cfg.stack_mismatch_cap}" if capped else ""),
+        ))
     for d in details:
         if (
             d.importance == "REQUIRED"
-            and d.match == SkillMatch.MISSING
+            and d.match in (SkillMatch.MISSING, SkillMatch.RELATED)
             and (d.skill in find_skills(job.title) or job.skill_years.get(d.skill))
         ):
             blockers.append(

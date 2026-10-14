@@ -5,7 +5,7 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
-ENGINE_VERSION = "match-engine/3"
+ENGINE_VERSION = "match-engine/4"
 
 COMPONENTS = (
     "role",
@@ -58,6 +58,8 @@ class SkillFactors(BaseModel):
     missing: float = 0.0
     required_share: float = Field(0.8, ge=0, le=1)  # rest of the skills weight is preferred
     insufficient_years: float = 0.6  # has the skill but fewer years than the JD asks
+    # Soft skills (Mentoring, Agile…) count this much of a technology in the skills average.
+    soft_weight: float = Field(0.5, ge=0, le=1)
 
 
 class ExperienceFactors(BaseModel):
@@ -118,6 +120,9 @@ class ScoringConfig(BaseModel):
     # Role factor multiplier when the title names a discipline outside your profile
     # ("Quality Engineering Lead", "Data Architect" for a commerce developer).
     foreign_discipline_factor: float = 0.4
+    # Highest score when none of the job's required main technologies (language, framework,
+    # platform, ERP module) is in your profile or your wanted skills.
+    stack_mismatch_cap: int = Field(60, ge=0, le=100)
     # Blocker types that force NOT_RECOMMENDED. Empty = blockers are shown, never auto-reject.
     hard_blockers: list[str] = Field(default_factory=list)
 

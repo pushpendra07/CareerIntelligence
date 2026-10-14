@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-CATALOG_VERSION = "skills/2"
+CATALOG_VERSION = "skills/4"
 
 
 @dataclass(frozen=True)
@@ -225,6 +225,23 @@ SKILLS: tuple[Skill, ...] = (
     # Integrations / enterprise
     S("ERP Integration", "integration", ["erp integration", "erp integrations", "erp"]),
     S("SAP", "integration", cs=["SAP"], related=["ERP Integration"]),
+    # SAP functional/technical modules are jobs of their own: integrating with SAP is related,
+    # not the same skill (category "erp" counts as a job's main technology).
+    S("SAP FICO", "erp", ["sap fico", "sap fi/co", "sap fi", "sap co", "sap fscm", "fscm",
+                          "treasury and risk management", "sap trm", "sap finance"],
+      related=["SAP"]),
+    S("SAP SD", "erp", ["sap sd", "sap sales and distribution"], related=["SAP"]),
+    S("SAP MM", "erp", ["sap mm", "sap materials management"], related=["SAP"]),
+    S("SAP ABAP", "erp", ["sap abap", "abap"], related=["SAP"]),
+    # Other enterprise platforms that are a job's whole stack (an Accenture "Packaged App" role).
+    S("ServiceNow", "erp", ["servicenow", "service now"]),
+    S("Salesforce", "erp", ["salesforce", "sfdc", "salesforce crm", "apex"]),
+    S("Oracle EBS", "erp",
+      ["oracle ebs", "oracle e-business suite", "oracle fusion", "oracle erp"]),
+    S("Pega", "erp", ["pega", "pegasystems"]),
+    S("Guidewire", "erp", ["guidewire"]),
+    S("SAP S/4HANA", "erp", ["s/4hana", "s/4 hana", "s4hana", "s4 hana", "sap hana", "hana"],
+      related=["SAP"]),
     S(
         "Microsoft Dynamics",
         "integration",

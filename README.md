@@ -115,6 +115,10 @@ CV ─▶ Professional Profile ─▶ Target Profile
   (an unknown salary is not heavily penalized), company tier and other requirements.
 - **Blocker detection**: mandatory certification, language, work authorization, minimum
   experience, notice period. Blockers are shown, and only auto-reject when you turn on hard rules.
+- **Off-stack cap**: if none of a job's main technologies (language, framework, platform, ERP
+  module such as SAP FICO or ServiceNow) is in your profile or your wanted skills, the score is
+  capped at 60, so a "Lead" title at a good company can't look like a strong match on its own.
+  Soft skills (mentoring, agile) count half as much as technologies.
 - **Recommended CV** for each job. When your inputs change, scores refresh by themselves in the background.
 
 </td></tr>

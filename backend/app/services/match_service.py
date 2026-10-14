@@ -140,6 +140,7 @@ def target_facts(t: TargetProfile) -> TargetFacts:
         excluded_roles=list(t.excluded_roles),
         excluded_technologies=list(t.excluded_technologies),
         excluded_industries=list(t.excluded_industries),
+        wanted_skills=[*t.required_skills, *t.preferred_skills],
     )
 
 

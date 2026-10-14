@@ -384,3 +384,63 @@ def test_title_only_jobs_cannot_score_like_full_jds() -> None:
     full = score_match(with_jd, CANDIDATE, TARGET, CFG)
     assert comp(capped, "skills") == CFG.no_jd_skills_cap < comp(full, "skills")
     assert capped.score < full.score and capped.confidence == "LOW"
+
+
+SAP_TREASURY_JD = """Project Role : Packaged/SaaS App Engineering Lead
+Must have skills : SAP FSCM Treasury and Risk Management (TRM)
+Minimum 12 year(s) of experience is required
+Educational Qualification : 15 years full time education
+- Mentor junior team members to support their professional growth.
+- Minimum 7 years of experience in SAP FSCM Treasury and Risk Management.
+Location: Bengaluru"""
+
+
+def test_off_stack_lead_role_is_capped() -> None:
+    """A lead role on an ERP module you only integrate with is not a strong match (job #44)."""
+    integrator = CANDIDATE.model_copy(update={
+        "total_years": 12.6, "relevant_years": 12.6,
+        "core_skills": [*CANDIDATE.core_skills, "SAP"]})
+    job = job_from_jd("Packaged/SaaS App Engineering Lead", SAP_TREASURY_JD, has_jd=True)
+    assert job.experience_min == 12  # "15 years full time education" is not experience
+    assert "SAP FICO" in job.required_skills and "SAP" not in job.required_skills
+    result = score_match(job, integrator, TARGET, CFG)
+    sap = next(d for d in result.skills if d.skill == "SAP FICO")
+    assert sap.match == SkillMatch.RELATED  # integrating with SAP != SAP finance consulting
+    assert result.score <= CFG.stack_mismatch_cap
+    assert any(b.type == "DIFFERENT_STACK" for b in result.blockers)
+
+
+def test_wanted_stack_is_not_capped() -> None:
+    """A Python job isn't off-stack when Python is a skill you want (Target roles)."""
+    job = job_from_jd("Senior Python Developer",
+                      "Requirements\n- 8+ years\n- Python, Django\n- MySQL, Docker\nRemote India",
+                      has_jd=True)
+    blocked = score_match(job, CANDIDATE, TARGET, CFG)
+    assert any(b.type == "DIFFERENT_STACK" for b in blocked.blockers)
+    wants_python = TARGET.model_copy(update={"wanted_skills": ["Python"]})
+    wanted = score_match(job, CANDIDATE, wants_python, CFG)
+    assert not any(b.type == "DIFFERENT_STACK" for b in wanted.blockers)
+
+
+def test_soft_skills_count_less_than_technologies() -> None:
+    lead = CANDIDATE.model_copy(update={"leadership": ["Technical Leadership", "Mentoring"]})
+    job = job_from_jd("Tech Lead", "Requirements\n- Java\n- Mentoring", has_jd=True)
+    result = score_match(job, lead, TARGET, CFG)
+    # Java missing (0); Mentoring and Technical Leadership (from the title) match at half weight:
+    # (0 + 0.5 + 0.5) / 2 = 0.5, where equal weights would give 2/3.
+    assert comp(result, "skills") == pytest.approx(0.5, abs=0.01)
+
+
+def test_general_skills_alone_are_not_a_skills_match() -> None:
+    job = job_from_jd("Solution Architect", "Requirements\n- System design\n- Mentoring",
+                      has_jd=True)
+    assert comp(score_match(job, CANDIDATE, TARGET, CFG), "skills") <= CFG.no_skills_factor
+
+
+def test_enterprise_platform_is_the_main_technology() -> None:
+    job = job_from_jd("Solution Architect",
+                      "Must have skills : ServiceNow Software Asset Management\n- Mentoring",
+                      has_jd=True)
+    assert "ServiceNow" in job.required_skills
+    result = score_match(job, CANDIDATE, TARGET, CFG)
+    assert result.score <= CFG.stack_mismatch_cap
