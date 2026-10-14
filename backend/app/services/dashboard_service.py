@@ -17,7 +17,7 @@ from app.models.interview import Interview, InterviewResult, InterviewStatus
 from app.models.job import Job, JobSourceLink, JobStatus
 from app.models.match import JobMatch
 from app.models.offer import Offer, OfferStatus
-from app.services import freshness
+from app.services import description_service, freshness
 from app.skills.catalog import SKILLS
 
 UNAPPLIED = [
@@ -26,6 +26,13 @@ UNAPPLIED = [
     JobStatus.REVIEWING.value,
     JobStatus.SHORTLISTED.value,
     JobStatus.READY_TO_APPLY.value,
+]
+
+
+APPLIED_OR_LATER = [
+    JobStatus.APPLIED.value, JobStatus.RECRUITER_CONTACTED.value, JobStatus.SCREENING.value,
+    JobStatus.INTERVIEW.value, JobStatus.OFFER.value, JobStatus.ACCEPTED.value,
+    JobStatus.REJECTED.value,
 ]
 
 
@@ -53,6 +60,26 @@ def summary(db: Session) -> dict[str, int]:
         "jobs_90_plus": _count(db, jobs.where(Job.match_score >= 90)),
         "jobs_80_plus": _count(db, jobs.where(Job.match_score >= 80)),
         "stale_scores": _count(db, all_jobs.where(Job.score_stale.is_(True))),
+        # Action counts for Today: what is waiting on you.
+        "new_70_plus": _count(db, jobs.where(
+            Job.status.in_([JobStatus.NEW.value, JobStatus.DISCOVERED.value]),
+            Job.match_score >= 70)),
+        "ready_to_apply": _count(db, jobs.where(
+            Job.status.in_([JobStatus.SHORTLISTED.value, JobStatus.READY_TO_APPLY.value]))),
+        "upcoming_interviews": _count(
+            db,
+            select(func.count()).select_from(Interview).where(
+                Interview.scheduled_at >= datetime.now(UTC),
+                Interview.status.in_([InterviewStatus.SCHEDULED.value,
+                                      InterviewStatus.RESCHEDULED.value])),
+        ),
+        "missing_jd_70_plus": description_service.candidate_count(db, 70),
+        # Any answer from the employer, including a rejection.
+        "responses": _count(
+            db,
+            select(func.count()).select_from(Application).where(Application.status.not_in(
+                ["APPLIED", "WITHDRAWN", "ON_HOLD", "CLOSED"])),
+        ),
         # 1 while the background refresher is re-scoring (services/freshness.py).
         "scores_updating": int(freshness.is_running()),
         "shortlisted": _count(db, jobs.where(Job.status == JobStatus.SHORTLISTED.value)),
@@ -143,7 +170,26 @@ def charts(db: Session) -> dict[str, Any]:
             .limit(10)
         ).all()
     ]
+    source_quality = [
+        {"label": src, "value": int(n),
+         "avg_score": round(float(avg), 1) if avg is not None else None,
+         "strong": int(strong), "applied": int(applied)}
+        for src, n, avg, strong, applied in db.execute(
+            select(
+                JobSourceLink.source,
+                func.count(func.distinct(Job.id)),
+                func.avg(Job.match_score),
+                func.count(func.distinct(case((Job.match_score >= 80, Job.id)))),
+                func.count(func.distinct(case((Job.status.in_(APPLIED_OR_LATER), Job.id)))),
+            )
+            .join(Job, Job.id == JobSourceLink.job_id)
+            .group_by(JobSourceLink.source)
+            .order_by(func.avg(Job.match_score).desc().nulls_last())
+        ).all()
+    ]
     return {
+        # Which sources bring jobs that actually fit: count, average score, 80+, applied.
+        "source_quality": source_quality,
         "jobs_by_source": _pairs(
             db.execute(
                 select(JobSourceLink.source, func.count(func.distinct(JobSourceLink.job_id)))

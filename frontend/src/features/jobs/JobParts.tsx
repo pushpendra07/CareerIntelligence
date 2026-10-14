@@ -10,10 +10,11 @@ export function KeyFacts({ job }: { job: JobDetail }) {
     ["Location", [job.location ?? job.locations.join(", "), job.work_model !== "UNKNOWN" ? humanize(job.work_model) : null].filter(Boolean).join(" · ") || "—"],
     ["Experience", experienceRange(job.experience_min, job.experience_max)],
     ["Salary", job.salary_text || salaryRange(job.salary_min, job.salary_max, job.salary_currency)],
-    ["Posted", formatDate(job.posting_date)],
+    ["Posted on job site", formatDate(job.posting_date)],
+    ["Added to this app", formatDate(job.created_at)],
   ];
   return (
-    <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+    <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
       {facts.map(([k, v]) => (
         <div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="text-slate-800">{v}</dd></div>
       ))}

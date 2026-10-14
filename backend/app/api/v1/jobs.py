@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import DB
@@ -27,7 +27,7 @@ from app.schemas.job import (
     SourceIn,
     StatusIn,
 )
-from app.services import freshness, job_service, match_service
+from app.services import description_service, freshness, job_service, match_service
 from app.services.job_service import JobFilters, JobInput
 
 router = APIRouter(tags=["jobs"])
@@ -174,6 +174,25 @@ def job_filters(
 
 
 JobFiltersDep = Annotated[JobFilters, Depends(job_filters)]
+
+
+class FetchDescriptionsIn(BaseModel):
+    limit: int = Field(default=description_service.DEFAULT_LIMIT, ge=1, le=200)
+    min_score: int = Field(default=0, ge=0, le=100)
+    wait: bool = False  # run inside the request (tests)
+
+
+@router.get("/jobs/fetch-descriptions")
+def fetch_descriptions_status(db: DB) -> dict[str, Any]:
+    """How many open jobs still lack a description, and the latest fetch run."""
+    return description_service.status(db)
+
+
+@router.post("/jobs/fetch-descriptions", status_code=202)
+def fetch_descriptions(db: DB, body: FetchDescriptionsIn) -> dict[str, Any]:
+    """Read missing descriptions from each job's own link, best-scoring jobs first."""
+    run = description_service.start(db, limit=body.limit, min_score=body.min_score, wait=body.wait)
+    return {"id": run.id, "status": run.status, "stats": run.stats}
 
 
 @router.get("/jobs/status-counts")

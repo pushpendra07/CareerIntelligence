@@ -252,7 +252,10 @@ asks how to do something in the app, answer from it.
    are re-scored automatically in the background within a minute (`services/freshness.py`).
    To force it now: `POST /api/v1/matches/reanalyze` with `{"only_stale": true}`.
 7. **Review new jobs** (`/jobs/review`): new jobs one at a time, best first; keys S/N/K/O/U.
-8. Menu: Today · Jobs · Pipeline · Follow-ups · My profile · Settings; related pages are tabs
+8. Missing descriptions: Today → **Fetch for 40 best jobs** (`POST /api/v1/jobs/fetch-descriptions`,
+   `services/description_service.py`, readers in `jobs/jd_fetch.py`). Never fetches LinkedIn,
+   Indeed, Glassdoor or Naukri. Search `q=#123` finds a job by ID.
+9. Menu: Today · Jobs · Pipeline · Follow-ups · My profile · Settings; related pages are tabs
    (`SECTIONS` in `layouts/AppLayout.tsx`). The Jobs list remembers sort/filters in
    localStorage (`jobs.sort.v1`, `jobs.filters.v1`) until Reset.
 

@@ -255,7 +255,7 @@ export function JobDetailPage() {
               <div className="mt-3 space-y-4 text-sm">
                 <KeyValue items={[
                   ["Employment", j.employment_type ?? "—"], ["Seniority", humanize(j.seniority)],
-                  ["Deadline", formatDate(j.application_deadline)], ["Added", formatDateTime(j.created_at)],
+                  ["Deadline", formatDate(j.application_deadline)], ["Added (exact time)", formatDateTime(j.created_at)],
                 ]} />
                 <div><div className="label">Required skills</div><Chips items={j.required_skills} tone="indigo" /></div>
                 <div><div className="label">Preferred skills</div><Chips items={j.preferred_skills} /></div>

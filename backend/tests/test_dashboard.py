@@ -33,6 +33,8 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     assert (s["total_jobs"], s["applications"], s["interviews"]) == (2, 1, 1)
     assert s["pending_followups"] == 2 and s["overdue_followups"] == 1
     assert s["due_followups"] == 1  # overdue counts; the application one is due later
+    assert s["upcoming_interviews"] == 1 and s["responses"] == 1  # interview = a response
+    assert s["ready_to_apply"] == 0 and s["missing_jd_70_plus"] == 0
 
     client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "CLOSED"})
     closed = client.get("/api/v1/dashboard").json()["summary"]
@@ -57,6 +59,10 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     assert {"label": "INTERVIEW", "value": 1} in charts["applications_by_status"]
     assert any(x["label"] == "PHP" for x in charts["top_requested_skills"])
     assert charts["interviews_over_time"][0]["value"] == 1
+    quality = {q["label"]: q for q in charts["source_quality"]}
+    assert sum(q["value"] for q in quality.values()) >= 2
+    assert sum(q["applied"] for q in quality.values()) >= 1
+    assert all(q["avg_score"] is not None for q in quality.values())
 
     analytics = client.get("/api/v1/dashboard/analytics").json()
     assert set(analytics["scores"]["average_component_factor"]) >= {"role", "skills"}

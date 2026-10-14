@@ -199,12 +199,13 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - **Added via** tag on every job — how it came into the app: **Manual** (Add Job),
   **Google Sheet**, **Job scanner**, **Career-Ops** or **File import**. A job found more than
   one way shows several tags. Filter with **Added via** in the filter row.
-- **Sort by clicking a column title** (Score, Job, Company, Location, Exp, Salary, Posted,
-  Status) or with the Sort menu (also Job ID, recently added); click again to reverse.
+- Columns: **ID**, Score, Job · Company, Location, Exp, Salary, **Posted** (date on the job
+  site), **Added** (date it came into this app), Status, Next step. **Sort by clicking a column
+  title**; click again to reverse. Search finds a job by its ID too: type `#123` or `123`.
 - The line above the table explains the score colours and *no JD* (no description, so the score
   is a rough guess).
 - Open a job. From top to bottom:
-  - the job's key facts, its score and status;
+  - the job's key facts (including *Posted on job site* and *Added to this app*), score, status;
   - **Next step** — what to do now: *Shortlist / Not relevant* for new jobs; *Apply on the
     site* then *Record that I applied* for shortlisted ones; *Plan a follow-up* or *Got an
     interview* once applied; *Interview prep* when interviewing;
@@ -251,21 +252,34 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
   for you; add more from the job page or **+ New reminder**.
 - **Recruiters**: contacts with company, role, channel and notes; link them to jobs.
 
-## 11. Dashboard and analytics
+## 11. Today and Insights
 
-- **Dashboard** (top to bottom):
+- **Today** (top to bottom):
   - **Getting started** checklist — shown until your CV, profile, target roles, salary target,
     scannable companies and first jobs are all in place; each step links to where you do it.
-  - **Jobs** and **Your pipeline** numbers — click any number to open those jobs/applications.
-  - **Best new matches to review** — your top new jobs scoring 70+ that you haven't applied to;
-    **★ Shortlist** or **Not relevant** in one click, without opening each job.
-  - **Today's priorities** — interviews, overdue follow-ups, strong jobs to apply to.
-  - **Coming up** — next interviews and follow-ups due.
-  - **Job sources** — new jobs in the last 7 days, when the scanner / Google Sheets /
-    Career-Ops last ran, and **Scan now**.
-  - **Insights** — charts: jobs by score, source, location; top skills; your skill gaps.
-- **Analytics**: funnels, *where scores are lost* (average component fit), interview rate by
-  score band, most-requested skills and your **skill gaps** (required skills you miss most).
+  - **To do** — what's waiting on you, each card opens the list: **New jobs to review** (and how
+    many score 70+), **Ready to apply** (shortlisted, not applied), **Follow-ups due**,
+    **Interviews coming up**, and **Good jobs without a description** with
+    **Fetch for 40 best jobs** (see below).
+  - **Progress** — applied this week, applications, **response rate** (applications that got any
+    answer), interviews, offers, open jobs.
+  - **Today's priorities**, **Best new matches** (★ Shortlist / Not relevant in one click),
+    **Coming up**, **Job sources** (when each source last ran, **Scan now**), CV advice.
+- **Fetch missing descriptions** — reads the description from each job's own link, best scores
+  first: job-board APIs (Greenhouse, Lever, SmartRecruiters, Workday), the structured job data
+  many career sites publish, and Career-Ops' fetcher when it's set up. LinkedIn, Indeed,
+  Glassdoor and Naukri are never read automatically (their terms forbid it) — open those and
+  paste the description. Jobs whose page has no description are marked and skipped next time.
+  Scores are recalculated as soon as a description arrives.
+- **Insights** (tab next to Today): every chart comes with a one-line takeaway.
+  - *How your search is going* — response and interview rate, the application funnel, and
+    whether higher scores get more interviews.
+  - *Where good jobs come from* — every source with its job count, average score, jobs scoring
+    80+ and how many you applied to (click a source to see its jobs); best companies,
+    locations, work model.
+  - *Your matches* — score spread vs the jobs you applied to, and where scores are lost (with
+    what to change).
+  - *Skills* — the required skills you miss most, CV advice, most requested skills.
 
 ## 12. Settings reference
 

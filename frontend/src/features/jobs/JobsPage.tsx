@@ -259,7 +259,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       <StatusTabs active={tab.key} query={query} />
       <Card>
         <div className="flex flex-wrap items-center gap-2">
-          <input className="input min-w-56 flex-1" placeholder="Search job title, company or location" aria-label="Search jobs"
+          <input className="input min-w-56 flex-1" placeholder="Search title, company, location or job ID (#123)" aria-label="Search jobs"
             key={params.get("q") ?? ""} defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
           {tab.statuses.length > 1 && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
@@ -314,9 +314,10 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
         <Card>
           {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (
             <div className="overflow-x-auto">
-              <p className="mb-2 text-xs text-slate-500">{data.total} job{data.total === 1 ? "" : "s"} · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
+              <p className="mb-2 text-xs text-slate-500">{data.total} job{data.total === 1 ? "" : "s"} · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>
+                  <SortHeader label="ID" field="id" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Score" field="match_score" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
                     extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
@@ -324,12 +325,14 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Added" field="created_at" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
                   <th className="th">Next step</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
                     <tr key={j.id} className="hover:bg-slate-50">
+                      <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
                       <td className="td max-w-md">
                         <Link to={`/jobs/${j.id}`} className="font-medium text-slate-800 hover:text-indigo-700">{j.title}</Link>
@@ -337,14 +340,13 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                           {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
                           {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-400">
-                          <span title="Job ID">#{j.id}</span><AddedViaTags values={j.added_via} />
-                        </div>
+                        <div className="mt-0.5"><AddedViaTags values={j.added_via} /></div>
                       </td>
                       <td className="td text-xs">{j.location ?? "—"}{j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}</td>
                       <td className="td text-xs">{experienceRange(j.experience_min, j.experience_max)}</td>
                       <td className="td text-xs">{j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</td>
-                      <td className="td text-xs" title={`Added ${formatDate(j.created_at)}`}>{formatDate(j.posting_date)}</td>
+                      <td className="td text-xs" title="Date the job was posted on the job site">{formatDate(j.posting_date)}</td>
+                      <td className="td text-xs" title="Date the job was added to this app">{formatDate(j.created_at)}</td>
                       <td className="td"><JobStatusBadge value={j.status} /></td>
                       <td className="td whitespace-nowrap">
                         <span className="inline-flex items-center gap-2"><NextStep job={j} /><DeleteJobButton jobId={j.id} title={j.title} compact /></span>

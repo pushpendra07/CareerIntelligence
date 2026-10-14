@@ -281,6 +281,10 @@ def test_filters_sorting_and_status(client: TestClient) -> None:
     )
     assert client.get("/api/v1/jobs", params={"source": "LINKEDIN"}).json()["total"] == 1
     assert client.get("/api/v1/jobs", params={"q": "beta"}).json()["total"] == 1
+    by_id = client.get("/api/v1/jobs", params={"q": f"#{java['job']['id']}"}).json()["items"]
+    assert [j["id"] for j in by_id] == [java["job"]["id"]]
+    assert client.get("/api/v1/jobs", params={"q": str(lead["id"])}).json()["items"][0]["id"] == (
+        lead["id"])
 
     r = client.post(f"/api/v1/jobs/{lead['id']}/status", json={"status": "SHORTLISTED"})
     assert r.json()["status"] == "SHORTLISTED"

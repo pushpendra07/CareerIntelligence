@@ -61,10 +61,13 @@ Conventions:
 ### jobs
 - `POST /api/v1/jobs/preview`
 - `POST /api/v1/jobs`
-- `GET /api/v1/jobs`
+- `GET /api/v1/jobs` (`q` also matches a job ID: `#123` or `123`)
 - `GET /api/v1/jobs/{job_id}`
 - `PATCH /api/v1/jobs/{job_id}`
 - `GET /api/v1/jobs/status-counts` (jobs per status for the same filters as `GET /jobs`)
+- `GET /api/v1/jobs/fetch-descriptions` — open jobs still missing a description, and the latest run
+- `POST /api/v1/jobs/fetch-descriptions` `{"limit": 40, "min_score": 0}` — read missing
+  descriptions from each job's link in the background, best scores first (one run at a time)
 - `DELETE /api/v1/jobs/{job_id}` (`?force=true` also deletes its applications/interviews/offers; otherwise 409 with counts)
 - `POST /api/v1/jobs/{job_id}/status`
 - `POST /api/v1/jobs/{job_id}/sources`

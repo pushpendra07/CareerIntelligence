@@ -7,7 +7,7 @@ import { mockApi, renderAt } from "./utils";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const JOB = { id: 7, title: "Magento Lead", status: "NEW", match_score: 80, score_stale: false, jd_status: "OK",
+const JOB = { id: 7, title: "Magento Lead", status: "NEW", match_score: 80, score_stale: false, jd_status: "OK", created_at: "2026-10-12T08:00:00Z",
   company: { id: 1, name: "Acme", tier: null }, location: null, work_model: "UNKNOWN", experience_min: null,
   experience_max: null, salary_min: null, salary_max: null, salary_currency: null, sources: ["LINKEDIN"], posting_date: null };
 
@@ -116,6 +116,12 @@ describe("job id", () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByTitle("Job ID")).toHaveTextContent("#7");
+    await userEvent.click(screen.getByRole("button", { name: "Sort by id" }));
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-id"); // newest ID first
+    await userEvent.click(screen.getByRole("button", { name: "Sort by added" }));
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-created_at");
+    expect(screen.getByRole("columnheader", { name: /Added/ })).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("columnheader", { name: /Posted/ })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "-id");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-id");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "id");

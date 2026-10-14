@@ -55,3 +55,13 @@ export function splitList(text: string): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+/** Job source codes in their usual spelling (LINKEDIN → LinkedIn). */
+const SOURCE_NAMES: Record<string, string> = {
+  LINKEDIN: "LinkedIn", SMARTRECRUITERS: "SmartRecruiters", SUCCESSFACTORS: "SuccessFactors",
+  OTHER_ATS: "Other job boards", CAREER_OPS: "Career-Ops", COMPANY_CAREERS: "Company career sites",
+  INSTAHYRE: "Instahyre", RECRUITER_EMAIL: "Recruiter email", WHATSAPP: "WhatsApp",
+};
+export function sourceName(code: string): string {
+  return SOURCE_NAMES[code] ?? humanize(code);
+}

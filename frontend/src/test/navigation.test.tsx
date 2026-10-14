@@ -22,20 +22,23 @@ const SUMMARY = { total_jobs: 410, closed_jobs: 6, new_jobs: 410, jobs_scored: 4
 
 describe("dashboard cards", () => {
   it("each card links to its filtered results", async () => {
-    mockApi({ "GET /dashboard": { summary: SUMMARY, priorities: [], funnels: {} }, "GET /dashboard/charts": {} });
+    mockApi({ "GET /dashboard": { summary: { ...SUMMARY, new_70_plus: 4, ready_to_apply: 2, due_followups: 1,
+      upcoming_interviews: 1, missing_jd_70_plus: 6, responses: 1 }, priorities: [], funnels: {} },
+    "GET /jobs/fetch-descriptions": { missing: 20, missing_70_plus: 6, running: null, last_run: null } });
     renderAt(<DashboardPage />);
+    const action = async (label: string) => (await screen.findByRole("link", { name: `${label}: open` })).getAttribute("href");
+    expect(await action("New jobs to review")).toBe("/jobs/review?min_score=70");
+    expect(await action("Ready to apply")).toBe("/jobs?tab=pending");
+    expect(await action("Follow-ups due")).toBe("/followups");
+    expect(await action("Interviews coming up")).toBe("/interviews");
+    expect(await action("Good jobs without a description")).toBe("/jobs?min_score=70&sort=-match_score");
     const link = async (label: string) => (await screen.findByRole("link", { name: `${label}: view results` })).getAttribute("href");
     expect(await link("Open jobs")).toBe("/jobs");
-    expect(await link("Closed positions")).toBe("/jobs/closed");
-    expect(await link("New to review")).toBe("/jobs?tab=new");
-    expect(await link("Excellent fit (90+)")).toBe("/jobs?min_score=90");
-    expect(await link("Strong fit (80+)")).toBe("/jobs?min_score=80");
-    expect(await link("Shortlisted")).toBe("/jobs?tab=pending&status=SHORTLISTED");
     expect(await link("Applications")).toBe("/applications");
     expect(await link("Interviews")).toBe("/interviews?upcoming=false");
-    expect(await link("Rejections")).toBe("/applications?status=REJECTED");
-    expect(await link("Follow-ups to do")).toBe("/followups");
-    expect(await link("Applied this week")).toBe("/applications");
+    expect(await link("Response rate")).toBe("/analytics");
+    expect(screen.getByRole("link", { name: "Response rate: view results" })).toHaveTextContent("100%"); // 1 of 1
+    expect(await screen.findByRole("button", { name: "Fetch for 20 best jobs" })).toBeInTheDocument();
   });
 
   it("jobs page sends every status from the card link", async () => {

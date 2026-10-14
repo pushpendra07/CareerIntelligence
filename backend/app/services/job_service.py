@@ -567,10 +567,14 @@ def filtered_jobs(f: JobFilters) -> Select[Any]:
         .options(selectinload(Job.company), selectinload(Job.source_links))
     )
     if f.q:
-        like = f"%{f.q.strip()}%"
-        stmt = stmt.where(
-            or_(Job.title.ilike(like), Company.name.ilike(like), Job.location.ilike(like))
-        )
+        q = f.q.strip()
+        like = f"%{q}%"
+        match = or_(Job.title.ilike(like), Company.name.ilike(like), Job.location.ilike(like))
+        # "#123" or "123" also finds the job with that ID.
+        digits = q.removeprefix("#")
+        if digits.isdigit() and len(digits) < 12:
+            match = or_(match, Job.id == int(digits))
+        stmt = stmt.where(match)
     if f.min_score is not None:
         stmt = stmt.where(Job.match_score >= f.min_score)
     if f.max_score is not None:
