@@ -128,16 +128,20 @@ export function ScoreBadge({ score, stale }: { score: number | null; stale?: boo
 }
 
 export function Spinner({ label = "Loading…" }: { label?: string }) {
-  return <div className="py-6 text-center text-sm text-slate-500" role="status">{label}</div>;
+  return (
+    <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500" role="status">
+      <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-500" />{label}
+    </div>
+  );
 }
 
 export function ErrorBox({ error }: { error: unknown }) {
   const message = error instanceof Error ? error.message : String(error);
-  return <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700" role="alert">{message}</div>;
+  return <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700" role="alert">{message}</div>;
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="py-8 text-center text-sm text-slate-500">{children}</div>;
+  return <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">{children}</div>;
 }
 
 export function Field({ label, children, hint, error }: { label: string; children: ReactNode; hint?: string; error?: string }) {
@@ -157,12 +161,12 @@ export const PAGE_SIZE = 10;
 export function Pagination({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (p: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / size));
   return (
-    <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
-      <span>{total.toLocaleString()} results</span>
+    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-600">
+      <span className="tabular-nums">{total.toLocaleString()} results</span>
       <div className="flex items-center gap-2">
-        <button className="btn-secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-        <span>Page {page} of {pages}</span>
-        <button className="btn-secondary" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
+        <button className="btn-secondary px-2.5" disabled={page <= 1} onClick={() => onPage(page - 1)}>← Previous</button>
+        <span className="tabular-nums text-slate-500">Page {page} of {pages}</span>
+        <button className="btn-secondary px-2.5" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next →</button>
       </div>
     </div>
   );
@@ -177,7 +181,7 @@ export function Stat({ label, value, tone = "text-slate-900", to }: { label: str
   const body = (
     <>
       <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${tone}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
     </>
   );
   if (!to) return <div className="card p-3">{body}</div>;

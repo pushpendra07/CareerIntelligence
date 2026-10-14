@@ -41,7 +41,7 @@ export function GlobalSearch() {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && q.length >= 2 && (
-        <div className="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-md border border-slate-200 bg-surface p-2 shadow-lg">
           {!groups.length && <p className="p-2 text-sm text-slate-500">No matches</p>}
           {groups.map(([group, hits]) => (
             <div key={group} className="mb-2">

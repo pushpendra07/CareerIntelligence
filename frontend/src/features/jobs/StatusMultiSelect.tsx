@@ -33,7 +33,7 @@ export function StatusMultiSelect({ options, value, onChange, emptyLabel = "All 
       </button>
       {open && (
         <div role="listbox" aria-multiselectable="true" aria-label="Job statuses"
-          className="absolute z-20 mt-1 w-64 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+          className="absolute z-20 mt-1 w-64 rounded-md border border-slate-200 bg-surface p-1 shadow-lg">
           <div className="flex justify-between border-b border-slate-100 px-2 py-1 text-xs">
             <button type="button" className="link" onClick={() => onChange(options)}>Select all</button>
             <button type="button" className="link" onClick={() => onChange([])}>Clear</button>

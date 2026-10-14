@@ -13,7 +13,7 @@ export function ListInput({ value, onChange, placeholder, label }: {
     setDraft("");
   };
   return (
-    <div className="rounded-md border border-slate-300 bg-white p-1.5">
+    <div className="rounded-md border border-slate-300 bg-surface p-1.5">
       <div className="flex flex-wrap gap-1">
         {value.map((item) => (
           <span key={item} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs">

@@ -69,7 +69,7 @@ function Chips({ label, options, value, onChange }: { label: string; options: [s
       <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
         {options.map(([v, text]) => (
           <button key={v || "any"} type="button" aria-pressed={value === v} onClick={() => onChange(v)}
-            className={`border-l border-slate-300 px-2.5 py-1 text-xs first:border-l-0 ${value === v ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+            className={`border-l border-slate-300 px-2.5 py-1 text-xs first:border-l-0 ${value === v ? "bg-indigo-600 text-white dark:bg-indigo-500" : "bg-surface text-slate-600 hover:bg-slate-50"}`}>
             {text}
           </button>
         ))}

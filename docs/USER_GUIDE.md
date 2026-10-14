@@ -6,6 +6,10 @@ from an empty database to scored jobs, applications and interviews.
 > First install and start the app: see the README → *Run locally* (`./start.sh`).
 > Everything below happens in the browser; nothing needs an API key.
 
+**Look and layout:** the ☰ button at the top left hides the menu so lists use the full screen
+width (remembered; on a phone it opens the menu as a panel). The ☀ / ☾ / 🖥 switch at the top
+right picks a **light**, **dark** or **same as my computer** theme (remembered in this browser).
+
 **The menu** has six entries; related pages are tabs at the top of each one:
 
 | Menu | Tabs |

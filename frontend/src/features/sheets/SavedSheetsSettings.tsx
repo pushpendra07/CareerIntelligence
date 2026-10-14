@@ -41,7 +41,7 @@ function SheetRow({ sheet }: { sheet: SavedSheet }) {
           {confirmRemove ? (
             <span className="flex items-center gap-1 text-xs">
               Remove from this list?
-              <button className="rounded bg-rose-600 px-2 py-0.5 text-white" onClick={() => remove.mutate()}>Remove</button>
+              <button className="rounded bg-rose-600 px-2 py-0.5 text-white dark:bg-rose-500" onClick={() => remove.mutate()}>Remove</button>
               <button className="rounded px-2 py-0.5 hover:bg-slate-100" onClick={() => setConfirmRemove(false)}>Cancel</button>
             </span>
           ) : <button className="btn-secondary" onClick={() => setConfirmRemove(true)}>Remove</button>}
@@ -79,7 +79,7 @@ function PrivateAccess() {
         <li>Enable the <a className="link" href="https://console.cloud.google.com/apis/library/sheets.googleapis.com" target="_blank" rel="noopener noreferrer">Google Sheets API</a> for that project.</li>
         <li>Go to <a className="link" href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener noreferrer">IAM &amp; Admin → Service accounts</a> → <b>Create service account</b> (no roles needed).</li>
         <li>Open it → <b>Keys</b> → <b>Add key</b> → <b>Create new key</b> → JSON. A file downloads.</li>
-        <li>Move that file to <code className="rounded bg-white px-1">backend/{a.key_file}</code> in this project (it is git-ignored), then restart the app.</li>
+        <li>Move that file to <code className="rounded bg-surface px-1">backend/{a.key_file}</code> in this project (it is git-ignored), then restart the app.</li>
         <li>This box then shows the service account's email: share each sheet with it as <b>Viewer</b>.</li>
       </ol>
     </details>

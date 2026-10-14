@@ -40,7 +40,7 @@ export function DeleteJobButton({ jobId, title, onDeleted, compact = false }: {
   return (
     <span role="alertdialog" aria-label="Confirm delete" className={`inline-flex flex-wrap items-center gap-2 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-800 ${compact ? "max-w-xs" : ""}`}>
       <span>{linked ? `${linkedMessage} Delete anyway?` : "Delete this job? Imports and scans won't add it back."}</span>
-      <button type="button" className="rounded bg-rose-600 px-2 py-0.5 font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+      <button type="button" className="rounded bg-rose-600 px-2 py-0.5 font-medium text-white dark:bg-rose-500 hover:bg-rose-700 disabled:opacity-50"
         disabled={del.isPending} onClick={() => del.mutate(linked)}>{del.isPending ? "Deleting…" : linked ? "Delete all" : "Delete"}</button>
       <button type="button" className="rounded px-2 py-0.5 hover:bg-rose-100" onClick={() => setStep("idle")}>Cancel</button>
       {del.error && !(del.error instanceof ApiError && del.error.status === 409) && <span className="w-full text-rose-700">{errorMessage(del.error)}</span>}

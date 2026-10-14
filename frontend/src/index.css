@@ -1,19 +1,175 @@
 @import "tailwindcss";
 
+/* Dark mode follows a class on <html> (set by utils/theme.ts: light, dark or system). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Cards, menus and inputs. White in light mode; a raised dark surface in dark mode. */
+  --color-surface: #ffffff;
+  --color-page: #f6f7fb;
+}
+
+/*
+ * Dark theme: the palette is re-mapped instead of adding dark: classes everywhere.
+ * Greys are inverted (slate-50 is the darkest background, slate-900 the lightest text); light
+ * tints (50-300) become dark tinted backgrounds and text shades (600-900) become light, so every
+ * badge, link and number stays readable. Shades 400-500 (bars, dots) are unchanged.
+ */
+.dark {
+  color-scheme: dark;
+  --color-surface: #121a2e;
+  --color-page: #0a1020;
+  --color-slate-50: #0a1020;
+  --color-slate-100: #172036;
+  --color-slate-200: #222d45;
+  --color-slate-300: #334160;
+  --color-slate-400: #6b7a96;
+  --color-slate-500: #94a1b8;
+  --color-slate-600: #a9b5c8;
+  --color-slate-700: #c7d0de;
+  --color-slate-800: #e1e6ef;
+  --color-slate-900: #f1f4f9;
+  --color-slate-950: #f8fafc;
+  --color-indigo-50: color-mix(in oklab, #6366f1 12%, #0f1729);
+  --color-indigo-100: color-mix(in oklab, #6366f1 20%, #0f1729);
+  --color-indigo-200: color-mix(in oklab, #6366f1 34%, #0f1729);
+  --color-indigo-300: color-mix(in oklab, #6366f1 52%, #0f1729);
+  --color-indigo-600: #818cf8;
+  --color-indigo-700: #a5b4fc;
+  --color-indigo-800: #c7d2fe;
+  --color-indigo-900: #e0e7ff;
+  --color-rose-50: color-mix(in oklab, #f43f5e 12%, #0f1729);
+  --color-rose-100: color-mix(in oklab, #f43f5e 20%, #0f1729);
+  --color-rose-200: color-mix(in oklab, #f43f5e 34%, #0f1729);
+  --color-rose-300: color-mix(in oklab, #f43f5e 52%, #0f1729);
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-emerald-50: color-mix(in oklab, #10b981 12%, #0f1729);
+  --color-emerald-100: color-mix(in oklab, #10b981 20%, #0f1729);
+  --color-emerald-200: color-mix(in oklab, #10b981 34%, #0f1729);
+  --color-emerald-300: color-mix(in oklab, #10b981 52%, #0f1729);
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+  --color-amber-50: color-mix(in oklab, #f59e0b 12%, #0f1729);
+  --color-amber-100: color-mix(in oklab, #f59e0b 20%, #0f1729);
+  --color-amber-200: color-mix(in oklab, #f59e0b 34%, #0f1729);
+  --color-amber-300: color-mix(in oklab, #f59e0b 52%, #0f1729);
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-sky-50: color-mix(in oklab, #0ea5e9 12%, #0f1729);
+  --color-sky-100: color-mix(in oklab, #0ea5e9 20%, #0f1729);
+  --color-sky-200: color-mix(in oklab, #0ea5e9 34%, #0f1729);
+  --color-sky-300: color-mix(in oklab, #0ea5e9 52%, #0f1729);
+  --color-sky-600: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+  --color-violet-50: color-mix(in oklab, #8b5cf6 12%, #0f1729);
+  --color-violet-100: color-mix(in oklab, #8b5cf6 20%, #0f1729);
+  --color-violet-200: color-mix(in oklab, #8b5cf6 34%, #0f1729);
+  --color-violet-300: color-mix(in oklab, #8b5cf6 52%, #0f1729);
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-violet-900: #ede9fe;
+  --color-teal-50: color-mix(in oklab, #14b8a6 12%, #0f1729);
+  --color-teal-100: color-mix(in oklab, #14b8a6 20%, #0f1729);
+  --color-teal-200: color-mix(in oklab, #14b8a6 34%, #0f1729);
+  --color-teal-300: color-mix(in oklab, #14b8a6 52%, #0f1729);
+  --color-teal-600: #2dd4bf;
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-teal-900: #ccfbf1;
+  --color-cyan-50: color-mix(in oklab, #06b6d4 12%, #0f1729);
+  --color-cyan-100: color-mix(in oklab, #06b6d4 20%, #0f1729);
+  --color-cyan-200: color-mix(in oklab, #06b6d4 34%, #0f1729);
+  --color-cyan-300: color-mix(in oklab, #06b6d4 52%, #0f1729);
+  --color-cyan-600: #22d3ee;
+  --color-cyan-700: #67e8f9;
+  --color-cyan-800: #a5f3fc;
+  --color-cyan-900: #cffafe;
+  --color-blue-50: color-mix(in oklab, #3b82f6 12%, #0f1729);
+  --color-blue-100: color-mix(in oklab, #3b82f6 20%, #0f1729);
+  --color-blue-200: color-mix(in oklab, #3b82f6 34%, #0f1729);
+  --color-blue-300: color-mix(in oklab, #3b82f6 52%, #0f1729);
+  --color-blue-600: #60a5fa;
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+  --color-blue-900: #dbeafe;
+  --color-orange-50: color-mix(in oklab, #f97316 12%, #0f1729);
+  --color-orange-100: color-mix(in oklab, #f97316 20%, #0f1729);
+  --color-orange-200: color-mix(in oklab, #f97316 34%, #0f1729);
+  --color-orange-300: color-mix(in oklab, #f97316 52%, #0f1729);
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fed7aa;
+  --color-orange-900: #ffedd5;
+  --color-lime-50: color-mix(in oklab, #84cc16 12%, #0f1729);
+  --color-lime-100: color-mix(in oklab, #84cc16 20%, #0f1729);
+  --color-lime-200: color-mix(in oklab, #84cc16 34%, #0f1729);
+  --color-lime-300: color-mix(in oklab, #84cc16 52%, #0f1729);
+  --color-lime-600: #a3e635;
+  --color-lime-700: #bef264;
+  --color-lime-800: #d9f99d;
+  --color-lime-900: #ecfccb;
+  --color-yellow-50: color-mix(in oklab, #eab308 12%, #0f1729);
+  --color-yellow-100: color-mix(in oklab, #eab308 20%, #0f1729);
+  --color-yellow-200: color-mix(in oklab, #eab308 34%, #0f1729);
+  --color-yellow-300: color-mix(in oklab, #eab308 52%, #0f1729);
+  --color-yellow-600: #facc15;
+  --color-yellow-700: #fde047;
+  --color-yellow-800: #fef08a;
+  --color-yellow-900: #fef9c3;
+  --color-zinc-50: color-mix(in oklab, #71717a 12%, #0f1729);
+  --color-zinc-100: color-mix(in oklab, #71717a 20%, #0f1729);
+  --color-zinc-200: color-mix(in oklab, #71717a 34%, #0f1729);
+  --color-zinc-300: color-mix(in oklab, #71717a 52%, #0f1729);
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-stone-50: color-mix(in oklab, #78716c 12%, #0f1729);
+  --color-stone-100: color-mix(in oklab, #78716c 20%, #0f1729);
+  --color-stone-200: color-mix(in oklab, #78716c 34%, #0f1729);
+  --color-stone-300: color-mix(in oklab, #78716c 52%, #0f1729);
+  --color-stone-600: #a8a29e;
+  --color-stone-700: #d6d3d1;
+  --color-stone-800: #e7e5e4;
+  --color-stone-900: #f5f5f4;
+  --color-neutral-50: color-mix(in oklab, #737373 12%, #0f1729);
+  --color-neutral-100: color-mix(in oklab, #737373 20%, #0f1729);
+  --color-neutral-200: color-mix(in oklab, #737373 34%, #0f1729);
+  --color-neutral-300: color-mix(in oklab, #737373 52%, #0f1729);
+  --color-neutral-600: #a3a3a3;
+  --color-neutral-700: #d4d4d4;
+  --color-neutral-800: #e5e5e5;
+  --color-neutral-900: #f5f5f5;
+}
+
 @layer base {
-  body { @apply text-slate-800 antialiased; }
-  h1 { @apply text-xl font-semibold text-slate-900; }
+  body { @apply bg-page font-sans text-slate-800 antialiased; }
+  h1 { @apply text-xl font-semibold tracking-tight text-slate-900; }
   h2 { @apply text-base font-semibold text-slate-900; }
+  ::selection { @apply bg-indigo-200; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-indigo-500; }
 }
 
 /* Tailwind v4: reusable classes are declared as utilities so they can compose with @apply. */
-@utility input { @apply w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-100; }
+@utility input { @apply w-full rounded-lg border border-slate-300 bg-surface px-3 py-1.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100; }
 @utility label { @apply mb-1 block text-xs font-medium text-slate-600; }
-@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50; }
-@utility btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700; }
-@utility btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
-@utility card { @apply rounded-lg border border-slate-200 bg-white p-4 shadow-sm; }
+@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50; }
+/* Solid buttons keep their brand colour in both themes (shade 600 turns light in dark mode). */
+@utility btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:text-white; }
+@utility btn-secondary { @apply btn border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50 hover:border-slate-400; }
+@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400; }
+@utility card { @apply rounded-xl border border-slate-200 bg-surface p-4 shadow-sm shadow-slate-900/[0.03]; }
 @utility link { @apply text-indigo-600 hover:underline; }
 @utility th { @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
 @utility td { @apply px-3 py-2 text-sm align-top; }

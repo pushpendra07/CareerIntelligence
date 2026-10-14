@@ -24,6 +24,33 @@ describe("menu", () => {
     expect(within(tabs).getByRole("link", { name: "Recruiters" })).toHaveAttribute("href", "/recruiters");
   });
 
+  it("switches theme and remembers it", async () => {
+    mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} } });
+    renderAt(<AppLayout />, { path: "/", route: "/" });
+    const group = screen.getByRole("group", { name: "Theme" });
+    await userEvent.click(within(group).getByRole("button", { name: "Dark theme" }));
+    expect(document.documentElement).toHaveClass("dark");
+    expect(window.localStorage.getItem("theme")).toBe("dark");
+    await userEvent.click(within(group).getByRole("button", { name: "Light theme" }));
+    expect(document.documentElement).not.toHaveClass("dark");
+    expect(within(group).getByRole("button", { name: "Light theme" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides the menu for full-width pages, and remembers it", async () => {
+    mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} } });
+    const first = renderAt(<AppLayout />, { path: "/jobs", route: "/jobs" });
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("max-w-[1440px]");
+    await userEvent.click(screen.getByRole("button", { name: "Hide menu" }));
+    expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
+    expect(screen.getByRole("main")).not.toHaveClass("max-w-[1440px]"); // full width
+    first.unmount();
+    renderAt(<AppLayout />, { path: "/jobs", route: "/jobs" });
+    expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show menu" }));
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
+  });
+
   it("finds the section and tab for any page", () => {
     expect(locate("/jobs/review").tab?.label).toBe("Review new");
     expect(locate("/jobs/42").tab?.label).toBe("All jobs");
