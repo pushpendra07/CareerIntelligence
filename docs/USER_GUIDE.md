@@ -175,7 +175,7 @@ Every way below goes through the same pipeline: duplicates are merged (one job c
 | **Built-in job scanner** | Settings → Job scanner → **Scan now** (or company page → Scan jobs) | Companies on supported job boards — full descriptions, 1–3 min |
 | **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
-| **CSV / JSON** | Settings → Import & export → import jobs | One-off lists |
+| **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now** (set up once with `./scripts/setup-career-ops.sh`) | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
 
 Job scanner setup (once): Settings → Job scanner → *What to keep*:
@@ -199,14 +199,26 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   **Score** (60+ / 70+ / 80+), **Work** (remote / hybrid / on-site), **Posted** (last 7 / 14 /
   30 days) and **Added via**. **More filters** opens exact minimum score, recommendation,
   company tier, technology, location, source, your years and applied or not. 10 jobs per page.
-- **Email to HR** (job page) → **Draft email** writes a short email from the job and your
-  profile: the required skills you match, your experience, one achievement, the job link and
-  your signature. Pick one of the suggested subjects or type your own, edit the message, then
+- **Email to HR** (job page) → **Draft email** writes an email from the job and your profile:
+  who you are (current role, employer, years), the required skills you match exactly, your most
+  relevant project highlight, a certification the job asks for, leadership for lead roles,
+  location / notice period, the job link and your signature. **Short message (LinkedIn)** gives
+  a brief version for LinkedIn or InMail. Better profile data (projects with highlights,
+  certifications, notice period in Target Profile) makes better drafts. Pick one of the suggested subjects or type your own, edit the message, then
   **Copy subject**, **Copy message**, **Copy subject + message** or **Open in email app**.
   **Find HR email with Google · ChatGPT · Gemini · Claude** searches for publicly listed HR /
   recruiter addresses at the company (the AI tools are told not to guess addresses);
   **Polish with ChatGPT · Gemini · Claude** asks them to tighten your edited draft. Nothing is
   sent from the app. Known recruiters for the company appear as suggestions in *To*.
+- **Interview done, HR not replying:** on a job in *Interview*, click **Interview done – no
+  reply** (or pick it in the Status menu or on the application). The job stays in the
+  **Interview** tab, a reminder *Ask for interview feedback* is added for 3 days later, and the
+  job page offers **Follow up**, **Next round**, **Got an offer** and **Rejected**. Scheduling
+  another round moves it back to *Interview*.
+- **Where it came from** (job page, right column): a timeline of the job's dates — posted on the
+  job site, added to your Google Sheet (from a `date_found` / `date_added` column), added to this
+  app, also found in other sources, last seen in the sheet. What a sheet doesn't say (no date
+  column, "Posted 2 days ago") is listed underneath.
 - **Is the job still open?** On a job, **Check if still open** asks the posting's own site
   (job-board API or the page itself) and shows *Still open*, *Closed*, *Probably closed* or
   *Couldn't tell*, with the reason. If it's closed, **Mark as closed** moves it to the Closed
@@ -246,8 +258,11 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 ## 8. Apply and track applications
 
 On a job → **Apply** (*Record application*): the **CV version** you sent (the recommended one is
-pre-selected), **Method** (portal, email, referral…), **Expected CTC**, **Notice period (days)**
-and **Notes**.
+pre-selected), **Method** (portal, email, referral…), **Expected CTC**, **Notice period (days)**,
+**Applied on** and **Notes**.
+**Applied on** is optional: leave it empty for today, or pick the day you actually applied from
+the date picker (future dates aren't allowed). That date is the application's applied date, and
+the first follow-up is due a week after it.
 This creates an **Application** (sidebar → Applications) and moves the job to *Applied*.
 
 On an application: update its status (Applied → Screening → Interview → Offer / Rejected /
@@ -308,19 +323,23 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
 
 ## 12. Settings reference
 
-| Panel | What it does |
+Settings has four tabs:
+
+| Tab | What's there |
 |---|---|
-| **Job scanner** | Scan now, Find job boards, coverage, last run details, filters and schedule |
-| **Google Sheets** | Saved sheets, Import, private-sheet connection (service account) |
-| **Scoring** | Weights, thresholds, tier factors, hard rules (versioned) |
-| **Career-Ops integration** | Import now, Scan + import, status (optional) |
-| **Notifications** | Follow-up reminders, interview reminder hours |
-| **AI providers** | Optional AI for summaries/questions (`AI_PROVIDER` in `backend/.env`; costs tokens) |
-| **Import & export** | CSV/JSON import of jobs or recruiters; export any list or everything |
+| **Job sources** | An overview of every job source (set up? last run?), then: **Job scanner** — *Search every company* switch, Scan now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import |
+| **Scoring** | What each part of the 0–100 score looks at, their weights (must total 100), the score each recommendation label needs, and (Advanced) company-tier points and deal-breakers. Save re-scores every job; Undo changes discards edits |
+| **Backup & import** | Download a full JSON backup or any list as CSV; import jobs or recruiters from a CSV/JSON file |
+| **About & AI** | Whether optional AI is on and how to turn it on; versions, Google account, Career-Ops path, storage |
+
+**Search every company** (Job sources → Job scanner): on = every company is scanned, including
+ones added later, whatever its own *Job search* tick says; off = only ticked companies. The
+per-company ticks are kept, so turning it off restores them. Companies can only be scanned
+when their job board is known (**Find job boards**).
 
 ## 13. Backups, exports and starting over
 
-- **Export**: Settings → Import & export → export jobs, companies, applications… as CSV/JSON,
+- **Export**: Settings → Backup & import → Back up your data → jobs, companies, applications… as CSV/JSON,
   or **export everything**.
 - Your data lives in `backend/.devdb/` (database) and `storage/` (CV files). Back up both
   folders while the app is stopped (`./stop.sh`).

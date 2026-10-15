@@ -145,7 +145,7 @@ CV ─▶ Professional Profile ─▶ Target Profile
   most-requested skills; **skill gaps**.
 - **Analytics**: where scores are lost, and interview rate by score band.
 - **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills.
-- **Import & export** (CSV/JSON, including a full JSON export of everything) and **Google Sheets** import.
+- **Backup & import** (CSV/JSON, including a full JSON backup of everything) and **Google Sheets** import.
 - **Audit log** of every important action.
 
 </td></tr>

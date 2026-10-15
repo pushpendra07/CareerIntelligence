@@ -70,11 +70,14 @@ def board_for(company: Company) -> Board | None:
     return None
 
 
-def scan_targets(db: Session, company_ids: list[int] | None = None
-                 ) -> list[tuple[Company, Board]]:
+def scan_targets(db: Session, company_ids: list[int] | None = None,
+                 all_companies: bool = False) -> list[tuple[Company, Board]]:
+    """Companies to scan: the ones asked for, else Job search on (or all of them)."""
     stmt = select(Company).order_by(Company.name)
-    stmt = stmt.where(Company.id.in_(company_ids)) if company_ids else stmt.where(
-        Company.job_search_enabled.is_(True))
+    if company_ids:
+        stmt = stmt.where(Company.id.in_(company_ids))
+    elif not all_companies:
+        stmt = stmt.where(Company.job_search_enabled.is_(True))
     out = []
     for company in db.scalars(stmt):
         if board := board_for(company):
@@ -163,7 +166,7 @@ def _run_scan(db: Session, company_ids: list[int] | None, trigger: str, http: Ht
         run = ScanRun(kind="SCAN", trigger=trigger, stats={}, companies=[])
         db.add(run)
         db.commit()
-    targets = scan_targets(db, company_ids)
+    targets = scan_targets(db, company_ids, bool(cfg.get("search_all_companies")))
     known = {u for (u,) in db.execute(text(
         "SELECT original_url FROM job_sources WHERE original_url IS NOT NULL"))}
     by_id = {c.id: c for c, _ in targets}

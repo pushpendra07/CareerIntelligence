@@ -137,14 +137,14 @@ https://github.com/career-ops-hq/career-ops, git-ignored because it holds person
    CAREER_OPS_SCAN_ENABLED=true
    ```
 3. Restart: `./stop.sh --keep-db && ./start.sh --no-open`.
-4. Check **Settings → Career-Ops integration**: Path, Version, "Node.js: available",
+4. Check **Settings → Job sources → Career-Ops**: Path, Version, "Node.js: available",
    "Scanning: enabled", and non-zero pipeline/tracker counts.
    Or: `curl -s http://127.0.0.1:8010/api/v1/career-ops/status | python3 -m json.tool`
    — `data_root` must be the Career-Ops folder (not `.`).
 
 ### Run it — three ways
 
-**A. In the app (recommended):** Settings → Career-Ops integration → **Scan + import**.
+**A. In the app (recommended):** Settings → Job sources → Career-Ops → **Scan + import**.
 Runs in the background (typically **15–20 minutes**; it checks ~12,000 postings; limit 45 min).
 The panel shows "Career-Ops is scanning…", then the result ("N new, M updated"). Only one
 scan runs at a time. Keep the app running until it finishes (`./stop.sh` stops the scan).
@@ -226,13 +226,13 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 
 - **Add Job** (button on Jobs / Dashboard): paste a job URL and description → live preview → Save & analyze.
   Use this for LinkedIn / Naukri / Indeed (they can't be scanned).
-- **CSV / JSON upload:** Settings → Import & export → import jobs or recruiters (`POST /api/v1/import/{jobs|recruiters}`).
+- **CSV / JSON upload:** Settings → Backup & import → Import a file (`POST /api/v1/import/{jobs|recruiters}`).
 - **Company research files (CLI):**
   ```bash
   cd backend && uv run python -m app.cli import-companies \
       --research-csv /path/master.csv --myjob-db /path/portal.sqlite --career-ops ../career-ops
   ```
-- **Export:** Settings → Import & export → export CSV/JSON (`GET /api/v1/export/{entity}`, `/export/all`).
+- **Export:** Settings → Backup & import → Back up your data (`GET /api/v1/export/{entity}`, `/export/all`).
 
 ## Day-to-day flow
 
@@ -376,7 +376,7 @@ If you change engine logic, bump `ENGINE_VERSION`.
 **Jobs UI**: status tabs with counts — All open (`/jobs`), New, Pending, Applied, Interview,
 Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). Tab → statuses:
 new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
-Applied+Recruiter contacted+Screening · interview · selected = Offer+Accepted · rejected ·
+Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback · selected = Offer+Accepted · rejected ·
 not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).
 Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).
 Every job has `added_via` (list, in arrival order): `manual` | `sheet` | `scanner` | `career_ops` |

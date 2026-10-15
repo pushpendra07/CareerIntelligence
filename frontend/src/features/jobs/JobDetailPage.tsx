@@ -6,8 +6,8 @@ import { ScoreBreakdown } from "../../components/charts";
 import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
 import type { Application, CV, FollowUp, Interview, JobDetail, Page } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
-import { FollowUpRow, QuickFollowUp } from "../followups/FollowUpParts";
-import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
+import { FollowUpRow, QuickFollowUp, inDays } from "../followups/FollowUpParts";
+import { FitSummary, JobDescription, KeyFacts, SourceTimeline, postingUrl } from "./JobParts";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { PostingCheck } from "./PostingCheck";
 import { EmailDraft } from "./EmailDraft";
@@ -63,10 +63,12 @@ function CareerOpsPanel({ job }: { job: JobDetail }) {
 
 function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
   const cvs = useQuery({ queryKey: ["cvs"], queryFn: () => api.get<Page<CV>>("/cvs") });
-  const [form, setForm] = useState({ method: "COMPANY_SITE", cv_version_id: "", notes: "", expected_salary: "", notice_period_days: "" });
+  const [form, setForm] = useState({ method: "COMPANY_SITE", cv_version_id: "", notes: "", expected_salary: "", notice_period_days: "", applied_on: "" });
+  const today = inDays(0);
   const apply = useMutation({
     mutationFn: () => api.post("/applications", {
       job_id: job.id, method: form.method,
+      applied_on: form.applied_on || undefined, // empty = today
       cv_version_id: form.cv_version_id ? Number(form.cv_version_id) : undefined,
       notes: form.notes || undefined,
       expected_salary: form.expected_salary || undefined,
@@ -85,7 +87,17 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
       </select>
       <input className="input" placeholder="Expected CTC (e.g. 4000000)" value={form.expected_salary} onChange={(e) => setForm({ ...form, expected_salary: e.target.value })} />
       <input className="input" placeholder="Notice period (days)" value={form.notice_period_days} onChange={(e) => setForm({ ...form, notice_period_days: e.target.value })} />
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        <span className="shrink-0">Applied on</span>
+        <input className="input" type="date" aria-label="Applied on" max={today} value={form.applied_on}
+          title="Leave empty for today" onChange={(e) => setForm({ ...form, applied_on: e.target.value })} />
+      </label>
       <input className="input sm:col-span-2" placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <p className="text-xs text-slate-500 sm:col-span-3">
+        {form.applied_on && form.applied_on !== today
+          ? `Will be recorded as applied on ${formatDate(form.applied_on)}; the first follow-up is due a week after that.`
+          : "Applied date: today. Pick a date if you applied earlier."}
+      </p>
       {apply.error && <div className="sm:col-span-3"><ErrorBox error={new Error(errorMessage(apply.error))} /></div>}
       <button className="btn-primary" disabled={apply.isPending} onClick={() => apply.mutate()}>Record application</button>
     </div>
@@ -123,6 +135,16 @@ function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: 
     actions = <>
       <Link className="btn-primary" to={`/jobs/${job.id}/prep`}>Interview prep</Link>
       <Link className="btn-secondary" to={`/interviews/new?job_id=${job.id}`}>Add a round</Link>
+      <button className="btn-secondary" disabled={busy} onClick={() => setStatus("AWAITING_FEEDBACK")}
+        title="The interview is over and HR hasn't replied yet">Interview done – no reply</button>
+    </>;
+  } else if (job.status === "AWAITING_FEEDBACK") {
+    text = "Interview done — HR hasn't replied yet. A follow-up to ask for feedback is planned; send it if there's still no answer.";
+    actions = <>
+      <a className="btn-primary" href="#follow-ups">Follow up</a>
+      <Link className="btn-secondary" to={`/interviews/new?job_id=${job.id}`}>Next round</Link>
+      <button className="btn-secondary" disabled={busy} onClick={() => setStatus("OFFER")}>Got an offer</button>
+      <button className="btn-secondary" disabled={busy} onClick={() => setStatus("REJECTED")}>Rejected</button>
     </>;
   } else if (["OFFER", "ACCEPTED"].includes(job.status)) {
     text = "You have an offer.";
@@ -235,6 +257,7 @@ export function JobDetailPage() {
               <QuickFollowUp key={j.id} jobId={j.id} jobTitle={j.title} applied={applied} />
             </Card>
           </div>
+          <Card title="Where it came from"><SourceTimeline job={j} /></Card>
           {(apps.data?.items.length || ivs.data?.items.length) ? (
             <Card title="Your progress">
               <ul className="space-y-2 text-sm">

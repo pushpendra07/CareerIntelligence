@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, errorMessage } from "../../api/client";
+import { ApiError, api, errorMessage } from "../../api/client";
 import { Card, Empty, ErrorBox, Spinner } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
 
@@ -14,22 +14,56 @@ export interface SavedSheet {
   last_error: string | null;
 }
 
+interface SheetCheck { readable: boolean | null; via: string; reason: string | null; message: string | null }
+
+/** The clear "can't import" message for a private sheet, with what to do about it. */
+function PrivateSheetNotice() {
+  return (
+    <div role="alert" className="mt-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+      <p className="font-medium">Can't import — this sheet is private.</p>
+      <p className="mt-1 text-xs">
+        Google only opens it for signed-in people, and the app has no Google sign-in yet. To import it from here, either:
+      </p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+        <li><b>Connect private sheets</b> (one-time setup above), then share the sheet with the service account's email as Viewer — the sheet stays private; or</li>
+        <li>in Google Sheets: <b>Share → General access → Anyone with the link → Viewer</b>; or</li>
+        <li>ask Claude to import it through its Google connector.</li>
+      </ul>
+    </div>
+  );
+}
+
 function SheetRow({ sheet }: { sheet: SavedSheet }) {
+  // Asked when the page opens, so a private sheet is flagged before Import is clicked.
+  const check = useQuery({
+    queryKey: ["sheets", sheet.id, "check"],
+    queryFn: () => api.get<SheetCheck>(`/sheets/${sheet.id}/check`),
+    staleTime: 5 * 60_000, retry: false,
+  }).data;
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries();
   const imp = useMutation({ mutationFn: () => api.post<SavedSheet>(`/sheets/${sheet.id}/import`), onSettled: refresh });
   const [confirmRemove, setConfirmRemove] = useState(false);
   const remove = useMutation({ mutationFn: () => api.delete(`/sheets/${sheet.id}`), onSuccess: refresh });
   const r = sheet.last_result;
-  const error = imp.error ? errorMessage(imp.error) : sheet.last_error;
+  const importFailedPrivate = imp.error instanceof ApiError
+    && (imp.error.details as { reason?: string } | undefined)?.reason === "private";
+  const isPrivate = importFailedPrivate || (!imp.error && check?.reason === "private");
+  const error = isPrivate ? null : imp.error ? errorMessage(imp.error) : check?.message ?? sheet.last_error;
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <a className="link font-medium" href={sheet.url} target="_blank" rel="noopener noreferrer">{sheet.title}</a>
+          {check?.readable === false && check.reason === "private" && (
+            <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Private — can't import</span>
+          )}
+          {check?.readable === true && (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700" title="Shared by link: Import reads its first tab">Open by link</span>
+          )}
           <p className="text-xs text-slate-500">
             {sheet.last_imported_at
-              ? <>Last import {formatDateTime(sheet.last_imported_at)}{r?.via === "connector" ? " (by an agent, via Google connector)" : ""}: <b>{r?.created ?? 0} new</b>, {r?.merged ?? 0} already in the app</>
+              ? <>{isPrivate || error ? "Last successful import" : "Last import"} {formatDateTime(sheet.last_imported_at)}{r?.via === "connector" ? " (by an agent, via Google connector)" : ""}: <b>{r?.created ?? 0} new</b>, {r?.merged ?? 0} already in the app</>
               : "Not imported yet"}
           </p>
           {r && r.tabs.length > 1 && (
@@ -47,7 +81,8 @@ function SheetRow({ sheet }: { sheet: SavedSheet }) {
           ) : <button className="btn-secondary" onClick={() => setConfirmRemove(true)}>Remove</button>}
         </div>
       </div>
-      {error && <p className="mt-1 rounded bg-amber-50 p-2 text-xs text-amber-800">{error}</p>}
+      {isPrivate && <PrivateSheetNotice />}
+      {error && <p role="alert" className="mt-1 rounded bg-amber-50 p-2 text-xs text-amber-800">{error}</p>}
     </li>
   );
 }

@@ -1,0 +1,68 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { locate } from "../layouts/AppLayout";
+import { SettingsPage } from "../features/settings/SettingsPage";
+import { mockApi, renderAt } from "./utils";
+
+afterEach(() => vi.unstubAllGlobals());
+
+const SCORING = { version: 4, config: {
+  weights: { role: 20, skills: 25, experience: 15, domain: 10, location: 10, seniority: 5, salary: 5, company: 5, other: 5 },
+  thresholds: { highly_recommended: 90, recommended: 80, consider: 70, low_priority: 60 },
+  tier_factors: { TIER_A: 1, TIER_B: 0.6 }, hard_blockers: [],
+} };
+
+describe("settings", () => {
+  it("has one tab per purpose", () => {
+    expect(locate("/settings").tab?.label).toBe("Job sources");
+    expect(locate("/settings/scoring").tab?.label).toBe("Scoring");
+    expect(locate("/settings/data").tab?.label).toBe("Backup & import");
+    expect(locate("/settings/about").tab?.label).toBe("About & AI");
+  });
+
+  it("job sources: an overview of every source, then each one", async () => {
+    mockApi({
+      "GET /scanner/status": { supported_boards: [], job_search_enabled: 215, scannable: 152, by_provider: {}, not_scannable: [],
+        running: null, last_run: { id: 1, kind: "SCAN", trigger: "manual", status: "COMPLETED", started_at: "2026-10-14T08:00:00Z", finished_at: null, stats: {} },
+        settings: { title_include: [], title_broad: [], jd_keywords: [], title_exclude: [], locations: [], location_exclude: [],
+          keep_unknown_location: true, max_age_days: 45, max_new_per_company: 50, schedule_hours: 0, search_all_companies: false } },
+      "GET /sheets": [{ id: 1, url: "u", title: "Seen Jobs", last_imported_at: "2026-10-15T10:00:00Z", last_result: null, last_error: null }],
+      "GET /sheets/access": { service_account: "reader@x.iam.gserviceaccount.com", key_file: "k", error: null },
+      "GET /career-ops/status": { configured: false },
+    });
+    renderAt(<SettingsPage />);
+    expect(await screen.findByText("152 companies scanned")).toBeInTheDocument();
+    expect(await screen.findByText("1 saved · private sheets connected")).toBeInTheDocument();
+    expect(await screen.findByText("Not set up (optional)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Add Job by hand/ })).toHaveAttribute("href", "/jobs/new");
+    // Removed: the one-off sheet import (Google Sheets card does it) and notification options that did nothing.
+    expect(screen.queryByText(/Import from Google Sheet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Daily digest/)).not.toBeInTheDocument();
+  });
+
+  it("scoring: explains each part, saves only real changes, can undo", async () => {
+    const api = mockApi({ "GET /settings/scoring": SCORING, "PUT /settings/scoring": SCORING });
+    renderAt(<SettingsPage view="scoring" />);
+    expect(await screen.findByText("Required skills you have")).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled(); // nothing changed yet
+    const skills = screen.getByLabelText("Skills weight");
+    await userEvent.clear(skills);
+    await userEvent.type(skills, "30");
+    expect(screen.getByText(/must be 100 to save/)).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Undo changes" }));
+    expect(screen.getByLabelText("Skills weight")).toHaveValue(25);
+    expect(api.calls.some((c) => c.method === "PUT")).toBe(false);
+  });
+
+  it("backup & import: downloads and a readable import result", async () => {
+    mockApi({ "POST /import/jobs": { created: 3, merged: 1, skipped: 0, errors: [] } });
+    renderAt(<SettingsPage view="data" />);
+    expect(screen.getByRole("link", { name: "Download full backup (JSON)" })).toHaveAttribute("href", "/api/v1/export/all");
+    await userEvent.upload(screen.getByLabelText("Import file"), new File(["title,company\nLead,Acme"], "jobs.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Imported: 3 new, 1 already in the app.")).toBeInTheDocument();
+  });
+});

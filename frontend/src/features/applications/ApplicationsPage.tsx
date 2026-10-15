@@ -6,7 +6,7 @@ import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Sp
 import type { Application, Page } from "../../types/api";
 import { formatDate, formatDateTime, formatMoney, humanize } from "../../utils/format";
 
-export const APP_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD", "CLOSED"];
+export const APP_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD", "CLOSED"];
 
 export function ApplicationsPage() {
   const [params] = useSearchParams();

@@ -41,6 +41,8 @@ export function CompanyDetailPage() {
   const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/companies/${id}`, body), onSuccess: refresh });
   const check = useMutation({ mutationFn: () => api.post<{ results: Record<string, string> }>(`/companies/${id}/check`), onSuccess: refresh });
   const profile = useQuery({ queryKey: ["preferences"], queryFn: () => api.get<Preferences>("/preferences") });
+  const appSettings = useQuery({ queryKey: ["app-settings"], queryFn: () => api.get<{ scanner?: { search_all_companies?: boolean } }>("/settings/app") });
+  const searchAll = !!appSettings.data?.scanner?.search_all_companies;
   const board = useQuery({ queryKey: ["company-board", id], queryFn: () => api.get<{ provider: string; url: string } | null>(`/scanner/companies/${id}/board`) });
   const scan = useMutation({
     mutationFn: () => api.post<{ board: { provider: string; url: string } | null; run: ScanRun }>(`/scanner/companies/${id}/scan`),
@@ -63,7 +65,13 @@ export function CompanyDetailPage() {
           <select className="input w-32" aria-label="Tier" value={co.tier ?? ""} onChange={(e) => patch.mutate({ tier: e.target.value || null })}>
             <option value="">No tier</option><option value="TIER_A">Tier A</option><option value="TIER_B">Tier B</option><option value="TIER_C">Tier C</option>
           </select>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={co.job_search_enabled} onChange={(e) => patch.mutate({ job_search_enabled: e.target.checked })} />Job search</label>
+          {searchAll ? (
+            <span className="flex items-center gap-2 text-sm" title="Settings → Job scanner → Search every company is on, so this company is scanned">
+              <input type="checkbox" checked disabled aria-label="Job search" />Job search <span className="text-xs text-slate-500">(all companies)</span>
+            </span>
+          ) : (
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={co.job_search_enabled} onChange={(e) => patch.mutate({ job_search_enabled: e.target.checked })} />Job search</label>
+          )}
           <button className="btn-secondary" disabled={scan.isPending} onClick={() => scan.mutate()} title="Search this company's job board now">{scan.isPending ? "Scanning…" : "Scan jobs"}</button>
           <button className="btn-secondary" disabled={check.isPending} onClick={() => check.mutate()}>{check.isPending ? "Checking…" : "Run verification check"}</button>
         </div>

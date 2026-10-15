@@ -8,7 +8,7 @@ from app.db.base import Base, TimestampMixin
 
 
 class AppSettings(TimestampMixin, Base):
-    """Single-row user preferences that aren't part of the profile (notifications, UI)."""
+    """Single-row app settings that aren't part of the profile (the job scanner's)."""
 
     __tablename__ = "app_settings"
 

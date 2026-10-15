@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -55,6 +55,36 @@ def test_interview_flow_and_status_sync(client: TestClient) -> None:
         json={"job_id": job["id"], "round_type": "HR", "meeting_link": "javascript:alert(1)"},
     )
     assert bad.status_code == 422
+
+
+def test_interview_done_no_reply(client: TestClient) -> None:
+    job, _ = setup(client)
+    app = client.post("/api/v1/applications", json={"job_id": job["id"]}).json()
+    client.post("/api/v1/interviews", json={"job_id": job["id"], "round_type": "TECHNICAL"})
+
+    r = client.post(f"/api/v1/applications/{app['id']}/status",
+                    json={"status": "AWAITING_FEEDBACK", "note": "HR silent since Friday"})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/v1/jobs/{job['id']}").json()["status"] == "AWAITING_FEEDBACK"
+    # A reminder to ask for feedback, once, besides the application's own follow-up.
+    open_ = client.get("/api/v1/followups", params={"job_id": job["id"], "completed": False})
+    feedback = [f for f in open_.json()["items"] if f["kind"] == "INTERVIEW"]
+    assert [f["title"] for f in feedback] == [f"Ask for interview feedback: {job['title']}"]
+    assert feedback[0]["due_date"] == str(date.today() + timedelta(days=3))
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "INTERVIEW"})
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "AWAITING_FEEDBACK"})
+    again = client.get("/api/v1/followups", params={"job_id": job["id"], "completed": False})
+    assert sum(f["kind"] == "INTERVIEW" for f in again.json()["items"]) == 1
+
+    # Still an open application; the job sits in the Interview tab's statuses.
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "AWAITING_FEEDBACK"
+    listed = client.get("/api/v1/jobs", params={"status": ["INTERVIEW", "AWAITING_FEEDBACK"]})
+    assert [j["id"] for j in listed.json()["items"]] == [job["id"]]
+
+    # Another round moves it back to Interview.
+    client.post("/api/v1/interviews", json={"job_id": job["id"], "round_type": "HR"})
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "INTERVIEW"
+    assert client.get(f"/api/v1/jobs/{job['id']}").json()["status"] == "INTERVIEW"
 
 
 def test_question_bank_and_prep(client: TestClient) -> None:

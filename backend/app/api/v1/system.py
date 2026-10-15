@@ -64,13 +64,9 @@ def ai_summary(db: DB, settings: AppSettings, job_id: int) -> dict[str, Any]:
 
 # --- settings ---------------------------------------------------------------------------------
 
+# Only settings the app actually uses. (Notification and list-view preferences were removed:
+# nothing read them. Jobs list sort/filters are remembered in the browser.)
 DEFAULT_APP_SETTINGS: dict[str, Any] = {
-    "notifications": {
-        "followup_reminders": True,
-        "interview_reminder_hours": 24,
-        "daily_digest": False,
-    },
-    "ui": {"default_job_sort": "-match_score", "jobs_page_size": 50},
     "scanner": DEFAULT_SCANNER_SETTINGS,
 }
 

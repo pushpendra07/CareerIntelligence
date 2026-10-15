@@ -279,6 +279,10 @@ STATUS_MAP = {
     "to apply": JobStatus.READY_TO_APPLY,
     "shortlisted": JobStatus.SHORTLISTED,
     "applied": JobStatus.APPLIED,
+    # Before "interview": these are matched by prefix, first match wins.
+    "interview done": JobStatus.AWAITING_FEEDBACK,
+    "awaiting feedback": JobStatus.AWAITING_FEEDBACK,
+    "no reply": JobStatus.AWAITING_FEEDBACK,
     "interview": JobStatus.INTERVIEW,
     "rejected": JobStatus.REJECTED,
     "closed": JobStatus.CLOSED,
@@ -339,6 +343,14 @@ def job_input_from_row(
             "status": _first(r, "status"),
             "alert_status": _first(r, "alert_status"),
             "sheet_id": _first(r, "job_id", "id"),
+            # When the row was put in the sheet, and the sheet's own "posted" text, so the job
+            # page can show: posted → added to the sheet → added to the app.
+            "added_to_sheet": _iso(_posted(_first(
+                r, "date_found", "date_added", "added_on", "added_date", "date_added_to_sheet",
+                "found_on", "found_date", "date_discovered", "discovered_on", "date_saved",
+                "saved_on", "timestamp", "created_at", "created"))),
+            "posted_text": _first(r, "date_posted", "posting_date", "posted_on", "posted_age",
+                                  "posted"),
         }.items()
         if v
     }

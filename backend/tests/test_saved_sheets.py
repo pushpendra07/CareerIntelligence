@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.http import FetchResult
-from app.integrations import google_sheets
+from app.integrations import google_sheets, saved_sheets
 
 URL = "https://docs.google.com/spreadsheets/d/1iE8Xn7duwizMkvnJJMbfHWLL-DRbIpRlumH_P8aa7Co/edit"
 ROWS = [
@@ -51,6 +51,7 @@ def test_direct_import_private_and_public(client: TestClient,
                         lambda url, **kw: FetchResult(url, 401, "<!DOCTYPE html>"))
     r = client.post(f"/api/v1/sheets/{sheet['id']}/import")
     assert r.status_code == 409 and "service account" in r.json()["error"]["message"]
+    assert r.json()["error"]["details"] == {"reason": "private"}
     assert "private" in client.get("/api/v1/sheets").json()[0]["last_error"]
 
     csv_text = "job_url,title,company\nhttps://jobs.lever.co/acme/1,Magento Lead,Acme\n"
@@ -59,6 +60,28 @@ def test_direct_import_private_and_public(client: TestClient,
     ok = client.post(f"/api/v1/sheets/{sheet['id']}/import").json()
     assert ok["last_result"]["via"] == "direct" and ok["last_result"]["created"] == 1
     assert ok["last_error"] is None
+
+
+def test_check_before_import(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sheet = client.post("/api/v1/sheets", json={"url": URL}).json()
+    check = f"/api/v1/sheets/{sheet['id']}/check"
+
+    def answer(status: int, text: str = "") -> None:
+        monkeypatch.setattr(saved_sheets, "safe_get",
+                            lambda url, **kw: FetchResult(url, status, text))
+
+    answer(401, "<!DOCTYPE html><title>Sign in</title>")
+    private = client.get(check).json()
+    assert private["readable"] is False and private["reason"] == "private"
+    assert "private" in private["message"]
+    answer(200, "<html>sign in</html>")  # a sign-in page served with 200
+    assert client.get(check).json()["reason"] == "private"
+    answer(404)
+    assert client.get(check).json()["reason"] == "not_found"
+    answer(200, "job_url,title,company\n")
+    assert client.get(check).json() == {"readable": True, "via": "link", "reason": None,
+                                        "message": None}
+    assert client.get("/api/v1/sheets/999/check").status_code == 404
 
 
 def test_rejects_non_sheet_urls(client: TestClient) -> None:
@@ -149,3 +172,25 @@ def test_import_private_sheet_all_tabs(client: TestClient, service_account,  # t
     r = client.post(f"/api/v1/sheets/{sheet['id']}/import")
     assert r.status_code == 409
     assert "add reader@demo.iam.gserviceaccount.com as Viewer" in r.json()["error"]["message"]
+
+
+def test_sheet_dates_reach_the_job(client: TestClient) -> None:
+    sheet = client.post("/api/v1/sheets", json={"url": URL, "title": "Seen Jobs"}).json()
+    row = {**ROWS[0], "date_found": "2026-10-09", "date_posted": "2026-10-08"}
+    undated = {k: v for k, v in row.items() if k != "date_found"}
+    body: dict = {"tabs": [{"tab": "Seen", "rows": [undated]}]}
+    client.post(f"/api/v1/sheets/{sheet['id']}/import-rows", json=body)
+    job_id = client.get("/api/v1/jobs").json()["items"][0]["id"]
+    first = client.get(f"/api/v1/jobs/{job_id}").json()
+    assert first["posting_date"] == "2026-10-08"
+    [link] = first["source_links"]
+    assert link["imported"]["source"] == "Seen Jobs · Seen"
+    assert link["imported"]["posted_text"] == "2026-10-08"
+    assert "added_to_sheet" not in link["imported"]  # the row had no date column
+
+    # Re-importing (now with the date column) fills it in for the job already in the app.
+    body["tabs"][0]["rows"] = [row]
+    client.post(f"/api/v1/sheets/{sheet['id']}/import-rows", json=body)
+    [link] = client.get(f"/api/v1/jobs/{job_id}").json()["source_links"]
+    assert link["imported"]["added_to_sheet"] == "2026-10-09"
+    assert link["first_seen_at"] <= link["last_seen_at"]

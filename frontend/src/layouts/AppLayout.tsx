@@ -28,8 +28,9 @@ export const SECTIONS: Section[] = [
   { to: "/profile", label: "My profile", icon: "profile", hint: "Your experience, what you want, CVs and interview answers",
     tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Target roles" },
       { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
-  { to: "/settings", label: "Settings", icon: "settings", hint: "Job scanner, Google Sheets, Career-Ops, scoring, imports",
-    tabs: [{ to: "/settings", label: "Settings" }] },
+  { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
+    tabs: [{ to: "/settings", label: "Job sources" }, { to: "/settings/scoring", label: "Scoring" },
+      { to: "/settings/data", label: "Backup & import" }, { to: "/settings/about", label: "About & AI" }] },
 ];
 
 const matches = (path: string, to: string) => (to === "/" ? path === "/" : path === to || path.startsWith(`${to}/`));

@@ -63,6 +63,12 @@ def access(settings: AppSettings) -> dict[str, Any]:
     return svc.access_info(settings)
 
 
+@router.get("/{sheet_id}/check")
+def check_sheet(db: DB, settings: AppSettings, sheet_id: int) -> dict[str, Any]:
+    """Whether Import can read the sheet now: `readable` true / false (private) / null (unknown)."""
+    return svc.check_access(svc.get_sheet(db, sheet_id), settings)
+
+
 @router.post("/{sheet_id}/import", response_model=SheetOut)
 def import_sheet(db: DB, settings: AppSettings, sheet_id: int) -> SheetOut:
     """Import every tab (service account) or the public CSV. 409 with a hint if it can't read."""

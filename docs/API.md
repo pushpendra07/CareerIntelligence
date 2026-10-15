@@ -71,8 +71,11 @@ Conventions:
 - `DELETE /api/v1/jobs/{job_id}` (`?force=true` also deletes its applications/interviews/offers; otherwise 409 with counts)
 - `POST /api/v1/jobs/{job_id}/status`
 - `GET /api/v1/jobs/{job_id}/email-draft` — an email to HR for this job, built without AI from
-  the job, the current match (exact skill matches, shared domains) and your profile:
-  `{to, to_options[], subjects[], body, company, company_domain, facts_used}`. `to` is the job's
+  the job, the current match (exact skill matches, shared domains) and your profile (current
+  role, the project highlight most relevant to the job's skills, a certification the job asks
+  for, leadership for lead roles, notice period, location):
+  `{to, to_options[], subjects[], body, short, company, company_domain, facts_used}`; `short` is
+  a LinkedIn / InMail version. `to` is the job's
   recruiter or a company contact with an email, else null. Nothing is saved or sent.
 - `POST /api/v1/jobs/{job_id}/check-posting` — ask the posting's own site whether the job is
   still open (Greenhouse, Lever, SmartRecruiters, Workday, Ashby APIs; other pages: 404/410,
@@ -93,10 +96,12 @@ Conventions:
 - `GET /api/v1/settings/scoring/history`
 
 ### applications
-- `POST /api/v1/applications`
+- `POST /api/v1/applications` — `applied_on` is optional (default today; 422 if in the future);
+  the first follow-up is due 7 days after it
 - `GET /api/v1/applications`
 - `GET /api/v1/applications/{application_id}`
-- `PATCH /api/v1/applications/{application_id}`
+- `PATCH /api/v1/applications/{application_id}` — `applied_on` can be changed (not to empty or
+  a future date)
 - `POST /api/v1/applications/{application_id}/status`
 - `POST /api/v1/applications/{application_id}/notes`
 - `GET /api/v1/followups` — filters: `completed`, `due_before`, `kind`, `application_id`, `job_id`; each item has `job_title`, `job_status`, `job_url`
@@ -146,6 +151,9 @@ Conventions:
 ### sheets
 - `GET /api/v1/sheets`
 - `POST /api/v1/sheets` (`{"url", "title"?}`)
+- `GET /api/v1/sheets/{sheet_id}/check` — can Import read it now? `{readable: true|false|null,
+  via: "link"|"service_account", reason: "private"|"not_found"|"error"|null, message}`. Import of
+  a private sheet returns 409 with `details.reason = "private"`.
 - `DELETE /api/v1/sheets/{sheet_id}`
 - `GET /api/v1/sheets/access` (service-account email to share private sheets with)
 - `POST /api/v1/sheets/{sheet_id}/import` (all tabs via service account, or public CSV; 409 with a hint)

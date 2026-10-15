@@ -44,6 +44,9 @@ DEFAULT_SCANNER_SETTINGS: dict[str, Any] = {
     "max_age_days": 45,
     "max_new_per_company": 50,
     "schedule_hours": 0,  # 0 = manual only; e.g. 24 = scan once a day while the app runs
+    # True: scan every company with a known job board, ignoring each company's Job search flag
+    # (the flags are kept, so turning this off restores the per-company choice).
+    "search_all_companies": False,
 }
 _GENERIC_PLACES = {"remote", "anywhere", "worldwide", "global"}
 _LIST_KEYS = ("title_include", "title_broad", "jd_keywords", "title_exclude", "locations",
@@ -153,4 +156,5 @@ def validate_scanner_settings(cfg: dict[str, Any]) -> dict[str, Any]:
             raise DomainValidationError(f"scanner.{key} must be between {lo} and {hi}")
         out[key] = value
     out["keep_unknown_location"] = bool(out["keep_unknown_location"])
+    out["search_all_companies"] = bool(out["search_all_companies"])
     return {k: out[k] for k in DEFAULT_SCANNER_SETTINGS}

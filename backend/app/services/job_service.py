@@ -527,7 +527,8 @@ STATUS_ORDER = case(
     {st.value: i for i, st in enumerate([
         JobStatus.NEW, JobStatus.DISCOVERED, JobStatus.REVIEWING, JobStatus.SHORTLISTED,
         JobStatus.READY_TO_APPLY, JobStatus.ON_HOLD, JobStatus.APPLIED,
-        JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW, JobStatus.OFFER,
+        JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW,
+        JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER,
         JobStatus.ACCEPTED, JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.NOT_RELEVANT,
         JobStatus.CLOSED,
     ])},
@@ -755,9 +756,33 @@ def set_status(
         f"{before} → {status.value}",
         {"from": before, "to": status.value, "note": note},
     )
+    if status == JobStatus.AWAITING_FEEDBACK:
+        _plan_feedback_follow_up(db, job)
     if commit:
         db.commit()
     return job
+
+
+FEEDBACK_FOLLOW_UP_DAYS = 3
+
+
+def _plan_feedback_follow_up(db: Session, job: Job) -> None:
+    """Interview done, no reply yet: remind the user to ask for feedback (once)."""
+    from datetime import timedelta
+
+    from app.models.application import Application, FollowUp, FollowUpKind
+
+    if db.scalar(select(FollowUp.id).where(FollowUp.job_id == job.id,
+                                           FollowUp.kind == FollowUpKind.INTERVIEW.value,
+                                           FollowUp.completed.is_(False))):
+        return
+    app_id = db.scalar(select(Application.id).where(Application.job_id == job.id)
+                       .order_by(Application.id.desc()).limit(1))
+    db.add(FollowUp(
+        kind=FollowUpKind.INTERVIEW.value, title=f"Ask for interview feedback: {job.title}",
+        due_date=date.today() + timedelta(days=FEEDBACK_FOLLOW_UP_DAYS), job_id=job.id,
+        company_id=job.company_id, application_id=app_id,
+    ))
 
 
 def add_source(

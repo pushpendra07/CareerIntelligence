@@ -1,5 +1,11 @@
+/** Codes whose plain words would be unclear. */
+const LABELS: Record<string, string> = {
+  AWAITING_FEEDBACK: "Interview done – no reply",
+};
+
 export function humanize(value: string | null | undefined): string {
   if (!value) return "—";
+  if (LABELS[value]) return LABELS[value];
   return value
     .toLowerCase()
     .split("_")

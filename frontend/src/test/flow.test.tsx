@@ -153,4 +153,53 @@ describe("job page", () => {
     expect(screen.getByRole("button", { name: "Record application" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "1. Apply on the site ↗" })).toBeInTheDocument();
   });
+
+  it("marks an interview as done with no reply, then offers the ways out", async () => {
+    const api = mockApi({
+      "GET /jobs/9": { ...JOB, status: "INTERVIEW" }, "GET /applications": empty, "GET /interviews": empty,
+      "GET /followups": empty, "POST /jobs/9/status": { ok: true },
+    });
+    const { unmount } = renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/9" });
+    await userEvent.click(await screen.findByRole("button", { name: "Interview done – no reply" }));
+    expect(api.calls.find((c) => c.method === "POST" && c.path === "/jobs/9/status")?.body).toEqual({ status: "AWAITING_FEEDBACK" });
+    unmount();
+
+    mockApi({
+      "GET /jobs/9": { ...JOB, status: "AWAITING_FEEDBACK" }, "GET /applications": empty, "GET /interviews": empty,
+      "GET /followups": empty,
+    });
+    renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/9" });
+    expect(await screen.findByText(/HR hasn't replied yet/)).toBeInTheDocument();
+    expect(screen.getAllByText("Interview done – no reply").length).toBeGreaterThan(0); // badge + status menu
+    for (const name of ["Got an offer", "Rejected"]) expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Next round" })).toBeInTheDocument();
+  });
+
+  const applyRoutes = {
+    "GET /jobs/9": { ...JOB, status: "SHORTLISTED" }, "GET /applications": empty, "GET /interviews": empty,
+    "GET /followups": empty, "GET /cvs": empty, "POST /applications": { id: 1 },
+  };
+  const applied = (api: ReturnType<typeof mockApi>) =>
+    api.calls.find((c) => c.method === "POST" && c.path === "/applications")?.body as Record<string, unknown>;
+
+  it("records the applied date the user picks", async () => {
+    const api = mockApi(applyRoutes);
+    renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/9?apply=1" });
+    const picker = await screen.findByLabelText("Applied on");
+    expect(picker).toHaveAttribute("type", "date");
+    expect(picker).toHaveAttribute("max", inDays(0)); // no future dates
+    await userEvent.type(picker, inDays(-5));
+    expect(screen.getByText(/Will be recorded as applied on/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Record application" }));
+    expect(applied(api)).toMatchObject({ job_id: 9, applied_on: inDays(-5) });
+  });
+
+  it("uses today when no applied date is picked", async () => {
+    const api = mockApi(applyRoutes);
+    renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/9?apply=1" });
+    expect(await screen.findByText("Applied date: today. Pick a date if you applied earlier.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Record application" }));
+    expect(applied(api)).toMatchObject({ job_id: 9 });
+    expect(applied(api)).not.toHaveProperty("applied_on"); // the server records today
+  });
 });

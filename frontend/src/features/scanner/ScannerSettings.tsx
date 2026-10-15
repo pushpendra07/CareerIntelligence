@@ -16,6 +16,8 @@ export interface ScannerConfig {
   max_age_days: number;
   max_new_per_company: number;
   schedule_hours: number;
+  /** Scan every company, ignoring each company's own Job search setting. */
+  search_all_companies: boolean;
 }
 
 interface RunRow {
@@ -37,6 +39,7 @@ interface ScannerStatus {
   by_provider: Record<string, number>;
   not_scannable: { id: number; name: string; careers_url: string | null }[];
   boards_not_searched?: { id: number; name: string }[];
+  search_all_companies?: boolean;
   running: ScanRun | null;
   last_run: ScanRun | null;
   settings: ScannerConfig;
@@ -113,6 +116,32 @@ function RunDetails({ runId }: { runId: number }) {
   );
 }
 
+/** One switch: scan every company, or only those with Job search ticked. */
+function SearchAllSwitch({ on }: { on: boolean }) {
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: (value: boolean) => api.patch("/settings/app", { scanner: { search_all_companies: value } }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+  return (
+    <div className="rounded-md border border-slate-200 p-3">
+      <label className="flex items-start gap-2">
+        <input type="checkbox" className="mt-0.5" checked={save.isPending ? !!save.variables : on} disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)} aria-label="Search every company" />
+        <span>
+          <b>Search every company</b>
+          <span className="block text-xs text-slate-500">
+            {on
+              ? "On: all companies are scanned, including ones you add later. Each company's own Job search setting is kept and applies again if you turn this off."
+              : "Off: only companies with Job search ticked on their page are scanned. Turn on to scan all companies without ticking each one."}
+          </span>
+        </span>
+      </label>
+      {save.error && <ErrorBox error={new Error(errorMessage(save.error))} />}
+    </div>
+  );
+}
+
 function FilterForm({ initial }: { initial: ScannerConfig }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, string | number | boolean>>({});
@@ -120,7 +149,7 @@ function FilterForm({ initial }: { initial: ScannerConfig }) {
     setForm(Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : v])));
   }, [initial]);
   const save = useMutation({
-    mutationFn: () => api.patch("/settings/app", { scanner: Object.fromEntries(Object.entries(form).map(([k, v]) =>
+    mutationFn: () => api.patch("/settings/app", { scanner: Object.fromEntries(Object.entries(form).filter(([k]) => k !== "search_all_companies").map(([k, v]) =>
       [k, LISTS.some(([key]) => key === k) ? String(v).split(",").map((x) => x.trim()).filter(Boolean) : v])) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scanner"] }),
   });
@@ -196,9 +225,12 @@ export function ScannerSettings() {
     </>}>
       {!s ? <Spinner /> : (
         <div className="space-y-2 text-sm">
+          <SearchAllSwitch on={!!s.search_all_companies} />
           <p>
-            Searches the job boards of companies marked <b>Job search</b> and adds relevant jobs, already scored.{" "}
-            <b>{s.scannable}</b> of {s.job_search_enabled} job-search companies have a supported board
+            {s.search_all_companies
+              ? <>Searches the job boards of <b>all companies</b> and adds relevant jobs, already scored.{" "}</>
+              : <>Searches the job boards of companies marked <b>Job search</b> and adds relevant jobs, already scored.{" "}</>}
+            <b>{s.scannable}</b> of {s.job_search_enabled} {s.search_all_companies ? "companies" : "job-search companies"} have a supported board
             {Object.keys(s.by_provider).length > 0 && <>: {Object.entries(s.by_provider).map(([p, n]) => <Badge key={p}>{humanize(p)} {n}</Badge>)}</>}
           </p>
           {running && <p className="rounded bg-indigo-50 p-2 text-indigo-800">{running.kind === "SCAN" ? "Scanning job boards" : "Looking for job boards"}… started {formatDateTime(running.started_at)}. You can keep using the app.</p>}
@@ -224,7 +256,7 @@ export function ScannerSettings() {
           )}
           {s.not_scannable.length > 0 && (
             <details>
-              <summary className="cursor-pointer text-xs text-slate-600">{s.not_scannable.length} job-search companies without a supported board</summary>
+              <summary className="cursor-pointer text-xs text-slate-600">{s.not_scannable.length} {s.search_all_companies ? "companies" : "job-search companies"} without a supported board</summary>
               <p className="mt-1 text-xs text-slate-500">Click <b>Find job boards</b>: it looks for links to a job board, SuccessFactors / Oracle career sites, job data on the company's own careers pages, Career-Ops' list, and the company's name on the job boards' public listings. Companies whose openings are only on LinkedIn or Naukri can't be scanned — add those jobs with <b>Add Job</b> or a Google Sheet.</p>
               <ul className="mt-1 max-h-48 overflow-auto text-xs">
                 {s.not_scannable.map((c) => <li key={c.id}><Link className="link" to={`/companies/${c.id}`}>{c.name}</Link> <span className="text-slate-400">{c.careers_url ?? "no careers URL"}</span></li>)}

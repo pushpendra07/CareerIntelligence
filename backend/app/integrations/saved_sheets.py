@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import ConflictError, DomainValidationError, NotFoundError
+from app.core.http import BlockedURLError, Fetcher, safe_get
 from app.integrations import google_api
 from app.integrations.google_sheets import (
     detect_kind,
+    export_url,
     fetch_rows,
     parse_sheet_url,
     rows_from_values,
@@ -123,6 +125,38 @@ def import_direct(db: Session, sheet: SavedSheet, settings: Settings) -> SavedSh
             return import_tabs(db, sheet, rows, via="google_api")
         return import_tabs(db, sheet, [("", fetch_rows(sheet.url))], via="direct")
     except DomainValidationError as exc:
-        sheet.last_error = PRIVATE_HINT if "not public" in exc.message else exc.message
+        private = "not public" in exc.message
+        sheet.last_error = PRIVATE_HINT if private else exc.message
         db.commit()
-        raise ConflictError(sheet.last_error) from exc
+        raise ConflictError(sheet.last_error,
+                            {"reason": "private" if private else "error"}) from exc
+
+
+def check_access(sheet: SavedSheet, settings: Settings,
+                 fetch: Fetcher | None = None) -> dict[str, Any]:
+    """Can Import read this sheet right now? Asked before the user clicks Import.
+
+    With a service account the answer depends on whether the sheet is shared with it, which
+    only an import can tell, so `readable` is None. Otherwise Google is asked for the CSV: a
+    sign-in page (401/403) means the sheet is private.
+    """
+    if google_api.key_file(settings.google_service_account_file) is not None:
+        return {"readable": None, "via": "service_account", "reason": None, "message": None}
+    _, gid = parse_sheet_url(sheet.url)
+    try:
+        res = (fetch or (lambda u: safe_get(u, timeout=15, max_bytes=4096)))(
+            export_url(sheet.spreadsheet_id, gid))
+    except (BlockedURLError, OSError) as exc:
+        return {"readable": None, "via": "link", "reason": "error",
+                "message": f"Couldn't reach Google: {exc}"}
+    looks_html = res.text.lstrip()[:15].lower().startswith(("<!doctype", "<html"))
+    if res.status in (401, 403) or (res.status == 200 and looks_html):
+        return {"readable": False, "via": "link", "reason": "private", "message": PRIVATE_HINT}
+    if res.status == 404:
+        return {"readable": False, "via": "link", "reason": "not_found",
+                "message": "Google can't find this sheet — it may have been deleted or the link "
+                           "changed."}
+    if res.status != 200:
+        return {"readable": None, "via": "link", "reason": "error",
+                "message": f"Google returned HTTP {res.status}"}
+    return {"readable": True, "via": "link", "reason": None, "message": None}

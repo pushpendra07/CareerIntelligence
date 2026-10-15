@@ -91,6 +91,8 @@ export interface JobSourceLink {
   detail: string | null;
   first_seen_at: string;
   last_seen_at: string;
+  /** Rows from a Google Sheet or file: which sheet/tab, when added there, its "posted" text. */
+  imported?: { source?: string; added_to_sheet?: string; posted_text?: string; status?: string } | null;
 }
 
 export interface PostingCheckResult {

@@ -35,6 +35,38 @@ describe("saved Google Sheets", () => {
   });
 });
 
+describe("private sheet message", () => {
+  const privateError = () => new Response(JSON.stringify({ error: { code: "conflict", message: PRIVATE, details: { reason: "private" } } }),
+    { status: 409, headers: { "content-type": "application/json" } });
+
+  it("flags a private sheet when the page opens and explains why Import can't read it", async () => {
+    mockApi({
+      "GET /sheets": [SHEET],
+      "GET /sheets/access": { service_account: null, key_file: "secrets/google-service-account.json", error: null },
+      "GET /sheets/1/check": { readable: false, via: "link", reason: "private", message: PRIVATE },
+      "POST /sheets/1/import": privateError,
+    });
+    renderAt(<SavedSheetsSettings />);
+    expect(await screen.findByText("Private — can't import")).toBeInTheDocument();
+    expect(screen.getByText("Can't import — this sheet is private.")).toBeInTheDocument();
+    expect(screen.getByText(/Last successful import/)).toBeInTheDocument();
+  });
+
+  it("shows the message when Import is refused, even if the check said it was open", async () => {
+    mockApi({
+      "GET /sheets": [SHEET],
+      "GET /sheets/access": { service_account: null, key_file: "secrets/google-service-account.json", error: null },
+      "GET /sheets/1/check": { readable: true, via: "link", reason: null, message: null },
+      "POST /sheets/1/import": privateError,
+    });
+    renderAt(<SavedSheetsSettings />);
+    expect(await screen.findByText("Open by link")).toBeInTheDocument();
+    expect(screen.queryByText("Can't import — this sheet is private.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Can't import — this sheet is private.")).toBeInTheDocument();
+  });
+});
+
 describe("private sheet access", () => {
   it("shows the service-account email to share sheets with", async () => {
     mockApi({ "GET /sheets": [], "GET /sheets/access": { service_account: "reader@proj.iam.gserviceaccount.com", key_file: "x", error: null } });

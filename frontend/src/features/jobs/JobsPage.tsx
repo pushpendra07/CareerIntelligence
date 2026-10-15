@@ -13,7 +13,7 @@ const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "loca
   "source", "status", "posted_after", "posted_within", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
 
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
-  "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
+  "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
   "CLOSED", "NOT_RELEVANT"];
 const RECS = ["HIGHLY_RECOMMENDED", "RECOMMENDED", "CONSIDER", "LOW_PRIORITY", "NOT_RECOMMENDED"];
 const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GREENHOUSE", "LEVER", "WORKDAY",
@@ -23,7 +23,7 @@ const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GRE
 const OPEN_STATUSES = JOB_STATUSES.filter((s) => s !== "CLOSED");
 export const NEW_STATUSES = ["NEW", "DISCOVERED"];
 export const PENDING_STATUSES = ["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"];
-export const APPLIED_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW"];
+export const APPLIED_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK"];
 
 /** Status tabs: every job is in exactly one tab (plus "All open"). */
 export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
@@ -31,7 +31,7 @@ export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
   { key: "new", label: "New", statuses: NEW_STATUSES },
   { key: "pending", label: "Pending", statuses: PENDING_STATUSES },
   { key: "applied", label: "Applied", statuses: ["APPLIED", "RECRUITER_CONTACTED", "SCREENING"] },
-  { key: "interview", label: "Interview", statuses: ["INTERVIEW"] },
+  { key: "interview", label: "Interview", statuses: ["INTERVIEW", "AWAITING_FEEDBACK"] },
   { key: "selected", label: "Selected", statuses: ["OFFER", "ACCEPTED"] },
   { key: "rejected", label: "Rejected", statuses: ["REJECTED"] },
   { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT"] },

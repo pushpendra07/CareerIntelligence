@@ -43,7 +43,10 @@ def _out(job: Job) -> JobOut:
 def detail(db: DB, job: Job) -> JobDetail:
     out = JobDetail.model_validate(job)
     out.sources = sorted({s.source for s in job.source_links})
-    out.source_links = [JobSourceOut.model_validate(s) for s in job.source_links]
+    out.source_links = [
+        JobSourceOut.model_validate(s).model_copy(update={"imported": (s.raw or {}).get("import")})
+        for s in job.source_links
+    ]
     match = match_service.current_match(db, job)
     out.match = match.result if match else None
     if job.recommended_cv_id and (cv := db.get(CV, job.recommended_cv_id)):

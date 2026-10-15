@@ -85,14 +85,13 @@ def test_ai_suggestions_are_sanitized(
 
 def test_settings(client: TestClient) -> None:
     s = client.get("/api/v1/settings/app").json()
-    assert s["notifications"]["followup_reminders"] is True
-    r = client.patch("/api/v1/settings/app", json={"notifications": {"daily_digest": True}})
-    assert r.json()["notifications"] == {
-        "followup_reminders": True,
-        "interview_reminder_hours": 24,
-        "daily_digest": True,
-    }
+    assert s["scanner"]["search_all_companies"] is False
+    r = client.patch("/api/v1/settings/app", json={"scanner": {"max_age_days": 30}})
+    assert r.json()["scanner"]["max_age_days"] == 30
+    assert r.json()["scanner"]["schedule_hours"] == 0  # other values kept
     assert client.patch("/api/v1/settings/app", json={"hacks": {}}).status_code == 422
+    # Removed, unused sections are refused rather than silently stored.
+    assert client.patch("/api/v1/settings/app", json={"notifications": {}}).status_code == 422
     info = client.get("/api/v1/settings/system").json()
     assert info["engine_version"].startswith("match-engine/")
     assert "api_key" not in json.dumps(info).replace("api_key_set", "")

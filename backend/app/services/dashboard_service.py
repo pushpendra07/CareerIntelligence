@@ -31,8 +31,8 @@ UNAPPLIED = [
 
 APPLIED_OR_LATER = [
     JobStatus.APPLIED.value, JobStatus.RECRUITER_CONTACTED.value, JobStatus.SCREENING.value,
-    JobStatus.INTERVIEW.value, JobStatus.OFFER.value, JobStatus.ACCEPTED.value,
-    JobStatus.REJECTED.value,
+    JobStatus.INTERVIEW.value, JobStatus.AWAITING_FEEDBACK.value, JobStatus.OFFER.value,
+    JobStatus.ACCEPTED.value, JobStatus.REJECTED.value,
 ]
 
 
@@ -269,7 +269,7 @@ def funnels(db: Session) -> dict[str, list[dict[str, Any]]]:
             select(func.count()).select_from(Application).where(Application.status.in_(statuses)),
         )
 
-    later = ["SCREENING", "INTERVIEW", "OFFER", "ACCEPTED"]
+    later = ["SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED"]
     reached_screen = _count(
         db,
         select(func.count(func.distinct(Application.id)))
@@ -278,7 +278,8 @@ def funnels(db: Session) -> dict[str, list[dict[str, Any]]]:
             or_(
                 Application.status.in_(later),
                 Application.events.any(
-                    text("to_status IN ('SCREENING','INTERVIEW','OFFER','ACCEPTED')")
+                    text("to_status IN "
+                         "('SCREENING','INTERVIEW','AWAITING_FEEDBACK','OFFER','ACCEPTED')")
                 ),
             )
         ),

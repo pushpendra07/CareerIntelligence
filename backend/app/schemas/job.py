@@ -125,6 +125,8 @@ class JobSourceOut(BaseModel):
     detail: str | None
     first_seen_at: datetime
     last_seen_at: datetime
+    # For rows from a Google Sheet or file: sheet/tab name, added_to_sheet, posted_text, status…
+    imported: dict[str, Any] | None = None
 
 
 class CompanyBrief(BaseModel):

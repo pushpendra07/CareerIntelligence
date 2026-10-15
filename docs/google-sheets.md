@@ -52,6 +52,7 @@ Column names are matched case-insensitively with punctuation removed
 | Experience | `experience_req`, `experience`, `experience_required` (+ `experience_min/max`) |
 | Salary | `salary_ctc`, `salary`, `ctc`, `compensation` (+ `salary_min/max/currency`) |
 | Posted date | `posting_date`, `date_posted`, `posted_on`, or a date inside `posted_age` |
+| Added to the sheet | `date_found`, `date_added`, `added_on`, `found_on`, `date_discovered`, `date_saved`, `timestamp`, `created_at` (shown on the job page; the sheet's own "posted" text is kept too) |
 | Description | `original_jd`, `jd`, `description`, `job_description` |
 | Skills | `required_skills`, `preferred_skills` (separated by `,` `;` `|`) |
 | Notes | `notes`, `apply_contact_notes`, `apply_contact`, `contact`; plus `Tailored resume:`, `Base resume:`, `Find job:` links, `category`/`match_score`, `key_match_factors`, `posted_age` |
@@ -59,7 +60,8 @@ Column names are matched case-insensitively with punctuation removed
 
 Status mapping: `resume-ready` / `ready…` → Ready to apply · `skipped…` → Not relevant ·
 `expired` / `closed` → Closed · `to apply` → New · `discovered` · `new` · `shortlisted` ·
-`applied` · `interview` · `rejected` · `not relevant` → same status · anything else → New.
+`applied` · `interview done` / `awaiting feedback` / `no reply` → Interview done – no reply ·
+`interview` · `rejected` · `not relevant` → same status · anything else → New.
 
 The sheet's own `match_score` is kept in the notes; the app computes its own 0–100 score.
 A URL shared by rows of different jobs (a search/listing page) is kept but not used to identify
@@ -100,7 +102,7 @@ search links and no job-search column). For each company the user wants searched
 | **Private sheet + service account connected** (recommended) | Settings → Google Sheets → **Import**. Reads **every tab** with the Google Sheets API (`POST /api/v1/sheets/{id}/import`, `via: google_api`) |
 | Sheet shared "Anyone with the link → Viewer" | Same **Import** button (first tab, or the tab in the URL's `gid`) |
 | Private sheet, no service account | An agent reads the rows with a Google connector and POSTs them: `.agent/workflows/import-google-sheets.md` |
-| A one-off tab | Download as CSV → Settings → Import & export |
+| A one-off tab | Download as CSV → Settings → Backup & import |
 | New sheet | Settings → Google Sheets → paste URL → Save sheet (`POST /api/v1/sheets {"url","title"}`) |
 
 Never edit the Google Sheets themselves.

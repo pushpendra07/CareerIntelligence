@@ -10,6 +10,8 @@ export interface EmailDraftResult {
   to_options: { name: string; email: string; job_title: string | null }[];
   subjects: string[];
   body: string;
+  /** Short version for LinkedIn / InMail. */
+  short: string;
   company: string;
   company_domain: string | null;
 }
@@ -33,11 +35,14 @@ export function EmailDraft({ job }: { job: JobDetail }) {
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [short, setShort] = useState("");
+  const [kind, setKind] = useState<"email" | "short">("email");
   const draft = useMutation({
     mutationFn: () => api.get<EmailDraftResult>(`/jobs/${job.id}/email-draft`),
     meta: { invalidates: false },
-    onSuccess: (d) => { setTo(d.to ?? ""); setSubject(d.subjects[0] ?? ""); setBody(d.body); },
+    onSuccess: (d) => { setTo(d.to ?? ""); setSubject(d.subjects[0] ?? ""); setBody(d.body); setShort(d.short); },
   });
+  const isEmail = kind === "email";
   const d = draft.data;
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const hr = hrEmailTopic(job.company.name, d?.company_domain, job.location);
@@ -51,12 +56,21 @@ export function EmailDraft({ job }: { job: JobDetail }) {
       {draft.error && <ErrorBox error={new Error(errorMessage(draft.error))} />}
       {!d && !draft.error && (
         <p className="text-sm text-slate-500">
-          Writes a short email from this job and your profile — the skills you match, your experience and the job link.
-          Edit it, then copy it or open it in your email app.
+          Writes an email from this job and your profile: the required skills you match, your most relevant project,
+          a matching certification and your experience — plus a short version for LinkedIn. Edit, then copy or open in your email app.
         </p>
       )}
       {d && (
         <div className="space-y-3 text-sm">
+          <div className="inline-flex overflow-hidden rounded-md border border-slate-300" role="group" aria-label="Draft type">
+            {([["email", "Email"], ["short", "Short message (LinkedIn)"]] as const).map(([k, text]) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}
+                className={`border-l border-slate-300 px-3 py-1 text-xs first:border-l-0 ${kind === k ? "bg-indigo-600 text-white dark:bg-indigo-500" : "bg-surface text-slate-600 hover:bg-slate-50"}`}>
+                {text}
+              </button>
+            ))}
+          </div>
+          {isEmail && <>
           <label className="block">
             <span className="label">To</span>
             <input className="input" type="email" aria-label="To" list={`hr-emails-${job.id}`} value={to} onChange={(e) => setTo(e.target.value)}
@@ -80,20 +94,25 @@ export function EmailDraft({ job }: { job: JobDetail }) {
               ))}
             </div>
           </div>
+          </>}
           <div>
             <div className="flex items-end justify-between gap-2">
-              <span className="label">Message</span>
-              <CopyButton text={body} label="Copy message" />
+              <span className="label">{isEmail ? "Message" : "Message for LinkedIn / InMail"}</span>
+              <CopyButton text={isEmail ? body : short} label="Copy message" />
             </div>
-            <textarea className="input mt-1 min-h-64 text-sm" aria-label="Message" value={body} onChange={(e) => setBody(e.target.value)} />
+            <textarea className={`input mt-1 text-sm ${isEmail ? "min-h-96" : "min-h-48"}`} aria-label="Message"
+              value={isEmail ? body : short} onChange={(e) => (isEmail ? setBody : setShort)(e.target.value)} />
+            {!isEmail && <p className="mt-1 text-xs text-slate-400">{short.length} characters — LinkedIn connection notes allow 300, InMail and messages more.</p>}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <CopyButton text={`Subject: ${subject}\n\n${body}`} label="Copy subject + message" />
-            <a className="btn-primary px-3 py-1.5 text-xs" href={mailto}>Open in email app</a>
-          </div>
+          {isEmail && (
+            <div className="flex flex-wrap gap-2">
+              <CopyButton text={`Subject: ${subject}\n\n${body}`} label="Copy subject + message" />
+              <a className="btn-primary px-3 py-1.5 text-xs" href={mailto}>Open in email app</a>
+            </div>
+          )}
           <div className="space-y-2 border-t border-slate-100 pt-3">
             <WebSearch label="Find HR email with" topic={hr} />
-            <WebSearch label="Polish with" topic={polishTopic(subject, body)} />
+            <WebSearch label="Polish with" topic={isEmail ? polishTopic(subject, body) : polishTopic("", short)} />
             <p className="text-xs text-slate-400">Only use addresses you can see published. Remember to attach your CV.</p>
           </div>
         </div>

@@ -12,6 +12,7 @@ const DRAFT = {
   to: "asha@acme.example", to_options: [{ name: "Asha", email: "asha@acme.example", job_title: null }],
   subjects: ["Application for Magento Lead", "Magento Lead at Acme – 12+ yrs"],
   body: "Hello Hiring Team,\n\nI'm writing about the Magento Lead role at Acme.", company: "Acme", company_domain: "acme.example",
+  short: "Hello,\n\nInterested in the Magento Lead role.",
 };
 
 describe("email draft", () => {
@@ -45,5 +46,13 @@ describe("email draft", () => {
     expect(claude[1]).toContain("Subject: Magento Lead at Acme – 12+ yrs"); // polish the edited draft
     const mail = screen.getByRole("link", { name: "Open in email app" }).getAttribute("href")!;
     expect(mail.startsWith("mailto:asha%40acme.example?subject=Magento%20Lead")).toBe(true);
+
+    // Short version for LinkedIn: no subject or mail link, its own text to copy.
+    await userEvent.click(screen.getByRole("button", { name: "Short message (LinkedIn)" }));
+    expect(screen.getByLabelText("Message")).toHaveValue(DRAFT.short);
+    expect(screen.queryByLabelText("Subject")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open in email app" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Copy message" }));
+    expect(writeText).toHaveBeenLastCalledWith(DRAFT.short);
   });
 });

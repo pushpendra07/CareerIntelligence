@@ -29,6 +29,7 @@ class ApplicationStatus(StrEnum):
     RECRUITER_CONTACTED = "RECRUITER_CONTACTED"
     SCREENING = "SCREENING"
     INTERVIEW = "INTERVIEW"
+    AWAITING_FEEDBACK = "AWAITING_FEEDBACK"  # interview done, HR hasn't replied
     OFFER = "OFFER"
     ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"

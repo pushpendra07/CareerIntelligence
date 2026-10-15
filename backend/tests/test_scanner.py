@@ -263,3 +263,25 @@ def test_detect_teamtailor_on_custom_domain(db: Session) -> None:
     service.detect_boards(db, [cid], fetch=lambda url: FetchResult(url, 200, page))
     [(_, board)] = service.scan_targets(db, [cid])
     assert (board.provider, board.extra["rss"]) == ("TEAMTAILOR", "https://careers.magebit.com/jobs.rss")
+
+
+def test_search_every_company_switch(client: TestClient, db: Session) -> None:
+    on = company(db, "On Co", "https://jobs.lever.co/onco")
+    off = company(db, "Off Co", "https://jobs.lever.co/offco", enabled=False)
+    db.commit()
+    assert [c.id for c, _ in service.scan_targets(db)] == [on]
+    assert {c.id for c, _ in service.scan_targets(db, all_companies=True)} == {on, off}
+
+    status = client.get("/api/v1/scanner/status").json()
+    assert status["search_all_companies"] is False
+    assert [c["name"] for c in status["boards_not_searched"]] == ["Off Co"]
+
+    saved = client.patch("/api/v1/settings/app", json={"scanner": {"search_all_companies": True}})
+    assert saved.json()["scanner"]["search_all_companies"] is True
+    status = client.get("/api/v1/scanner/status").json()
+    assert status["search_all_companies"] is True and status["boards_not_searched"] == []
+    assert status["scannable"] == 2
+    # Each company's own flag is kept, so turning the switch off restores the old choice.
+    assert client.get(f"/api/v1/companies/{off}").json()["job_search_enabled"] is False
+    client.patch("/api/v1/settings/app", json={"scanner": {"search_all_companies": False}})
+    assert client.get("/api/v1/scanner/status").json()["scannable"] == 1

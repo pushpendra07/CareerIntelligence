@@ -45,3 +45,21 @@ describe("job scanner settings", () => {
     expect((patch?.body as { scanner: { title_include: string[] } }).scanner.title_include).toEqual(["magento", "adobe commerce"]);
   });
 });
+
+describe("search every company", () => {
+  it("turns the switch on without sending the filter form", async () => {
+    let on = false;
+    const api = mockApi({
+      "GET /scanner/status": () => ({ ...STATUS, search_all_companies: on, settings: { ...SETTINGS, search_all_companies: on } }),
+      "PATCH /settings/app": () => { on = true; return { scanner: { ...SETTINGS, search_all_companies: true } }; },
+    });
+    renderAt(<ScannerSettings />);
+    const box = await screen.findByRole("checkbox", { name: "Search every company" });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(/only companies with Job search ticked/)).toBeInTheDocument();
+    await userEvent.click(box);
+    expect(api.calls.find((c) => c.method === "PATCH")?.body).toEqual({ scanner: { search_all_companies: true } });
+    expect(await screen.findByText(/all companies are scanned, including ones you add later/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Search every company" })).toBeChecked();
+  });
+});

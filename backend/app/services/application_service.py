@@ -25,6 +25,7 @@ OPEN_STATUSES = {
     ApplicationStatus.RECRUITER_CONTACTED,
     ApplicationStatus.SCREENING,
     ApplicationStatus.INTERVIEW,
+    ApplicationStatus.AWAITING_FEEDBACK,
     ApplicationStatus.OFFER,
     ApplicationStatus.ON_HOLD,
 }
@@ -100,6 +101,8 @@ def create_application(
     _contact(db, data.get("recruiter_contact_id"))
     _contact(db, data.get("referral_contact_id"))
     applied_on = data.get("applied_on") or date.today()
+    if applied_on > date.today():
+        raise DomainValidationError("The applied date can't be in the future")
     status = ApplicationStatus(data.get("status") or ApplicationStatus.APPLIED)
     follow_up = data.get("follow_up_date")
     if follow_up is None and status in OPEN_STATUSES and origin == "manual":
@@ -163,6 +166,11 @@ def update_application(db: Session, application_id: int, changes: dict[str, Any]
         and db.get(CVVersion, changes["cv_version_id"]) is None
     ):
         raise DomainValidationError("CV version not found")
+    if "applied_on" in changes:
+        if changes["applied_on"] is None:
+            raise DomainValidationError("The applied date can't be empty")
+        if changes["applied_on"] > date.today():
+            raise DomainValidationError("The applied date can't be in the future")
     _contact(db, changes.get("recruiter_contact_id"))
     _contact(db, changes.get("referral_contact_id"))
     for key, value in changes.items():

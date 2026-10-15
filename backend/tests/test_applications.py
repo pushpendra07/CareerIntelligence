@@ -98,6 +98,24 @@ def test_application_validation(client: TestClient) -> None:
     assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "APPLIED"
 
 
+def test_chosen_applied_date(client: TestClient) -> None:
+    job, _ = setup(client)
+    tomorrow = date.today() + timedelta(days=1)
+    url = "/api/v1/applications"
+    future = client.post(url, json={"job_id": job["id"], "applied_on": str(tomorrow)})
+    assert future.status_code == 422 and "future" in future.json()["error"]["message"]
+
+    earlier = date.today() - timedelta(days=10)
+    app = client.post(url, json={"job_id": job["id"], "applied_on": str(earlier)})
+    assert app.status_code == 201
+    assert app.json()["applied_on"] == str(earlier)
+    assert app.json()["follow_up_date"] == str(earlier + timedelta(days=7))  # a week after
+    assert client.get(f"/api/v1/jobs/{job['id']}").json()["status"] == "APPLIED"
+
+    patch = client.patch(f"{url}/{app.json()['id']}", json={"applied_on": str(tomorrow)})
+    assert patch.status_code == 422
+
+
 def test_followups_crud(client: TestClient) -> None:
     job, _ = setup(client)
     yesterday = date.today() - timedelta(days=1)

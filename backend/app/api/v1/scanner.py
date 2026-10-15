@@ -33,9 +33,15 @@ class RunIn(BaseModel):
 @router.get("/status")
 def status(db: DB) -> dict[str, Any]:
     """Which companies the scanner covers, and the latest runs."""
-    disabled = db.scalars(select(Company).where(Company.job_search_enabled.is_(False)))
-    ready_off = [c for c in disabled if service.board_for(c)]
-    enabled = list(db.scalars(select(Company).where(Company.job_search_enabled.is_(True))))
+    cfg = service.scanner_settings(db)
+    all_companies = bool(cfg.get("search_all_companies"))
+    if all_companies:  # every company is searched; nothing is left out by its Job search flag
+        ready_off: list[Company] = []
+        enabled = list(db.scalars(select(Company)))
+    else:
+        disabled = db.scalars(select(Company).where(Company.job_search_enabled.is_(False)))
+        ready_off = [c for c in disabled if service.board_for(c)]
+        enabled = list(db.scalars(select(Company).where(Company.job_search_enabled.is_(True))))
     boards = {c.id: service.board_for(c) for c in enabled}
     by_provider = Counter(b.provider for b in boards.values() if b)
     last = db.scalar(select(ScanRun).where(ScanRun.kind == "SCAN")
@@ -50,7 +56,8 @@ def status(db: DB) -> dict[str, Any]:
                           for c in enabled if not boards[c.id]],
         "running": _run_out(running) if running else None,
         "last_run": _run_out(last) if last else None,
-        "settings": service.scanner_settings(db),
+        "settings": cfg,
+        "search_all_companies": all_companies,
         # Companies whose job board is known but that aren't searched yet (Job search off).
         "boards_not_searched": [{"id": c.id, "name": c.name} for c in ready_off],
     }

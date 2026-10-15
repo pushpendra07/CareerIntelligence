@@ -96,6 +96,6 @@ export function polishTopic(subject: string, body: string): SearchTopic {
   return {
     prompt: "Improve this job application email to a recruiter: make it clear, warm and concise (under 170 words), "
       + "and suggest a better subject line. Keep every fact as it is and don't add new claims.\n\n"
-      + `Subject: ${subject}\n\n${body}`,
+      + (subject ? `Subject: ${subject}\n\n` : "") + body,
   };
 }

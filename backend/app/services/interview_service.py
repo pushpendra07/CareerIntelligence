@@ -66,6 +66,7 @@ def schedule(db: Session, data: dict[str, Any]) -> Interview:
         ApplicationStatus.APPLIED,
         ApplicationStatus.RECRUITER_CONTACTED,
         ApplicationStatus.SCREENING,
+        ApplicationStatus.AWAITING_FEEDBACK,  # another round after waiting
     ):
         from app.services.application_service import change_status
 

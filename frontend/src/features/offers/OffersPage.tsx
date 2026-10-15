@@ -61,7 +61,7 @@ export function OffersPage() {
   const [page, setPage] = useState(1);
   const offers = useQuery({ queryKey: ["offers", page], queryFn: () => api.get<Page<Offer>>("/offers", { page, size: PAGE_SIZE }) });
   const compare = useQuery({ queryKey: ["offers", "compare"], queryFn: () => api.get<Comparison>("/offers/compare") });
-  const jobs = useQuery({ queryKey: ["jobs", "offer-candidates"], queryFn: () => api.get<Page<Job>>("/jobs", { status: ["INTERVIEW", "OFFER", "SCREENING"], size: 100 }) });
+  const jobs = useQuery({ queryKey: ["jobs", "offer-candidates"], queryFn: () => api.get<Page<Job>>("/jobs", { status: ["INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "SCREENING"], size: 100 }) });
   const [form, setForm] = useState({ job_id: "", base_salary: "", variable_pay: "", bonus: "", equity: "", currency: "INR", joining_date: "", expiry_date: "", location: "", work_model: "", benefits: "" });
   const create = useMutation({
     mutationFn: () => api.post("/offers", {

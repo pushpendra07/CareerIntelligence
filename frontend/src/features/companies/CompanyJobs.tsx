@@ -19,7 +19,7 @@ export function CompanyJobs({ companyId, companyName, total, open, onScan, scann
   const [page, setPage] = useState(1);
   const query = { company_id: companyId, sort: "-match_score", page, size: PAGE_SIZE,
     ...(openOnly ? { status: ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD", "APPLIED",
-      "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "OFFER", "ACCEPTED"] } : {}) };
+      "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED"] } : {}) };
   const jobs = useQuery({ queryKey: ["jobs", "company", companyId, openOnly, page], queryFn: () => api.get<Page<Job>>("/jobs", query) });
   return (
     <section id="jobs">
