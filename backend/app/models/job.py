@@ -136,6 +136,9 @@ class Job(TimestampMixin, Base):
     career_ops_evaluation: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     career_ops_report: Mapped[str | None] = mapped_column(String(500))
     career_ops_status: Mapped[str | None] = mapped_column(String(30))
+    # Last "is it still open?" check of the posting link (jobs/liveness.py): state, reason,
+    # url, valid_through, checked_at.
+    posting_check: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     company: Mapped[Company] = relationship()
     recruiter_contact: Mapped[Contact | None] = relationship()

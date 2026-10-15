@@ -210,6 +210,9 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     queryKey: ["jobs", listQuery, page],
     queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: PAGE_SIZE }),
     enabled: restored,
+    // Scores marked "updating" are re-scored in the background: poll until they're fresh.
+    // Otherwise check now and then for jobs added by scans and imports.
+    refetchInterval: (q) => (q.state.data?.items.some((j) => j.score_stale) ? 5000 : 60_000),
   });
 
   /** Apply a change made by the user, and remember it for next time. */

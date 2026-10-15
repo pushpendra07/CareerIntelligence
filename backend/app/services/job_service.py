@@ -858,3 +858,33 @@ def delete_job(db: Session, job_id: int, *, force: bool = False) -> dict[str, An
     db.delete(job)
     db.commit()
     return {"deleted": job_id, **linked}
+
+
+def check_posting(
+    db: Session, job_id: int, *, http: Any | None = None, today: date | None = None,
+) -> Job:
+    """Ask the posting's own site whether the job is still open, and remember the answer.
+
+    Doesn't change the job's status: the user decides (e.g. sets it to Closed).
+    """
+    from app.core.http import BlockedURLError
+    from app.jobs.liveness import UNKNOWN, PostingCheck
+    from app.jobs.liveness import check_posting as check
+    from app.scanner.providers import ProviderError
+    from app.scanner.service import default_http
+
+    job = get_job(db, job_id)
+    links = (s.original_url for s in job.source_links if s.original_url)
+    url = job.source_url or next(links, None)
+    if not url:
+        raise DomainValidationError("This job has no link to check — add the posting's URL first")
+    try:
+        result = check(url, http or default_http, today or datetime.now(UTC).date())
+    except (ProviderError, BlockedURLError, OSError, ValueError) as exc:
+        result = PostingCheck(UNKNOWN, f"Couldn't reach the posting: {str(exc)[:150]}", url)
+    job.posting_check = {**result.as_dict(), "checked_at": datetime.now(UTC).isoformat()}
+    record_activity(db, "job.posting_checked", "job", job.id,
+                    f"Posting check: {result.state.replace('_', ' ').lower()} — {result.reason}",
+                    {"state": result.state, "url": url})
+    db.commit()
+    return get_job(db, job_id)

@@ -70,6 +70,16 @@ Conventions:
   descriptions from each job's link in the background, best scores first (one run at a time)
 - `DELETE /api/v1/jobs/{job_id}` (`?force=true` also deletes its applications/interviews/offers; otherwise 409 with counts)
 - `POST /api/v1/jobs/{job_id}/status`
+- `GET /api/v1/jobs/{job_id}/email-draft` — an email to HR for this job, built without AI from
+  the job, the current match (exact skill matches, shared domains) and your profile:
+  `{to, to_options[], subjects[], body, company, company_domain, facts_used}`. `to` is the job's
+  recruiter or a company contact with an email, else null. Nothing is saved or sent.
+- `POST /api/v1/jobs/{job_id}/check-posting` — ask the posting's own site whether the job is
+  still open (Greenhouse, Lever, SmartRecruiters, Workday, Ashby APIs; other pages: 404/410,
+  redirect to a job list, expired `validThrough`, "no longer accepting" notices). Saves
+  `posting_check` `{state: OPEN|CLOSED|LIKELY_CLOSED|UNKNOWN, reason, url, valid_through,
+  checked_at}` on the job and returns it; the job's status is not changed. LinkedIn, Indeed,
+  Glassdoor and Naukri are never fetched (state UNKNOWN). 422 if the job has no link.
 - `POST /api/v1/jobs/{job_id}/sources`
 - `POST /api/v1/jobs/{job_id}/merge`
 - `POST /api/v1/jobs/{job_id}/comments` (`{"body"}`) — add a dated comment; `GET /jobs/{id}` returns `comments`, newest first

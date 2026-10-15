@@ -93,6 +93,14 @@ export interface JobSourceLink {
   last_seen_at: string;
 }
 
+export interface PostingCheckResult {
+  state: "OPEN" | "CLOSED" | "LIKELY_CLOSED" | "UNKNOWN";
+  reason: string;
+  url: string;
+  valid_through: string | null;
+  checked_at: string;
+}
+
 export interface JobDetail extends Job {
   original_jd: string;
   parsed_jd: Record<string, unknown> & {
@@ -119,6 +127,8 @@ export interface JobDetail extends Job {
   career_ops_evaluation: Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
   career_ops_report: string | null;
   career_ops_status: string | null;
+  /** Last "is it still open?" check of the posting link. */
+  posting_check: PostingCheckResult | null;
 }
 
 export interface FieldSource {

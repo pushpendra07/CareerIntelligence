@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge } from "../../components/ui";
-import type { CompanyDetail, Contact, Page } from "../../types/api";
+import { WebSearch, companyTopic } from "../../components/WebSearch";
+import type { CompanyDetail, Contact, Page, Preferences } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 import { type ScanRun, num, runSummary } from "../scanner/ScannerSettings";
 import { CompanyJobs } from "./CompanyJobs";
@@ -39,6 +40,7 @@ export function CompanyDetailPage() {
   const contacts = useQuery({ queryKey: ["recruiters", { company_id: id }], queryFn: () => api.get<Page<Contact>>("/recruiters", { company_id: id }) });
   const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/companies/${id}`, body), onSuccess: refresh });
   const check = useMutation({ mutationFn: () => api.post<{ results: Record<string, string> }>(`/companies/${id}/check`), onSuccess: refresh });
+  const profile = useQuery({ queryKey: ["preferences"], queryFn: () => api.get<Preferences>("/preferences") });
   const board = useQuery({ queryKey: ["company-board", id], queryFn: () => api.get<{ provider: string; url: string } | null>(`/scanner/companies/${id}/board`) });
   const scan = useMutation({
     mutationFn: () => api.post<{ board: { provider: string; url: string } | null; run: ScanRun }>(`/scanner/companies/${id}/scan`),
@@ -55,6 +57,7 @@ export function CompanyDetailPage() {
           <h1>{co.name} <span className="text-base font-normal text-slate-400" title="Company ID">#{co.id}</span></h1>
           <div className="mt-1 flex flex-wrap gap-2 text-sm"><StatusBadge value={co.verification_status} /><Badge>score {co.verification_score}</Badge>{co.tier && <StatusBadge value={co.tier} />}</div>
           {co.aliases.length > 0 && <p className="mt-1 text-xs text-slate-500">Also known as: {co.aliases.join(", ")}</p>}
+          <div className="mt-2"><WebSearch label="Find jobs for me with" topic={companyTopic(co.name, profile.data)} /></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <select className="input w-32" aria-label="Tier" value={co.tier ?? ""} onChange={(e) => patch.mutate({ tier: e.target.value || null })}>

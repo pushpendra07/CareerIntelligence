@@ -28,6 +28,7 @@ from app.schemas.job import (
     StatusIn,
 )
 from app.services import description_service, freshness, job_service, match_service
+from app.services import email_draft as email_draft_service
 from app.services.job_service import JobFilters, JobInput
 
 router = APIRouter(tags=["jobs"])
@@ -232,6 +233,18 @@ def delete_job(db: DB, job_id: int, force: bool = False) -> dict[str, Any]:
 def set_status(db: DB, job_id: int, body: StatusIn) -> JobDetail:
     job_service.set_status(db, job_id, body.status, body.note)
     return detail(db, job_service.get_job(db, job_id))
+
+
+@router.post("/jobs/{job_id}/check-posting", response_model=JobDetail)
+def check_posting(db: DB, job_id: int) -> JobDetail:
+    """Ask the posting's own site whether the job is still open (status is not changed)."""
+    return detail(db, job_service.check_posting(db, job_id))
+
+
+@router.get("/jobs/{job_id}/email-draft")
+def email_draft(db: DB, job_id: int) -> dict[str, Any]:
+    """A ready-to-edit email to HR for this job, from the job, your match and your profile."""
+    return email_draft_service.draft_for_job(db, job_id)
 
 
 @router.post("/jobs/{job_id}/sources", response_model=JobDetail)

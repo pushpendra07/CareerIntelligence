@@ -218,3 +218,16 @@ describe("job comments", () => {
     expect(api.calls.map((c) => `${c.method} ${c.path}`)).toEqual(["DELETE /jobs/7/comments/3"]);
   });
 });
+
+describe("live list", () => {
+  it("shows a status change without a page reload", async () => {
+    let status = "NEW";
+    mockApi({
+      "GET /jobs": (url: URL) => page([{ ...JOB, status }])(url),
+      "POST /jobs/7/status": () => { status = "SHORTLISTED"; return { ...JOB, status }; },
+    });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click(await screen.findByRole("button", { name: "Shortlist Magento Lead" }));
+    expect(await screen.findByRole("link", { name: "Apply to Magento Lead" })).toBeInTheDocument();
+  });
+});

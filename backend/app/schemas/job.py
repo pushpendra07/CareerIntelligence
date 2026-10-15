@@ -207,6 +207,7 @@ class JobDetail(JobOut):
     career_ops_evaluation: dict[str, Any] | None = None
     career_ops_report: str | None = None
     career_ops_status: str | None = None
+    posting_check: dict[str, Any] | None = None
 
 
 class JobCreateOut(BaseModel):

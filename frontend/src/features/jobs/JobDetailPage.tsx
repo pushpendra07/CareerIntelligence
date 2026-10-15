@@ -9,6 +9,9 @@ import { formatDate, formatDateTime, humanize } from "../../utils/format";
 import { FollowUpRow, QuickFollowUp } from "../followups/FollowUpParts";
 import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
 import { DeleteJobButton } from "./DeleteJobButton";
+import { PostingCheck } from "./PostingCheck";
+import { EmailDraft } from "./EmailDraft";
+import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { APPLIED_STATUSES, JOB_STATUSES, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
@@ -175,6 +178,9 @@ export function JobDetailPage() {
               {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
               <AddedViaTags values={j.added_via} />
             </div>
+            <div className="mt-2">
+              <WebSearch label="Find on other portals with" topic={jobTopic({ title: j.title, company: j.company.name, location: j.location, url: postingUrl(j) })} />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {j.match_score !== null && (
@@ -194,6 +200,9 @@ export function JobDetailPage() {
           </select>
           {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
         </div>
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <PostingCheck job={j} onMarkClosed={() => status.mutate("CLOSED")} busy={status.isPending} />
+        </div>
       </Card>
       <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
@@ -209,6 +218,7 @@ export function JobDetailPage() {
             {j.recommended_cv && <p className="mt-3 text-sm">Best CV for this job: <Link className="link" to={`/cvs/${j.recommended_cv.id}`}>{j.recommended_cv.name}</Link></p>}
             <div className="mt-3"><ScoreDetails job={j} /></div>
           </Card>
+          <EmailDraft key={j.id} job={j} />
           <Card title="Job description" actions={j.jd_status !== "OK" ? (
             <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending} title="Download the description from the posting">
               {fetchJd.isPending ? "Fetching…" : "Fetch description"}</button>) : undefined}>

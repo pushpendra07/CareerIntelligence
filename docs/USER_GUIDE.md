@@ -160,6 +160,10 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
   website, SuccessFactors/Oracle sites, job data on own careers pages, the name on job boards),
   then **Turn on job search for them** includes those companies in scans.
   Full list of scanned companies: [scan-coverage.md](scan-coverage.md).
+- **Find jobs for me with Google · ChatGPT · Gemini · Claude** (under the company name) searches
+  the web for open jobs at that company that fit your Target Profile (titles, key skills,
+  locations, experience). Gemini can't be opened with the question filled in: the button copies
+  it, paste it in Gemini.
 
 ## 6. Get jobs into the app
 
@@ -195,6 +199,23 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   **Score** (60+ / 70+ / 80+), **Work** (remote / hybrid / on-site), **Posted** (last 7 / 14 /
   30 days) and **Added via**. **More filters** opens exact minimum score, recommendation,
   company tier, technology, location, source, your years and applied or not. 10 jobs per page.
+- **Email to HR** (job page) → **Draft email** writes a short email from the job and your
+  profile: the required skills you match, your experience, one achievement, the job link and
+  your signature. Pick one of the suggested subjects or type your own, edit the message, then
+  **Copy subject**, **Copy message**, **Copy subject + message** or **Open in email app**.
+  **Find HR email with Google · ChatGPT · Gemini · Claude** searches for publicly listed HR /
+  recruiter addresses at the company (the AI tools are told not to guess addresses);
+  **Polish with ChatGPT · Gemini · Claude** asks them to tighten your edited draft. Nothing is
+  sent from the app. Known recruiters for the company appear as suggestions in *To*.
+- **Is the job still open?** On a job, **Check if still open** asks the posting's own site
+  (job-board API or the page itself) and shows *Still open*, *Closed*, *Probably closed* or
+  *Couldn't tell*, with the reason. If it's closed, **Mark as closed** moves it to the Closed
+  tab. Postings older than two months show *Posted N months/years ago*. LinkedIn, Indeed,
+  Glassdoor and Naukri can't be checked automatically — open the posting instead.
+- On a job (and on **Add Job** once title and company are filled), **Find on other portals with
+  Google · ChatGPT · Gemini · Claude** looks for the same posting on LinkedIn, Naukri, Indeed,
+  Glassdoor, Instahyre, Foundit and the company's careers site.
+- Lists, counts and badges update by themselves after any change — no page reload needed.
 - **Your sort and filters are remembered** in this browser until you change them or press
   **Reset**. A link that brings its own filters (e.g. a Dashboard card) uses those instead; your
   sort still applies.

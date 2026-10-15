@@ -1,12 +1,13 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
+import { createQueryClient } from "../api/queryClient";
 
 /** Render a page inside the providers it needs, at a given route. */
 export function renderAt(ui: ReactElement, { path = "/", route = "/" }: { path?: string; route?: string } = {}) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const client = createQueryClient({ queries: { retry: false, staleTime: 0, refetchOnWindowFocus: false }, mutations: { retry: false } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[route]}>

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { api, errorMessage } from "../../api/client";
 import { Badge, Card, Chips, ErrorBox, Field, PageIntro } from "../../components/ui";
+import { WebSearch, jobTopic } from "../../components/WebSearch";
 import type { JobDetail } from "../../types/api";
 import { formatMoney, humanize, splitList } from "../../utils/format";
 
@@ -76,7 +77,7 @@ export function AddJobPage() {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<JobForm>({
     resolver: zodResolver(jobSchema), defaultValues: EMPTY,
   });
-  const [url, jd, title] = watch(["url", "jd", "title"]);
+  const [url, jd, title, company, jobLocation] = watch(["url", "jd", "title", "company", "location"]);
   const [debounced, setDebounced] = useState({ url: "", jd: "", title: "" });
   useEffect(() => {
     const t = setTimeout(() => setDebounced({ url, jd, title }), 500);
@@ -101,6 +102,7 @@ export function AddJobPage() {
             <Field label="Job Title *" error={errors.title?.message}><input className="input" {...register("title")} /></Field>
             <Field label="Company *" error={errors.company?.message}><input className="input" {...register("company")} /></Field>
           </div>
+          <WebSearch label="Find on other portals with" topic={jobTopic({ title, company, location: jobLocation, url })} />
           <Field label="Job URL" error={errors.url?.message} hint="LinkedIn, Naukri, Indeed, ATS or careers page">
             <input className="input" placeholder="https://…" {...register("url")} />
           </Field>
