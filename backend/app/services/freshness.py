@@ -64,9 +64,14 @@ def refresh(db: Session) -> dict[str, int]:
     if not _lock.acquire(blocking=False):
         return {"reparsed": 0, "rescored": 0, "skipped": 1}
     try:
+        from app.services.application_service import ensure_applications
+
         reparsed = reparse_outdated(db)
         rescored = reanalyze(db, only_stale=True)["analyzed"]
-        return {"reparsed": reparsed, "rescored": rescored, "skipped": 0}
+        # Jobs marked Applied by an import (sheet, file, Career-Ops merge) get their application.
+        recorded = ensure_applications(db)
+        return {"reparsed": reparsed, "rescored": rescored, "applications": recorded,
+                "skipped": 0}
     finally:
         _lock.release()
 

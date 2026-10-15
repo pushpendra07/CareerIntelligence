@@ -383,3 +383,34 @@ def pending_followup_count(db: Session, by: date | None = None) -> int:
     if by:
         stmt = stmt.where(FollowUp.due_date <= by)
     return db.scalar(stmt) or 0
+
+
+# Job statuses that mean the user has applied (REJECTED is ambiguous: it may be the user's own
+# decision before applying, so it doesn't create an application).
+APPLIED_JOB_STATUSES = (
+    JobStatus.APPLIED, JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW,
+    JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER, JobStatus.ACCEPTED,
+)
+AUTO_NOTE = ("Recorded automatically: the job was marked as applied without the Apply form "
+             "(e.g. from a sheet). The applied date is approximate — edit it if you know it.")
+
+
+def ensure_applications(db: Session, job_ids: list[int] | None = None, limit: int = 500) -> int:
+    """Give every job marked Applied (or later) an application, so the pipeline, follow-ups and
+    insights count it. Dated when the job's status last changed (else when it was added)."""
+    has_app = select(Application.id).where(Application.job_id == Job.id).exists()
+    stmt = select(Job).where(Job.status.in_([s.value for s in APPLIED_JOB_STATUSES]), ~has_app)
+    if job_ids is not None:
+        stmt = stmt.where(Job.id.in_(job_ids))
+    created = 0
+    for job in db.scalars(stmt.order_by(Job.id).limit(limit)).all():
+        when = job.status_changed_at or job.created_at
+        create_application(db, job.id, {
+            "status": ApplicationStatus(job.status),
+            "applied_on": min(when.date(), date.today()) if when else date.today(),
+            "method": "OTHER", "notes": AUTO_NOTE,
+        }, origin="auto", commit=False)
+        created += 1
+    if created:
+        db.commit()
+    return created

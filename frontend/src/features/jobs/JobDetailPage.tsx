@@ -7,7 +7,7 @@ import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadg
 import type { Application, CV, FollowUp, Interview, JobDetail, Page } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
 import { FollowUpRow, QuickFollowUp, inDays } from "../followups/FollowUpParts";
-import { FitSummary, JobDescription, KeyFacts, SourceTimeline, postingUrl } from "./JobParts";
+import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { PostingCheck } from "./PostingCheck";
 import { EmailDraft } from "./EmailDraft";
@@ -257,7 +257,6 @@ export function JobDetailPage() {
               <QuickFollowUp key={j.id} jobId={j.id} jobTitle={j.title} applied={applied} />
             </Card>
           </div>
-          <Card title="Where it came from"><SourceTimeline job={j} /></Card>
           {(apps.data?.items.length || ivs.data?.items.length) ? (
             <Card title="Your progress">
               <ul className="space-y-2 text-sm">

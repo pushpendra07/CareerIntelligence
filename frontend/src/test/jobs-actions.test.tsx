@@ -82,11 +82,11 @@ describe("delete job", () => {
 });
 
 describe("sorting and page size", () => {
-  it("sorts by clicking column headers and shows 10 per page", async () => {
+  it("sorts by clicking column headers and shows 25 per page by default", async () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     await screen.findByText("Magento Lead");
-    expect(listUrls(api.fn).at(-1)!.searchParams.get("size")).toBe("10");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("size")).toBe("25");
 
     await userEvent.click(screen.getByRole("button", { name: "Sort by posted" }));
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-posting_date"); // newest first
@@ -229,5 +229,34 @@ describe("live list", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     await userEvent.click(await screen.findByRole("button", { name: "Shortlist Magento Lead" }));
     expect(await screen.findByRole("link", { name: "Apply to Magento Lead" })).toBeInTheDocument();
+  });
+});
+
+describe("bulk actions", () => {
+  const two = [JOB, { ...JOB, id: 8, title: "PHP Architect" }];
+
+  it("ticks jobs and changes their status together", async () => {
+    const api = mockApi({ "GET /jobs": page(two), "POST /jobs/bulk": { updated: 2, missing: [] } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    expect(screen.queryByRole("region", { name: "Selected jobs" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all jobs on this page" }));
+    const bar = screen.getByRole("region", { name: "Selected jobs" });
+    expect(within(bar).getByText("2 selected")).toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole("button", { name: "Not relevant" }));
+    expect(api.calls.find((c) => c.path === "/jobs/bulk")?.body).toEqual({ job_ids: [7, 8], action: "status", status: "NOT_RELEVANT" });
+    expect(await screen.findByText("Updated 2 jobs.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Selected jobs" })).not.toBeInTheDocument();
+  });
+
+  it("deletes after confirming, and says which tracked jobs were kept", async () => {
+    const api = mockApi({ "GET /jobs": page(two), "POST /jobs/bulk": { deleted: 1, skipped: [{ id: 8, title: "PHP Architect", reason: "x" }], missing: [] } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select Magento Lead" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select PHP Architect" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete…" }));
+    expect(api.calls.some((c) => c.path === "/jobs/bulk")).toBe(false); // asks first
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(api.calls.find((c) => c.path === "/jobs/bulk")?.body).toEqual({ job_ids: [7, 8], action: "delete" });
+    expect(await screen.findByText(/Deleted 1 job\. Kept 1 with an application/)).toBeInTheDocument();
   });
 });

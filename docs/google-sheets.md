@@ -52,7 +52,7 @@ Column names are matched case-insensitively with punctuation removed
 | Experience | `experience_req`, `experience`, `experience_required` (+ `experience_min/max`) |
 | Salary | `salary_ctc`, `salary`, `ctc`, `compensation` (+ `salary_min/max/currency`) |
 | Posted date | `posting_date`, `date_posted`, `posted_on`, or a date inside `posted_age` |
-| Added to the sheet | `date_found`, `date_added`, `added_on`, `found_on`, `date_discovered`, `date_saved`, `timestamp`, `created_at` (shown on the job page; the sheet's own "posted" text is kept too) |
+| Added to the sheet | `date_found`, `date_added`, `added_on`, `found_on`, `date_discovered`, `date_saved`, `timestamp`, `created_at` (shown at the top of the job page, between "Posted on job site" and "Added to this app") |
 | Description | `original_jd`, `jd`, `description`, `job_description` |
 | Skills | `required_skills`, `preferred_skills` (separated by `,` `;` `|`) |
 | Notes | `notes`, `apply_contact_notes`, `apply_contact`, `contact`; plus `Tailored resume:`, `Base resume:`, `Find job:` links, `category`/`match_score`, `key_match_factors`, `posted_age` |

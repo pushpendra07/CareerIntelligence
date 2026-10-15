@@ -758,9 +758,29 @@ def set_status(
     )
     if status == JobStatus.AWAITING_FEEDBACK:
         _plan_feedback_follow_up(db, job)
+    _record_application(db, job, status)
     if commit:
         db.commit()
     return job
+
+
+def _record_application(db: Session, job: Job, status: JobStatus) -> None:
+    """Marked as applied without the Apply form: record the application too."""
+    from app.models.application import Application
+    from app.services.application_service import APPLIED_JOB_STATUSES, AUTO_NOTE
+
+    if status not in APPLIED_JOB_STATUSES:
+        return
+    if db.scalar(select(Application.id).where(Application.job_id == job.id).limit(1)):
+        return  # it has one (create_application also syncs the job status back here)
+    from app.models.application import ApplicationStatus
+    from app.services.application_service import create_application
+
+    db.flush()
+    create_application(db, job.id, {"status": ApplicationStatus(status.value), "method": "OTHER",
+                                    "notes": AUTO_NOTE.replace(" The applied date is approximate"
+                                                               " — edit it if you know it.", "")},
+                       origin="auto", commit=False)
 
 
 FEEDBACK_FOLLOW_UP_DAYS = 3
@@ -913,3 +933,32 @@ def check_posting(
                     {"state": result.state, "url": url})
     db.commit()
     return get_job(db, job_id)
+
+
+def bulk_update(db: Session, job_ids: list[int], action: str,
+                status: JobStatus | None = None) -> dict[str, Any]:
+    """Set the status of, or delete, many jobs. Deleting skips jobs with applications,
+    interviews or offers (delete those one at a time, so nothing tracked is lost by accident)."""
+    ids = list(dict.fromkeys(job_ids))
+    found = set(db.scalars(select(Job.id).where(Job.id.in_(ids))))
+    missing = [i for i in ids if i not in found]
+    if action == "status":
+        if status is None:
+            raise DomainValidationError("Pick a status")
+        for job_id in ids:
+            if job_id in found:
+                set_status(db, job_id, status, "bulk change", commit=False)
+        db.commit()
+        return {"updated": len(found), "missing": missing}
+    deleted, skipped = 0, []
+    for job_id in ids:
+        if job_id not in found:
+            continue
+        try:
+            delete_job(db, job_id)
+            deleted += 1
+        except ConflictError as exc:
+            db.rollback()
+            job = db.get(Job, job_id)
+            skipped.append({"id": job_id, "title": job.title if job else "", "reason": exc.message})
+    return {"deleted": deleted, "skipped": skipped, "missing": missing}

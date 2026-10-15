@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -160,3 +161,36 @@ def test_career_ops_applied_rows_become_applications(
         db, settings.model_copy(update={"career_ops_path": root})
     )
     assert again.stats["applications"] == 0 and db.query(Application).count() == 1
+
+
+def test_applied_jobs_always_have_an_application(client: TestClient, db: Session) -> None:
+    from app.services.application_service import ensure_applications
+
+    job, _ = setup(client)
+    # Marked Applied from the status menu (not the Apply form): an application is recorded.
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "APPLIED"})
+    apps = client.get("/api/v1/applications", params={"job_id": job["id"]}).json()["items"]
+    assert len(apps) == 1 and apps[0]["status"] == "APPLIED"
+    assert apps[0]["applied_on"] == str(date.today())
+    assert "Recorded automatically" in (apps[0]["notes"] or "")
+    # No follow-up flood for automatic records; the manual Apply form still plans one.
+    assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 0
+
+    # Imported as applied (e.g. a sheet row): the background refresher records it.
+    rows = [{"title": "Magento Architect", "company": "Beta", "status": "applied",
+             "url": "https://jobs.lever.co/beta/1"}]
+    upload = {"file": ("j.json", json.dumps(rows), "application/json")}
+    r = client.post("/api/v1/import/jobs", files=upload)
+    assert r.status_code == 200, r.text
+    imported = client.get("/api/v1/jobs", params={"q": "Magento Architect"}).json()["items"][0]
+    assert imported["status"] == "APPLIED"
+    assert ensure_applications(db) == 1
+    assert ensure_applications(db) == 0  # once only
+    by_job = client.get("/api/v1/applications", params={"job_id": imported["id"]}).json()
+    assert by_job["total"] == 1
+
+    # Rejected is ambiguous (maybe your own decision), so it doesn't create one.
+    new = {"title": "PHP Lead", "company": "Gamma", "jd": JD}
+    other = client.post("/api/v1/jobs", json=new).json()["job"]
+    client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "REJECTED"})
+    assert client.get("/api/v1/applications", params={"job_id": other["id"]}).json()["total"] == 0

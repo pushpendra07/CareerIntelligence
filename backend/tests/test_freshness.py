@@ -28,7 +28,7 @@ def test_refresh_reparses_old_catalog_jobs_and_rescores(db: Session) -> None:
     assert "Drupal" in job.required_skills
     assert job.score_stale is False and job.match_score is not None
     assert freshness.outdated_count(db) == 0
-    assert freshness.refresh(db) == {"reparsed": 0, "rescored": 0, "skipped": 0}
+    assert freshness.refresh(db) == {"reparsed": 0, "rescored": 0, "applications": 0, "skipped": 0}
 
 
 def test_refresh_skips_while_another_runs(db: Session) -> None:

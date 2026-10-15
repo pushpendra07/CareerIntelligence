@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, PAGE_SIZE, ADDED_VIA, AddedViaTags } from "../../components/ui";
+import { api, errorMessage } from "../../api/client";
+import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { StatusMultiSelect } from "./StatusMultiSelect";
@@ -167,6 +167,48 @@ function NextStep({ job }: { job: Job }) {
   return null;
 }
 
+/** Act on the jobs ticked in the list: change their status or delete them. */
+function BulkBar({ ids, onDone }: { ids: number[]; onDone: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  const [message, setMessage] = useState("");
+  const run = useMutation({
+    mutationFn: (body: { action: "status" | "delete"; status?: string }) =>
+      api.post<{ updated?: number; deleted?: number; skipped?: { title: string }[] }>("/jobs/bulk", { job_ids: ids, ...body }),
+    onSuccess: (r) => {
+      setConfirm(false);
+      setMessage(r.deleted !== undefined
+        ? `Deleted ${r.deleted} job${r.deleted === 1 ? "" : "s"}.${r.skipped?.length ? ` Kept ${r.skipped.length} with an application — delete those from the job page.` : ""}`
+        : `Updated ${r.updated} job${r.updated === 1 ? "" : "s"}.`);
+      onDone();
+    },
+  });
+  const set = (status: string) => run.mutate({ action: "status", status });
+  if (!ids.length) return message ? <p className="mb-2 rounded bg-emerald-50 p-2 text-sm text-emerald-800" role="status">{message}</p> : null;
+  return (
+    <div className="sticky top-0 z-10 mb-2 flex flex-wrap items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-sm dark:bg-indigo-950" role="region" aria-label="Selected jobs">
+      <b>{ids.length} selected</b>
+      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("SHORTLISTED")}>★ Shortlist</button>
+      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("NOT_RELEVANT")}>Not relevant</button>
+      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("CLOSED")}>Closed</button>
+      <select className="input w-auto py-1 text-xs" aria-label="Set status of selected jobs" value="" disabled={run.isPending}
+        onChange={(e) => e.target.value && set(e.target.value)}>
+        <option value="">Set status…</option>
+        {JOB_STATUSES.map((st) => <option key={st} value={st}>{humanize(st)}</option>)}
+      </select>
+      {confirm ? (
+        <span className="flex items-center gap-1 text-xs">
+          Delete {ids.length} job{ids.length === 1 ? "" : "s"}? Jobs with an application are kept.
+          <button className="rounded bg-rose-600 px-2 py-1 text-white dark:bg-rose-500" disabled={run.isPending} onClick={() => run.mutate({ action: "delete" })}>Delete</button>
+          <button className="rounded px-2 py-1 hover:bg-slate-100" onClick={() => setConfirm(false)}>Cancel</button>
+        </span>
+      ) : <button className="btn-secondary px-2 py-1 text-xs text-rose-700" onClick={() => setConfirm(true)}>Delete…</button>}
+      <span className="flex-1" />
+      <button className="link text-xs" onClick={onDone}>Clear selection</button>
+      {run.error && <ErrorBox error={new Error(errorMessage(run.error))} />}
+    </div>
+  );
+}
+
 const daysAgo = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -206,14 +248,30 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const picked = params.getAll("status").filter((s) => tab.statuses.includes(s));
   const statuses = picked.length ? picked : defaultStatuses(tab);
   const listQuery = { ...query, status: statuses, closed: String(closed) };
+  const [size, setSize] = usePageSize("jobs.pageSize.v1");
   const { data, isLoading, error } = useQuery({
-    queryKey: ["jobs", listQuery, page],
-    queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size: PAGE_SIZE }),
+    queryKey: ["jobs", listQuery, page, size],
+    queryFn: () => api.get<Page<Job>>("/jobs", { ...listQuery, page, size }),
     enabled: restored,
     // Scores marked "updating" are re-scored in the background: poll until they're fresh.
     // Otherwise check now and then for jobs added by scans and imports.
     refetchInterval: (q) => (q.state.data?.items.some((j) => j.score_stale) ? 5000 : 60_000),
   });
+  // Ticked jobs; cleared when the page, filters or rows-per-page change.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const listKey = JSON.stringify([listQuery, page, size]);
+  useEffect(() => setSelected(new Set()), [listKey]);
+  const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const setPage = (p: number) => {
+    const n = new URLSearchParams(params);
+    if (p > 1) n.set("page", String(p)); else n.delete("page");
+    setParams(n);
+  };
+  // Filters or a bigger page can leave the page number past the end: go to the last page.
+  const lastPage = data ? Math.max(1, Math.ceil(data.total / size)) : 1;
+  useEffect(() => {
+    if (data && page > lastPage) setPage(lastPage);
+  }, [data, page, lastPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Apply a change made by the user, and remember it for next time. */
   const update = (next: URLSearchParams) => {
@@ -314,12 +372,20 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       {(isLoading || !restored) && <Spinner />}
       {error && <ErrorBox error={error} />}
       {data && (
-        <Card>
+        <Card className="scroll-mt-16" id="jobs-list">
+          {data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "job" : "jobs"} />}
           {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (
             <div className="overflow-x-auto">
-              <p className="mb-2 text-xs text-slate-500">{data.total} job{data.total === 1 ? "" : "s"} · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
+              <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />
+              <p className="mb-2 text-xs text-slate-500"><b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>
+                  <th className="th w-8">
+                    <input type="checkbox" aria-label="Select all jobs on this page"
+                      checked={data.items.length > 0 && data.items.every((j) => selected.has(j.id))}
+                      ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !data.items.every((j) => selected.has(j.id)); }}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(data.items.map((j) => j.id)) : new Set())} />
+                  </th>
                   <SortHeader label="ID" field="id" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Score" field="match_score" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
@@ -334,7 +400,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
-                    <tr key={j.id} className="hover:bg-slate-50">
+                    <tr key={j.id} className={selected.has(j.id) ? "bg-indigo-50/60" : "hover:bg-slate-50"}>
+                      <td className="td w-8"><input type="checkbox" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
                       <td className="td max-w-md">
@@ -360,7 +427,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
               </table>
             </div>
           )}
-          <Pagination page={page} size={PAGE_SIZE} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
+          <Pagination page={page} size={size} total={data.total} onPage={setPage} scrollTo="jobs-list"
+            onSize={(n) => { setSize(n); setPage(1); }} noun={data.total === 1 ? "job" : "jobs"} />
         </Card>
       )}
     </div>

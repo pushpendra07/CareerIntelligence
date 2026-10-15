@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Card, Empty, ErrorBox, Pagination, Spinner, StatusBadge, PAGE_SIZE, PageIntro } from "../../components/ui";
+import { Card, Empty, ErrorBox, Pagination, Spinner, StatusBadge, PageIntro, usePageSize } from "../../components/ui";
 import type { Company, Page } from "../../types/api";
 
 export const VERIFICATION = ["DISCOVERED", "RESEARCHED", "VERIFIED", "PARTIALLY_VERIFIED", "NEEDS_REVIEW",
@@ -14,10 +14,20 @@ export function CompaniesPage() {
   const page = Number(params.get("page") ?? 1);
   const filters = Object.fromEntries(["q", "tier", "verification_status", "india_presence", "job_search_enabled", "hiring_status", "has_jobs", "sort"]
     .map((k) => [k, params.get(k) ?? undefined]));
+  const [size, setSize] = usePageSize("companies.pageSize.v1");
   const { data, isLoading, error } = useQuery({
-    queryKey: ["companies", filters, page],
-    queryFn: () => api.get<Page<Company>>("/companies", { ...filters, page, size: PAGE_SIZE }),
+    queryKey: ["companies", filters, page, size],
+    queryFn: () => api.get<Page<Company>>("/companies", { ...filters, page, size }),
   });
+  const setPage = (p: number) => {
+    const n = new URLSearchParams(params);
+    if (p > 1) n.set("page", String(p)); else n.delete("page");
+    setParams(n);
+  };
+  const lastPage = data ? Math.max(1, Math.ceil(data.total / size)) : 1;
+  useEffect(() => {
+    if (data && page > lastPage) setPage(lastPage);
+  }, [data, page, lastPage]); // eslint-disable-line react-hooks/exhaustive-deps
   const stats = useQuery({ queryKey: ["companies", "stats"], queryFn: () => api.get<Record<string, unknown>>("/companies/stats") });
   const [newName, setNewName] = useState("");
   const create = useMutation({
@@ -75,7 +85,8 @@ export function CompaniesPage() {
       {isLoading && <Spinner />}
       {error && <ErrorBox error={error} />}
       {data && (
-        <Card>
+        <Card className="scroll-mt-16" id="companies-list">
+          {data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "company" : "companies"} />}
           {!data.items.length ? <Empty>No companies found.</Empty> : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
@@ -108,7 +119,8 @@ export function CompaniesPage() {
               </table>
             </div>
           )}
-          <Pagination page={page} size={PAGE_SIZE} total={data.total} onPage={(p) => { const n = new URLSearchParams(params); n.set("page", String(p)); setParams(n); }} />
+          <Pagination page={page} size={size} total={data.total} onPage={setPage} scrollTo="companies-list"
+            onSize={(n) => { setSize(n); setPage(1); }} noun={data.total === 1 ? "company" : "companies"} />
         </Card>
       )}
     </div>

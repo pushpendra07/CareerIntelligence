@@ -69,7 +69,11 @@ Conventions:
 - `POST /api/v1/jobs/fetch-descriptions` `{"limit": 40, "min_score": 0}` — read missing
   descriptions from each job's link in the background, best scores first (one run at a time)
 - `DELETE /api/v1/jobs/{job_id}` (`?force=true` also deletes its applications/interviews/offers; otherwise 409 with counts)
-- `POST /api/v1/jobs/{job_id}/status`
+- `POST /api/v1/jobs/{job_id}/status` — setting Applied (or a later stage) on a job without an
+  application records one automatically (`origin: "auto"`, no follow-up planned)
+- `POST /api/v1/jobs/bulk` `{"job_ids": [..], "action": "status", "status": "NOT_RELEVANT"}` or
+  `{"job_ids": [..], "action": "delete"}` — up to 500 jobs; delete skips jobs with
+  applications/interviews/offers and lists them in `skipped`
 - `GET /api/v1/jobs/{job_id}/email-draft` — an email to HR for this job, built without AI from
   the job, the current match (exact skill matches, shared domains) and your profile (current
   role, the project highlight most relevant to the job's skills, a certification the job asks

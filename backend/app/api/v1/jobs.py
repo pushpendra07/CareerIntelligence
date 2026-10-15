@@ -14,6 +14,7 @@ from app.models.activity_log import ActivityLog
 from app.models.cv import CV
 from app.models.job import Job
 from app.schemas.job import (
+    BulkJobsIn,
     JobCommentIn,
     JobCommentOut,
     JobCreate,
@@ -197,6 +198,12 @@ def fetch_descriptions(db: DB, body: FetchDescriptionsIn) -> dict[str, Any]:
     """Read missing descriptions from each job's own link, best-scoring jobs first."""
     run = description_service.start(db, limit=body.limit, min_score=body.min_score, wait=body.wait)
     return {"id": run.id, "status": run.status, "stats": run.stats}
+
+
+@router.post("/jobs/bulk")
+def bulk_jobs(db: DB, body: BulkJobsIn) -> dict[str, Any]:
+    """Set the status of, or delete, up to 500 jobs. Deleting skips jobs with applications."""
+    return job_service.bulk_update(db, body.job_ids, body.action, body.status)
 
 
 @router.get("/jobs/status-counts")

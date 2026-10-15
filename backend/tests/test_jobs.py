@@ -540,3 +540,26 @@ def test_job_comments(client: TestClient) -> None:
 def test_cms_and_language_skills_detected() -> None:
     p = parse_jd("Drupal 10 or WordPress developer. PHP, Laravel and Python required.", "CMS Dev")
     assert {"Drupal", "WordPress", "PHP", "Laravel", "Python"} <= set(p.required_skills)
+
+
+def test_bulk_status_and_delete(client: TestClient) -> None:
+    def add(i: int) -> int:
+        new = {"title": f"PHP Lead {i}", "company": f"Co{i}", "jd": "PHP and Magento 2 lead role"}
+        return int(client.post("/api/v1/jobs", json=new).json()["job"]["id"])
+
+    ids = [add(i) for i in range(3)]
+    body = {"job_ids": ids[:2] + [999999], "action": "status", "status": "NOT_RELEVANT"}
+    r = client.post("/api/v1/jobs/bulk", json=body)
+    assert r.json() == {"updated": 2, "missing": [999999]}
+    assert {client.get(f"/api/v1/jobs/{i}").json()["status"] for i in ids[:2]} == {"NOT_RELEVANT"}
+    no_status = client.post("/api/v1/jobs/bulk", json={"job_ids": ids, "action": "status"})
+    assert no_status.status_code == 422
+
+    client.post("/api/v1/applications", json={"job_id": ids[2]})  # tracked: never bulk-deleted
+    gone = client.post("/api/v1/jobs/bulk", json={"job_ids": ids, "action": "delete"}).json()
+    assert gone["deleted"] == 2
+    assert [s["id"] for s in gone["skipped"]] == [ids[2]]
+    assert client.get(f"/api/v1/jobs/{ids[0]}").status_code == 404
+    assert client.get(f"/api/v1/jobs/{ids[2]}").status_code == 200
+    empty = client.post("/api/v1/jobs/bulk", json={"job_ids": [], "action": "delete"})
+    assert empty.status_code == 422

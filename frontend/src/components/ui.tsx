@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { humanize } from "../utils/format";
+import { prefs } from "../utils/storage";
 
-export function Card({ title, actions, children, className = "" }: {
-  title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string;
+export function Card({ title, actions, children, className = "", id }: {
+  title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string;
 }) {
   return (
-    <section className={`card ${className}`}>
+    <section id={id} className={`card ${className}`}>
       {(title || actions) && (
         <div className="mb-3 flex items-center justify-between gap-2">
           {title ? <h2>{title}</h2> : <span />}
@@ -159,16 +160,110 @@ export function Field({ label, children, hint, error }: { label: string; childre
 /** Rows per page on every paginated list. */
 export const PAGE_SIZE = 10;
 
-export function Pagination({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (p: number) => void }) {
+/** Page numbers to show around the current one: 1 … 4 5 [6] 7 8 … 45 */
+export function pageRange(page: number, pages: number, around = 2): (number | "…")[] {
+  const shown = (p: number) => p === 1 || p === pages || Math.abs(p - page) <= around;
+  const out: (number | "…")[] = [];
+  for (let p = 1; p <= pages; p++) {
+    // A "…" that would hide a single page shows that page instead.
+    if (shown(p) || (shown(p - 1) && shown(p + 1))) out.push(p);
+    else if (out[out.length - 1] !== "…") out.push("…");
+  }
+  return out;
+}
+
+export const PAGE_SIZES = [10, 25, 50, 100];
+
+/** Rows per page for one list, remembered in this browser. */
+export function usePageSize(key: string, fallback = 25): [number, (n: number) => void] {
+  const [size, setSize] = useState(() => {
+    const saved = Number(prefs.get(key));
+    return PAGE_SIZES.includes(saved) ? saved : fallback;
+  });
+  return [size, (n: number) => { setSize(n); prefs.set(key, String(n)); }];
+}
+
+type PaginationProps = {
+  page: number; size: number; total: number; onPage: (p: number) => void;
+  /** Show a rows-per-page menu. */
+  onSize?: (n: number) => void;
+  /** "top": a compact bar above the list; "bottom" (default): the full control. */
+  position?: "top" | "bottom";
+  /** Id of the element to scroll back to after changing page. */
+  scrollTo?: string;
+  noun?: string;
+};
+
+export function Pagination({ page, size, total, onPage, onSize, position = "bottom", scrollTo, noun = "results" }: PaginationProps) {
   const pages = Math.max(1, Math.ceil(total / size));
-  return (
-    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-600">
-      <span className="tabular-nums">{total.toLocaleString()} results</span>
-      <div className="flex items-center gap-2">
-        <button className="btn-secondary px-2.5" disabled={page <= 1} onClick={() => onPage(page - 1)}>← Previous</button>
-        <span className="tabular-nums text-slate-500">Page {page} of {pages}</span>
-        <button className="btn-secondary px-2.5" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next →</button>
+  const [jump, setJump] = useState("");
+  const go = (p: number) => {
+    const next = Math.min(Math.max(1, p), pages);
+    if (next !== page) onPage(next);
+    if (scrollTo) document.getElementById(scrollTo)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  };
+  const from = total ? (page - 1) * size + 1 : 0;
+  const to = Math.min(page * size, total);
+  const showing = <span className="tabular-nums">Showing <b>{from.toLocaleString()}–{to.toLocaleString()}</b> of <b>{total.toLocaleString()}</b> {noun}</span>;
+  const btn = "btn-secondary min-w-8 px-2 py-1 text-xs disabled:opacity-40";
+  const arrows = (
+    <>
+      <button className={btn} disabled={page <= 1} onClick={() => go(1)} aria-label="First page" title="First page">«</button>
+      <button className={btn} disabled={page <= 1} onClick={() => go(page - 1)} aria-label="Previous page" title="Previous page">‹</button>
+    </>
+  );
+  const arrowsEnd = (
+    <>
+      <button className={btn} disabled={page >= pages} onClick={() => go(page + 1)} aria-label="Next page" title="Next page">›</button>
+      <button className={btn} disabled={page >= pages} onClick={() => go(pages)} aria-label="Last page" title="Last page">»</button>
+    </>
+  );
+  if (position === "top") {
+    return (
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+        {showing}
+        {pages > 1 && (
+          <nav className="flex items-center gap-1" aria-label="Pages (top)">
+            <button className={btn} disabled={page <= 1} onClick={() => go(page - 1)} aria-label="Previous page (top)">‹</button>
+            <span className="tabular-nums text-slate-500">Page {page} of {pages}</span>
+            <button className={btn} disabled={page >= pages} onClick={() => go(page + 1)} aria-label="Next page (top)">›</button>
+          </nav>
+        )}
       </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm text-slate-600">
+      <div className="flex flex-wrap items-center gap-3">
+        {showing}
+        {onSize && (
+          <label className="flex items-center gap-1 text-xs">
+            Rows per page
+            <select className="input w-auto py-1 text-xs" aria-label="Rows per page" value={size} onChange={(e) => onSize(Number(e.target.value))}>
+              {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      {pages > 1 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <nav className="flex items-center gap-1" aria-label="Pages">
+            {arrows}
+            {pageRange(page, pages).map((p, i) => p === "…"
+              ? <span key={`gap${i}`} className="px-1 text-slate-400">…</span>
+              : <button key={p} className={p === page ? "btn-primary min-w-8 px-2 py-1 text-xs" : btn} aria-current={p === page ? "page" : undefined}
+                  aria-label={`Page ${p}`} onClick={() => go(p)}>{p}</button>)}
+            {arrowsEnd}
+          </nav>
+          {pages > 7 && (
+            <form className="ml-2 flex items-center gap-1 text-xs" onSubmit={(e) => { e.preventDefault(); if (Number(jump)) go(Number(jump)); setJump(""); }}>
+              Go to
+              <input className="input w-16 py-1 text-xs" type="number" min={1} aria-label="Go to page" title={`1–${pages}`} value={jump} onChange={(e) => setJump(e.target.value)} />
+              <button type="submit" className="btn-secondary px-2 py-1 text-xs" disabled={!jump}>Go</button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }

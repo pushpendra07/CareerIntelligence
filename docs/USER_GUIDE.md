@@ -215,10 +215,9 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   **Interview** tab, a reminder *Ask for interview feedback* is added for 3 days later, and the
   job page offers **Follow up**, **Next round**, **Got an offer** and **Rejected**. Scheduling
   another round moves it back to *Interview*.
-- **Where it came from** (job page, right column): a timeline of the job's dates — posted on the
-  job site, added to your Google Sheet (from a `date_found` / `date_added` column), added to this
-  app, also found in other sources, last seen in the sheet. What a sheet doesn't say (no date
-  column, "Posted 2 days ago") is listed underneath.
+- **Job dates** (top of the job page): *Posted on job site* → *Added to sheet* (jobs from a
+  Google Sheet; from a `date_found` / `date_added` column) → *Added to this app*. If the sheet has
+  no real posted date its own text is shown, e.g. "Active Opening" (sheet).
 - **Is the job still open?** On a job, **Check if still open** asks the posting's own site
   (job-board API or the page itself) and shows *Still open*, *Closed*, *Probably closed* or
   *Couldn't tell*, with the reason. If it's closed, **Mark as closed** moves it to the Closed
@@ -228,6 +227,14 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   Google · ChatGPT · Gemini · Claude** looks for the same posting on LinkedIn, Naukri, Indeed,
   Glassdoor, Instahyre, Foundit and the company's careers site.
 - Lists, counts and badges update by themselves after any change — no page reload needed.
+- **Pages:** "Showing 51–75 of 447" above and below the list, numbered pages with first/last,
+  *Go to* a page, and **Rows per page** (10/25/50/100, remembered). Same on Companies.
+- **Act on many jobs at once:** tick jobs (or the box in the header for the whole page), then
+  **★ Shortlist**, **Not relevant**, **Closed**, **Set status…** or **Delete…**. Bulk delete keeps
+  jobs that have an application — delete those from the job page.
+- **Applied means tracked:** a job marked Applied (or later) anywhere — status menu, a sheet,
+  a file, Career-Ops — always gets an application, so Pipeline, follow-ups and Insights count it.
+  Ones recorded automatically say so in their notes, with an approximate applied date.
 - **Your sort and filters are remembered** in this browser until you change them or press
   **Reset**. A link that brings its own filters (e.g. a Dashboard card) uses those instead; your
   sort still applies.

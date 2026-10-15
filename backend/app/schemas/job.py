@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -100,6 +100,13 @@ class JobUpdate(BaseModel):
 class StatusIn(BaseModel):
     status: JobStatus
     note: str | None = None
+
+
+class BulkJobsIn(BaseModel):
+    """Change many jobs at once (from the Jobs list's selection)."""
+    job_ids: list[int] = Field(min_length=1, max_length=500)
+    action: Literal["status", "delete"]
+    status: JobStatus | None = None  # required for "status"
 
 
 class SourceIn(BaseModel):
