@@ -63,6 +63,7 @@ def detail(db: DB, job: Job) -> JobDetail:
             "id": r.id,
             "name": r.name,
             "email": r.email,
+            "phone": r.phone,
             "linkedin_url": r.linkedin_url,
             "status": r.status,
         }
@@ -117,6 +118,7 @@ def create_job(db: DB, body: JobCreate) -> JobCreateOut:
         recruiter_name=body.recruiter_name,
         recruiter_linkedin=body.recruiter_linkedin,
         recruiter_email=body.recruiter_email,
+        recruiter_phone=body.recruiter_phone,
         origin="manual",
     )
     result = job_service.ingest_job(db, data)

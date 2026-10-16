@@ -142,6 +142,24 @@ EMPLOYMENT_TYPES = [
     ("Contract", r"\b(contract(ual)?|fixed[- ]term|temporary)\b"),
     ("Full-time", r"\b(full[- ]time|permanent)\b"),
 ]
+_TYPE_WORDS = {
+    "fulltime": "Full-time", "permanent": "Full-time", "regular": "Full-time",
+    "parttime": "Part-time", "contract": "Contract", "contractual": "Contract",
+    "temporary": "Contract", "fixedterm": "Contract", "contracttohire": "Contract-to-hire",
+    "c2h": "Contract-to-hire", "internship": "Internship", "intern": "Internship",
+    "freelance": "Freelance", "freelancer": "Freelance",
+}
+
+
+def normalize_employment_type(value: str | None) -> str | None:
+    """"FULL_TIME" / "Full time" / "full-time" → "Full-time" (names as in EMPLOYMENT_TYPES);
+    unknown values are kept as written."""
+    if not value or not value.strip():
+        return None
+    key = re.sub(r"[^a-z0-9]", "", value.lower())
+    return _TYPE_WORDS.get(key, value.strip())
+
+
 WORK_MODELS = [
     ("HYBRID", r"\bhybrid\b"),
     ("REMOTE", r"\b(remote|work from home|wfh|work from anywhere|fully distributed)\b"),

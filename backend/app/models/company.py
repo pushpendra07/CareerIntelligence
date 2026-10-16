@@ -162,6 +162,7 @@ class Contact(TimestampMixin, Base):
     )
     linkedin_url: Mapped[str | None] = mapped_column(String(500))
     email: Mapped[str | None] = mapped_column(String(200))
+    phone: Mapped[str | None] = mapped_column(String(40), index=True)
     source: Mapped[str | None] = mapped_column(String(200))
     location: Mapped[str | None] = mapped_column(String(200))
     notes: Mapped[str | None] = mapped_column(Text)

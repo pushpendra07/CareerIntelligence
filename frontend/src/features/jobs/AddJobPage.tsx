@@ -30,6 +30,7 @@ export const jobSchema = z.object({
   recruiter_name: z.string(),
   recruiter_linkedin: z.string().trim().refine((v) => !v || /linkedin\.com\/in\//i.test(v), "Use a linkedin.com/in/ profile URL"),
   recruiter_email: optionalEmail,
+  recruiter_phone: z.string().trim().refine((v) => !v || v.replace(/\D/g, "").length >= 8, "Enter a phone number"),
   jd: z.string().trim().min(1, "Paste the job description"),
   responsibilities: z.string(),
   required_skills: z.string(),
@@ -42,7 +43,7 @@ export type JobForm = z.infer<typeof jobSchema>;
 const EMPTY: JobForm = {
   title: "", company: "", url: "", source: "", location: "", work_model: "", employment_type: "",
   experience: "", salary: "", salary_currency: "", posting_date: "", application_deadline: "",
-  recruiter_name: "", recruiter_linkedin: "", recruiter_email: "", jd: "", responsibilities: "",
+  recruiter_name: "", recruiter_linkedin: "", recruiter_email: "", recruiter_phone: "", jd: "", responsibilities: "",
   required_skills: "", preferred_skills: "", qualifications: "", notes: "",
 };
 
@@ -137,6 +138,7 @@ export function AddJobPage() {
               <Field label="Recruiter"><input className="input" {...register("recruiter_name")} /></Field>
               <Field label="Recruiter LinkedIn" error={errors.recruiter_linkedin?.message}><input className="input" {...register("recruiter_linkedin")} /></Field>
               <Field label="Recruiter email" error={errors.recruiter_email?.message}><input className="input" {...register("recruiter_email")} /></Field>
+              <Field label="Recruiter phone / WhatsApp" error={errors.recruiter_phone?.message}><input className="input" inputMode="tel" placeholder="98765 43210" {...register("recruiter_phone")} /></Field>
               <Field label="Required skills" hint="comma separated (overrides JD parsing)"><input className="input" {...register("required_skills")} /></Field>
               <Field label="Preferred skills"><input className="input" {...register("preferred_skills")} /></Field>
               <Field label="Qualifications"><input className="input" {...register("qualifications")} /></Field>

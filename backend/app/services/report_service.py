@@ -13,23 +13,25 @@ period of equal length just before `from`, so the UI can show the change. All co
 SQL; tables are capped at TABLE_LIMIT rows.
 """
 
+import re
 from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import Date, String, cast, func, literal, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Date, String, cast, func, literal, or_, select, text
+from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import DomainValidationError, NotFoundError
+from app.jobs.jd_parser import CITY_ALIASES, INDIAN_CITIES, normalize_employment_type
 from app.models.application import Application, ApplicationEvent, FollowUp
 from app.models.company import Company
 from app.models.interview import Interview
-from app.models.job import Job
+from app.models.job import Job, JobSourceLink
 from app.models.offer import Offer
 from app.models.scan import ScanRun
 
 Group = Literal["day", "week", "month"]
-TABLE_LIMIT = 500
+TABLE_LIMIT = 2000  # rows sent per table (chart clicks filter these in the browser)
 TOP = 8  # categories shown before "Other"
 BY1 = (text("1"),)  # GROUP BY the first (and second) selected column
 BY2 = (text("1"), text("2"))
@@ -54,6 +56,16 @@ REPORTS: dict[str, tuple[str, str]] = {
                "have them."),
     "scans": ("Scans & imports", "Job scans and imports: runs, results and failures."),
 }
+
+
+# When a job was found: the date your Google Sheet says it was added (jobs imported from a
+# sheet arrive in the app in one go, days or weeks later), else the day it entered the app.
+_src = aliased(JobSourceLink)
+SHEET_DATE = (
+    select(func.min(cast(_src.raw["import"]["added_to_sheet"].astext, Date)))
+    .where(_src.job_id == Job.id).correlate(Job).scalar_subquery()
+)
+FOUND = cast(func.least(SHEET_DATE, cast(Job.created_at, Date)), Date)
 
 
 # ---------------------------------------------------------------- periods
@@ -155,13 +167,19 @@ def pct(part: int, whole: int) -> int | None:
 
 
 def chart(cid: str, title: str, kind: str, data: list[dict[str, Any]],
-          series: list[tuple[str, str]] | None = None, note: str | None = None) -> dict[str, Any]:
+          series: list[tuple[str, str]] | None = None, note: str | None = None,
+          filter: str | None = None) -> dict[str, Any]:
+    """`filter`: clicking a bar/slice shows only the table rows whose `filter` field equals the
+    item's `code` (lists: contains it)."""
     return {"id": cid, "title": title, "kind": kind, "data": data, "note": note,
+            "filter": filter,
             "series": [{"key": k, "label": lbl} for k, lbl in (series or [("value", "Count")])]}
 
 
 def pairs(rows: Any, label: Callable[[Any], str] = lambda v: str(v)) -> list[dict[str, Any]]:
-    return [{"label": label(k) if k is not None else "Unknown", "value": int(n)} for k, n in rows]
+    """[(value, n)] → [{label, value, code}]; `code` is the raw value, used for filtering."""
+    return [{"label": label(k) if k is not None else "Unknown", "value": int(n),
+             "code": str(k) if k is not None else None} for k, n in rows]
 
 
 def top_n(items: list[dict[str, Any]], n: int = TOP) -> list[dict[str, Any]]:
@@ -181,6 +199,84 @@ def table(title: str, columns: list[tuple[str, str, str]], rows: list[dict[str, 
           ) -> dict[str, Any]:
     return {"title": title, "rows": rows[:TABLE_LIMIT], "total": len(rows),
             "columns": [{"key": k, "label": lbl, "kind": kind} for k, lbl, kind in columns]}
+
+
+_CITY_RES = [(re.compile(rf"\b{re.escape(c)}\b", re.I), CITY_ALIASES.get(c.lower(), c))
+             for c in INDIAN_CITIES]
+
+
+def place(location: str | None) -> str:
+    """Group a free-text location: its Indian city, else remote (India / elsewhere), India
+    without a city, outside India, or not stated. "Bengaluru / Bangalore" → "Bengaluru"."""
+    text = (location or "").strip()
+    if not text:
+        return "Not stated"
+    cities = list(dict.fromkeys(name for rx, name in _CITY_RES if rx.search(text)))
+    if len(cities) == 1:
+        return cities[0]
+    if cities:
+        return "Several Indian cities"
+    india = re.search(r"\bindia\b|\bpan[- ]india\b", text, re.I)
+    if re.search(r"\bremote\b|work from home|\bwfh\b|anywhere", text, re.I):
+        return "Remote (India)" if india else "Remote (outside India / global)"
+    return "India (city not stated)" if india else "Outside India"
+
+
+def _city(location: str | None) -> str:
+    return place(location)
+
+
+def _band(score: int | None) -> str:
+    return "Not scored" if score is None else f"{min(score // 10 * 10, 90)}"
+
+
+JOB_COLUMNS = [
+    ("title", "Job", "job"), ("company", "Company", "company"), ("location", "Location", "text"),
+    ("work_model", "Work model", "code"), ("employment_type", "Type", "text"),
+    ("score", "Score", "number"), ("status", "Job status", "code"),
+    ("app_status", "Application", "code"), ("applied_on", "Applied", "date"),
+    ("source", "Source", "code"), ("found", "Found", "date"), ("added", "Added to app", "date"),
+]
+
+
+def applied_in(r: Range) -> Any:
+    """Jobs with an application sent in the period (own alias: no clash with outer joins)."""
+    a = aliased(Application)
+    return Job.id.in_(select(a.job_id).where(r.within(a.applied_on)))
+
+
+def job_table(db: Session, title: str, *where: Any) -> dict[str, Any]:
+    """The jobs behind a report's numbers, best score first, with their latest application.
+    Extra fields (city, band, tier, skills, added_via) are there for chart-click filters."""
+    latest = (
+        select(Application.job_id, func.max(Application.id).label("app_id"))
+        .group_by(Application.job_id).subquery()
+    )
+    rows = db.execute(
+        select(Job, Company.name, Company.tier, Application.status, Application.applied_on,
+               FOUND)
+        .join(Company, Company.id == Job.company_id)
+        .outerjoin(latest, latest.c.job_id == Job.id)
+        .outerjoin(Application, Application.id == latest.c.app_id)
+        .where(*where)
+        .order_by(FOUND.desc(), Job.match_score.desc().nulls_last(), Job.id.desc())
+        .limit(TABLE_LIMIT + 1)
+    ).all()
+    out = [{
+        "id": j.id, "title": j.title, "company": c, "company_id": j.company_id,
+        "location": j.location, "city": _city(j.location),
+        "work_model": j.work_model,
+        "employment_type": normalize_employment_type(j.employment_type) or "Not stated",
+        "score": j.match_score, "band": _band(j.match_score), "status": j.status,
+        "app_status": ast, "applied_on": ap.isoformat() if ap else None, "source": j.source,
+        "found": found.isoformat() if found else None,
+        "added": j.created_at.date().isoformat(), "tier": tier or "NO_TIER",
+        "skills": j.required_skills or [], "added_via": j.added_via or [],
+    } for j, c, tier, ast, ap, found in rows]
+    t = table(title, JOB_COLUMNS, out)
+    if len(out) > TABLE_LIMIT:
+        t["total"] = _count(db, select(func.count(Job.id)).where(*where))
+    return t
 
 
 def _stacked_keys(rows: list[Any]) -> list[str]:
@@ -208,7 +304,7 @@ def _overview(db: Session, r: Range) -> dict[str, Any]:
     def counts(previous: bool) -> dict[str, int]:
         return {
             "jobs": _count(db, select(func.count(Job.id)).where(
-                r.within(Job.created_at, previous))),
+                r.within(FOUND, previous))),
             "apps": _count(db, select(func.count(Application.id)).where(
                 r.within(Application.applied_on, previous))),
             "answers": _count(db, select(func.count(func.distinct(
@@ -238,8 +334,8 @@ def _overview(db: Session, r: Range) -> dict[str, Any]:
         if where is not None:
             stmt = stmt.where(where)
         activity += db.execute(stmt.group_by(*BY1)).all()
-    jobs = db.execute(select(r.bucket(Job.created_at), func.count(Job.id))
-                      .where(r.within(Job.created_at)).group_by(*BY1)).all()
+    jobs = db.execute(select(r.bucket(FOUND), func.count(Job.id))
+                      .where(r.within(FOUND)).group_by(*BY1)).all()
     status = db.execute(select(Application.status, func.count()).where(
         r.within(Application.applied_on)).group_by(*BY1)).all()
     applied = now["apps"]
@@ -273,8 +369,11 @@ def _overview(db: Session, r: Range) -> dict[str, Any]:
             chart("funnel", "How far the period's applications got", "hbar",
                   [{"label": k, "value": v} for k, v in reached.items()],
                   note="Of the applications sent in the period: where each one is now."),
-            chart("status", "Applications by current status", "donut", pairs(status, nice)),
+            chart("status", "Applications by current status", "donut", pairs(status, nice),
+                  filter="app_status"),
         ],
+        "jobs": job_table(db, "Jobs found or applied to in the period",
+                          or_(r.within(FOUND), applied_in(r))),
         "table": table("By period", [
             ("label", "Period", "text"), ("Jobs found", "Jobs found", "number"),
             ("Applications", "Applications", "number"), ("Answers", "Answers", "number"),
@@ -284,10 +383,10 @@ def _overview(db: Session, r: Range) -> dict[str, Any]:
 
 
 def _jobs(db: Session, r: Range) -> dict[str, Any]:
-    in_range = r.within(Job.created_at)
+    in_range = r.within(FOUND)
 
     def stats(previous: bool) -> dict[str, Any]:
-        w = r.within(Job.created_at, previous)
+        w = r.within(FOUND, previous)
         return {
             "n": _count(db, select(func.count(Job.id)).where(w)),
             "avg": db.scalar(select(func.round(func.avg(Job.match_score))).where(w)),
@@ -296,7 +395,7 @@ def _jobs(db: Session, r: Range) -> dict[str, Any]:
         }
 
     now, prev = stats(False), stats(True)
-    by_source = db.execute(select(r.bucket(Job.created_at), Job.source, func.count(Job.id))
+    by_source = db.execute(select(r.bucket(FOUND), Job.source, func.count(Job.id))
                            .where(in_range).group_by(*BY2)).all()
     data, series = _stacked(r, list(by_source))
     band = func.coalesce(
@@ -306,13 +405,12 @@ def _jobs(db: Session, r: Range) -> dict[str, Any]:
     for s in score_data:
         if s["label"] != "Not scored":
             s["label"] = f"{s['label']}–{int(s['label']) + 9}"
-    loc = func.coalesce(func.nullif(func.split_part(Job.location, ",", 1), ""), "Not stated")
-    rows = db.execute(
-        select(Job.id, Job.title, Company.name, Job.location, Job.work_model,
-               Job.employment_type, Job.match_score, Job.status, Job.source, Job.created_at)
-        .join(Company, Company.id == Job.company_id).where(in_range)
-        .order_by(Job.match_score.desc().nulls_last(), Job.id.desc()).limit(TABLE_LIMIT)
-    ).all()
+    places: dict[str, int] = {}
+    types: dict[str, int] = {}
+    for location, kind in db.execute(select(Job.location, Job.employment_type).where(in_range)):
+        places[place(location)] = places.get(place(location), 0) + 1
+        k = normalize_employment_type(kind) or "Not stated"
+        types[k] = types.get(k, 0) + 1
     return {
         "kpis": [
             kpi("Jobs found", "jobs", now["n"], prev["n"]),
@@ -324,28 +422,20 @@ def _jobs(db: Session, r: Range) -> dict[str, Any]:
         ],
         "charts": [
             chart("added", "Jobs found per period, by source", "stacked", data, series),
-            chart("scores", "How well they fit (score)", "bar", score_data, [("value", "Jobs")]),
+            chart("scores", "How well they fit (score)", "bar", score_data, [("value", "Jobs")],
+                  filter="band"),
             chart("work_model", "Onsite, hybrid or remote", "donut", pairs(db.execute(
                 select(Job.work_model, func.count(Job.id)).where(in_range).group_by(*BY1)).all(),
-                lambda v: "Not stated" if v == "UNKNOWN" else nice(v))),
+                lambda v: "Not stated" if v == "UNKNOWN" else nice(v)), filter="work_model"),
             chart("status", "Where they are now", "donut", top_n(pairs(db.execute(
                 select(Job.status, func.count(Job.id)).where(in_range).group_by(*BY1)).all(),
-                nice))),
-            chart("locations", "Top locations", "hbar", top_n(pairs(db.execute(
-                select(loc, func.count(Job.id)).where(in_range).group_by(*BY1)).all()), 10)),
-            chart("type", "Job type", "donut", pairs(db.execute(
-                select(func.coalesce(Job.employment_type, "Not stated"), func.count(Job.id))
-                .where(in_range).group_by(*BY1)).all())),
+                nice)), filter="status"),
+            chart("locations", "Where the jobs are", "hbar",
+                  top_n(pairs(places.items()), 12), filter="city"),
+            chart("type", "Job type", "donut", pairs(sorted(types.items(), key=lambda x: -x[1])),
+                  filter="employment_type"),
         ],
-        "table": table("Jobs found in the period (best first)", [
-            ("title", "Job", "job"), ("company", "Company", "text"),
-            ("location", "Location", "text"), ("work_model", "Work model", "code"),
-            ("employment_type", "Type", "text"), ("score", "Score", "number"),
-            ("status", "Status", "code"), ("source", "Source", "code"),
-            ("added", "Added", "date"),
-        ], [{"id": j, "title": t, "company": c, "location": lo, "work_model": wm,
-             "employment_type": et, "score": s, "status": st, "source": so,
-             "added": a.date().isoformat()} for j, t, c, lo, wm, et, s, st, so, a in rows]),
+        "table": job_table(db, "Jobs found in the period (newest first)", in_range),
     }
 
 
@@ -410,13 +500,13 @@ def _applications(db: Session, r: Range) -> dict[str, Any]:
                   data, series),
             chart("status", "Where they are now", "donut", pairs(db.execute(
                 select(Application.status, func.count()).where(in_range).group_by(*BY1)).all(),
-                nice)),
+                nice), filter="status"),
             chart("by_score", "Do higher scores get interviews?", "bar", band_data,
                   [("Applied", "Applied"), ("Interview", "Reached interview")],
                   note="Applications grouped by the job's score."),
             chart("method", "How you applied", "hbar", top_n(pairs(db.execute(
                 select(Application.method, func.count()).where(in_range).group_by(*BY1)).all(),
-                nice))),
+                nice)), filter="method"),
         ],
         "table": table("Applications in the period", [
             ("title", "Job", "job"), ("company", "Company", "text"),
@@ -473,13 +563,13 @@ def _interviews(db: Session, r: Range) -> dict[str, Any]:
             chart("per_period", "Interviews per period, by round", "stacked", data, series),
             chart("result", "Results", "donut", pairs(db.execute(
                 select(Interview.result, func.count()).where(r.within(at)).group_by(*BY1)).all(),
-                nice)),
+                nice), filter="result"),
             chart("status", "Status", "donut", pairs(db.execute(
                 select(Interview.status, func.count()).where(r.within(at)).group_by(*BY1)).all(),
-                nice)),
+                nice), filter="status"),
             chart("rounds", "Rounds by type", "hbar", pairs(db.execute(
                 select(Interview.round_type, func.count()).where(r.within(at))
-                .group_by(*BY1)).all(), nice)),
+                .group_by(*BY1)).all(), nice), filter="round_type"),
         ],
         "table": table("Interviews in the period", [
             ("title", "Job", "job"), ("company", "Company", "text"), ("round", "Round", "number"),
@@ -526,7 +616,7 @@ def _offers(db: Session, r: Range) -> dict[str, Any]:
                     r.within(Offer.offer_date)).group_by(*BY1)).all()), [("value", "Offers")]),
             chart("status", "Decisions", "donut", pairs(db.execute(
                 select(Offer.status, func.count()).where(r.within(Offer.offer_date))
-                .group_by(*BY1)).all(), nice)),
+                .group_by(*BY1)).all(), nice), filter="status"),
             chart("ctc", "Total CTC by company", "hbar", sorted(money, key=lambda x: -x["value"]),
                   [("value", "Total CTC")]),
         ],
@@ -548,7 +638,7 @@ def _companies(db: Session, r: Range) -> dict[str, Any]:
     jobs = (select(Job.company_id.label("cid"), func.count(Job.id).label("jobs"),
                    func.max(Job.match_score).label("best"),
                    func.round(func.avg(Job.match_score)).label("avg"))
-            .where(r.within(Job.created_at)).group_by(Job.company_id).subquery())
+            .where(r.within(FOUND)).group_by(Job.company_id).subquery())
     apps = (select(Application.company_id.label("cid"), func.count().label("apps"),
                    func.count().filter(Application.status.in_(RESPONDED)).label("answers"))
             .where(r.within(Application.applied_on)).group_by(Application.company_id).subquery())
@@ -572,15 +662,15 @@ def _companies(db: Session, r: Range) -> dict[str, Any]:
     out = [{"company_id": cid, "company": n, "tier": t, "jobs": j, "best": b,
             "avg": a and int(a), "apps": ap, "answers": an, "interviews": iv, "offers": of}
            for cid, n, t, j, b, a, ap, an, iv, of in rows]
-    by_apps = [{"label": x["company"], "Applications": x["apps"], "Interviews": x["interviews"]}
+    by_apps = [{"label": x["company"], "code": x["company"], "Applications": x["apps"],
+                "Interviews": x["interviews"]}
                for x in sorted(out, key=lambda x: -x["apps"])[:10] if x["apps"]]
-    by_jobs = [{"label": x["company"], "value": x["jobs"]}
+    by_jobs = [{"label": x["company"], "code": x["company"], "value": x["jobs"]}
                for x in sorted(out, key=lambda x: -x["jobs"])[:10] if x["jobs"]]
     tiers: dict[str, int] = {}
     for x in out:
         if x["apps"]:
-            label = (x["tier"] or "No tier").replace("TIER_", "Tier ")
-            tiers[label] = tiers.get(label, 0) + x["apps"]
+            tiers[x["tier"] or "NO_TIER"] = tiers.get(x["tier"] or "NO_TIER", 0) + x["apps"]
     return {
         "kpis": [
             kpi("Companies with activity", "active", len(out)),
@@ -590,11 +680,16 @@ def _companies(db: Session, r: Range) -> dict[str, Any]:
         ],
         "charts": [
             chart("apps", "Most applied-to companies", "bar", by_apps,
-                  [("Applications", "Applications"), ("Interviews", "Interviews")]),
-            chart("jobs", "Most jobs found", "hbar", by_jobs, [("value", "Jobs")]),
+                  [("Applications", "Applications"), ("Interviews", "Interviews")],
+                  filter="company"),
+            chart("jobs", "Most jobs found", "hbar", by_jobs, [("value", "Jobs")],
+                  filter="company"),
             chart("tiers", "Applications by company tier", "donut",
-                  [{"label": k, "value": v} for k, v in tiers.items()]),
+                  [{"label": "No tier" if k == "NO_TIER" else k.replace("TIER_", "Tier "),
+                    "code": k, "value": v} for k, v in tiers.items()], filter="tier"),
         ],
+        "jobs": job_table(db, "Jobs found or applied to in the period",
+                          or_(r.within(FOUND), applied_in(r))),
         "table": table("Companies with activity in the period", [
             ("company", "Company", "company"), ("tier", "Tier", "code"),
             ("jobs", "Jobs found", "number"), ("best", "Best score", "number"),
@@ -606,7 +701,7 @@ def _companies(db: Session, r: Range) -> dict[str, Any]:
 
 
 def _sources(db: Session, r: Range) -> dict[str, Any]:
-    in_range = r.within(Job.created_at)
+    in_range = r.within(FOUND)
     rows = db.execute(
         select(Job.source, func.count(Job.id), func.round(func.avg(Job.match_score)),
                func.count(Job.id).filter(Job.match_score >= 80),
@@ -618,7 +713,7 @@ def _sources(db: Session, r: Range) -> dict[str, Any]:
     ).all()
     out = [{"source": s, "jobs": n, "avg": a and int(a), "strong": st, "apps": ap,
             "interviews": iv, "interview_rate": pct(iv, ap)} for s, n, a, st, ap, iv in rows]
-    per = db.execute(select(r.bucket(Job.created_at), Job.source, func.count(Job.id))
+    per = db.execute(select(r.bucket(FOUND), Job.source, func.count(Job.id))
                      .where(in_range).group_by(*BY2)).all()
     data, series = _stacked(r, list(per))
     best = max((x for x in out if x["jobs"] >= 3 and x["avg"] is not None),
@@ -632,14 +727,16 @@ def _sources(db: Session, r: Range) -> dict[str, Any]:
         "charts": [
             chart("per_period", "Jobs found per period, by source", "stacked", data, series),
             chart("quality", "Average score by source", "hbar",
-                  [{"label": nice(x["source"]), "value": x["avg"] or 0} for x in out],
+                  [{"label": nice(x["source"]), "code": x["source"], "value": x["avg"] or 0}
+                   for x in out],
                   [("value", "Average score")],
-                  note=f"Best: {nice(best['source'])}" if best else None),
+                  note=f"Best: {nice(best['source'])}" if best else None, filter="source"),
             chart("funnel", "Applications and interviews by source", "bar",
-                  [{"label": nice(x["source"]), "Applied": x["apps"],
+                  [{"label": nice(x["source"]), "code": x["source"], "Applied": x["apps"],
                     "Interview": x["interviews"]} for x in out if x["apps"]],
-                  [("Applied", "Applied"), ("Interview", "Reached interview")]),
+                  [("Applied", "Applied"), ("Interview", "Reached interview")], filter="source"),
         ],
+        "jobs": job_table(db, "Jobs found in the period", in_range),
         "table": table("Sources", [
             ("source", "Source", "source"), ("jobs", "Jobs", "number"),
             ("avg", "Avg score", "number"), ("strong", "Score 80+", "number"),
@@ -690,7 +787,7 @@ def _followups(db: Session, r: Range) -> dict[str, Any]:
                   [("Due", "Due"), ("Done", "Done")]),
             chart("kind", "By kind", "donut", pairs(db.execute(
                 select(FollowUp.kind, func.count()).where(r.within(FollowUp.due_date))
-                .group_by(*BY1)).all(), nice)),
+                .group_by(*BY1)).all(), nice), filter="kind"),
         ],
         "table": table("Follow-ups due in the period", [
             ("title", "Follow-up", "job"), ("company", "Company", "text"),
@@ -708,12 +805,12 @@ def _skills(db: Session, r: Range) -> dict[str, Any]:
     skill = func.jsonb_array_elements_text(Job.required_skills).table_valued("value")
     asked = db.execute(
         select(skill.c.value, func.count(func.distinct(Job.id)))
-        .select_from(Job).join(skill, literal(True)).where(r.within(Job.created_at))
+        .select_from(Job).join(skill, literal(True)).where(r.within(FOUND))
         .group_by(*BY1).order_by(func.count(func.distinct(Job.id)).desc()).limit(25)
     ).all()
-    n_jobs = _count(db, select(func.count(Job.id)).where(r.within(Job.created_at)))
+    n_jobs = _count(db, select(func.count(Job.id)).where(r.within(FOUND)))
     n_skills = _count(db, select(func.count(func.distinct(skill.c.value)))
-                      .select_from(Job).join(skill, literal(True)).where(r.within(Job.created_at)))
+                      .select_from(Job).join(skill, literal(True)).where(r.within(FOUND)))
     gaps = dashboard_service.skill_gaps(db, 15)
     return {
         "kpis": [
@@ -724,11 +821,13 @@ def _skills(db: Session, r: Range) -> dict[str, Any]:
         ],
         "charts": [
             chart("asked", "Most asked-for skills (period's jobs)", "hbar",
-                  [{"label": s, "value": n} for s, n in asked[:15]], [("value", "Jobs")]),
+                  [{"label": s, "code": s, "value": n} for s, n in asked[:15]],
+                  [("value", "Jobs")], filter="skills"),
             chart("gaps", "Skills you're missing most (all open jobs)", "hbar",
-                  [{"label": g["label"], "value": g["value"]} for g in gaps],
-                  [("value", "Jobs")]),
+                  [{"label": g["label"], "code": g["label"], "value": g["value"]} for g in gaps],
+                  [("value", "Jobs")], filter="skills"),
         ],
+        "jobs": job_table(db, "Jobs found in the period", r.within(FOUND)),
         "table": table("Skills asked for in the period", [
             ("skill", "Skill", "skill"), ("jobs", "Jobs", "number"),
             ("share", "Share of jobs %", "number"),
@@ -768,6 +867,9 @@ def _scans(db: Session, r: Range) -> dict[str, Any]:
             chart("new", "New jobs found by runs", "bar", r.series(new_rows, ["New jobs"]),
                   [("New jobs", "New jobs")]),
         ],
+        "jobs": job_table(
+            db, "Jobs found by scans in the period", r.within(Job.created_at),
+            or_(Job.added_via.contains(["scanner"]), Job.added_via.contains(["career_ops"]))),
         "table": table("Runs in the period", [
             ("started", "Started", "date"), ("kind", "Kind", "code"),
             ("trigger", "How", "code"), ("status", "Status", "code"),
@@ -809,4 +911,4 @@ def build(db: Session, name: str, start: date | None = None, end: date | None = 
     return {"report": name, "title": title, "description": description,
             "from": start.isoformat(), "to": end.isoformat(), "group": group,
             "previous": {"from": r.prev_start.isoformat(), "to": r.prev_end.isoformat()},
-            **body}
+            "jobs": None, **body}

@@ -25,10 +25,12 @@ from app.core.urls import (
     normalize_url,
 )
 from app.jobs import dedup
+from app.jobs.contacts import normalize_phone
 from app.jobs.jd_parser import (
     ParsedJD,
     detect_seniority,
     detect_work_model,
+    normalize_employment_type,
     parse_experience,
     parse_jd,
     parse_salary,
@@ -37,6 +39,7 @@ from app.models.company import Company, Contact
 from app.models.job import DeletedJob, Job, JobComment, JobSourceLink, JobStatus, WorkModel
 from app.services.activity import record_activity
 from app.services.company_service import find_or_create_by_name
+from app.services.contact_extraction import link_job_contacts
 from app.skills.catalog import normalize_skill_list
 
 logger = logging.getLogger(__name__)
@@ -88,6 +91,7 @@ class JobInput:
     recruiter_name: str | None = None
     recruiter_linkedin: str | None = None
     recruiter_email: str | None = None
+    recruiter_phone: str | None = None
     status: JobStatus = JobStatus.NEW
     raw: dict[str, Any] = field(default_factory=dict)
     origin: str = "manual"  # "manual" | "sheet" | "import" | "career_ops" | "scan"
@@ -171,7 +175,7 @@ def _manual_values(data: JobInput) -> dict[str, Any]:
         "employment_type",
     ):
         if (v := getattr(data, name)) not in (None, ""):
-            values[name] = v
+            values[name] = normalize_employment_type(v) if name == "employment_type" else v
     if data.work_model and data.work_model != WorkModel.UNKNOWN:
         values["work_model"] = WorkModel(data.work_model).value
     for name in ("required_skills", "preferred_skills"):
@@ -333,7 +337,8 @@ def _attach_source(
 
 
 def _recruiter(db: Session, company: Company, data: JobInput) -> Contact | None:
-    if not (data.recruiter_name or data.recruiter_email or data.recruiter_linkedin):
+    phone = normalize_phone(data.recruiter_phone) if data.recruiter_phone else None
+    if not (data.recruiter_name or data.recruiter_email or data.recruiter_linkedin or phone):
         return None
     from app.services.company_service import save_contact
 
@@ -342,12 +347,17 @@ def _recruiter(db: Session, company: Company, data: JobInput) -> Contact | None:
         existing = db.scalar(select(Contact).where(Contact.email == data.recruiter_email.lower()))
     if existing is None and data.recruiter_linkedin:
         existing = db.scalar(select(Contact).where(Contact.linkedin_url == data.recruiter_linkedin))
+    if existing is None and phone:
+        existing = db.scalar(select(Contact).where(Contact.phone == phone))
     if existing:
+        if phone and not existing.phone:
+            existing.phone = phone
         return existing
     payload = {
-        "name": data.recruiter_name or data.recruiter_email or "Recruiter",
+        "name": data.recruiter_name or data.recruiter_email or phone or "Recruiter",
         "company_id": company.id,
         "email": data.recruiter_email,
+        "phone": phone,
         "linkedin_url": data.recruiter_linkedin,
         "source": data.origin,
         "contact_type": "RECRUITER",
@@ -445,7 +455,8 @@ def ingest_job(
                 "employment_type",
             ):
                 if (v := getattr(data, name)) is not None:
-                    setattr(job, name, v)
+                    setattr(job, name, normalize_employment_type(v)
+                            if name == "employment_type" else v)
             if data.work_model:
                 job.work_model = data.work_model
         for name, value in manual.items():
@@ -470,6 +481,7 @@ def ingest_job(
     job.dedup_key = dedup.dedup_key(company.id, job.title, job.locations, job.location)
     if (contact := _recruiter(db, company, data)) and job.recruiter_contact_id is None:
         job.recruiter_contact_id = contact.id
+    link_job_contacts(db, job)  # emails / phones written in the notes or description
     db.flush()
     if analyze:
         from app.services.match_service import analyze_job
@@ -680,6 +692,8 @@ def update_job(db: Session, job_id: int, changes: dict[str, Any]) -> Job:
             value = WorkModel.UNKNOWN.value
         if name in ("location", "employment_type") and isinstance(value, str):
             value = value.strip() or None
+        if name == "employment_type":
+            value = normalize_employment_type(value)
         setattr(job, name, value)
         if name not in ("original_jd", "notes", "title", "posting_date", "application_deadline"):
             manual.add(name)
@@ -702,6 +716,8 @@ def update_job(db: Session, job_id: int, changes: dict[str, Any]) -> Job:
         # The edited location replaces the places read from the JD (used for the location score).
         job.locations = [job.location] if job.location else []
     job.dedup_key = dedup.dedup_key(job.company_id, job.title, job.locations, job.location)
+    if {"notes", "original_jd"} & set(changes):
+        link_job_contacts(db, job)
     record_activity(db, "job.updated", "job", job.id, job.title, {"fields": sorted(changes)})
     from app.services.match_service import analyze_job
 
@@ -726,6 +742,7 @@ def add_comment(db: Session, job_id: int, body: str) -> JobComment:
     db.add(comment)
     db.flush()
     record_activity(db, "job.commented", "job", job.id, cleaned[:200], {"comment_id": comment.id})
+    link_job_contacts(db, job)
     db.commit()
     return comment
 

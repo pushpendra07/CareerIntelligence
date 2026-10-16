@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import DomainValidationError
 from app.core.text import clean, split_list
-from app.core.urls import is_listing_url
+from app.core.urls import is_email, is_linkedin_profile_url, is_listing_url
 from app.jobs.jd_parser import detect_work_model
 from app.models.application import Application, FollowUp
 from app.models.company import Contact
@@ -389,6 +389,16 @@ def job_input_from_row(
         required_skills=split_list(r.get("required_skills"), r"[;,|]") or None,
         preferred_skills=split_list(r.get("preferred_skills"), r"[;,|]") or None,
         notes="\n".join(p for p in notes_parts if p) or None,
+        recruiter_name=_first(r, "recruiter", "recruiter_name", "hr_name", "contact_name",
+                              "contact_person", "hiring_manager"),
+        recruiter_email=email if (email := _first(
+            r, "recruiter_email", "hr_email", "contact_email", "email", "email_id")) and is_email(
+            email) else None,
+        recruiter_phone=_first(r, "recruiter_phone", "hr_phone", "contact_phone", "phone",
+                               "mobile", "contact_number", "phone_number", "whatsapp"),
+        recruiter_linkedin=li if (li := _first(r, "recruiter_linkedin", "hr_linkedin",
+                                               "contact_linkedin")) and is_linkedin_profile_url(
+            li) else None,
         status=_status(sheet.get("status")),
         raw={"import": {"source": source_label, **sheet}} if sheet else {},
         origin="import",

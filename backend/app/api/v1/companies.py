@@ -3,6 +3,8 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.api.deps import DB, AppSettings
 from app.companies.checker import check_company
@@ -11,6 +13,7 @@ from app.companies.verification import Claim
 from app.core.errors import DomainValidationError
 from app.core.pagination import Page, PageParams, page_params
 from app.models.company import Contact
+from app.models.job import Job
 from app.schemas.company import (
     CompanyCreate,
     CompanyDetail,
@@ -22,7 +25,7 @@ from app.schemas.company import (
     EvidenceIn,
     MergeIn,
 )
-from app.services import company_service
+from app.services import company_service, contact_extraction
 
 router = APIRouter(tags=["companies"])
 
@@ -165,9 +168,13 @@ def merge(db: DB, company_id: int, body: MergeIn) -> CompanyDetail:
     )
 
 
-def _contact_out(contact: Contact) -> ContactOut:
+def _contact_out(contact: Contact, db: Session | None = None) -> ContactOut:
     out = ContactOut.model_validate(contact)
     out.company_name = contact.company.name if contact.company else None
+    if db is not None:
+        out.jobs = [{"id": i, "title": t, "status": s} for i, t, s in db.execute(
+            select(Job.id, Job.title, Job.status).where(Job.recruiter_contact_id == contact.id)
+            .order_by(Job.id.desc()).limit(20))]
     return out
 
 
@@ -183,8 +190,16 @@ def list_contacts(
         db, params, q=q, company_id=company_id, status=status
     )
     return Page(
-        items=[_contact_out(c) for c in items], total=total, page=params.page, size=params.size
+        items=[_contact_out(c, db) for c in items], total=total, page=params.page,
+        size=params.size,
     )
+
+
+@router.post("/recruiters/find-in-jobs")
+def find_contacts_in_jobs(db: DB) -> dict[str, Any]:
+    """Save emails / phones / LinkedIn profiles written in jobs' notes, comments and
+    descriptions as recruiters, linked to the job. Safe to run again."""
+    return contact_extraction.find_in_all_jobs(db)
 
 
 @router.post("/recruiters", response_model=ContactOut, status_code=201)
@@ -195,7 +210,7 @@ def create_contact(db: DB, body: ContactCreate) -> ContactOut:
 
 @router.get("/recruiters/{contact_id}", response_model=ContactOut)
 def get_contact(db: DB, contact_id: int) -> ContactOut:
-    return _contact_out(company_service.get_contact(db, contact_id))
+    return _contact_out(company_service.get_contact(db, contact_id), db)
 
 
 @router.patch("/recruiters/{contact_id}", response_model=ContactOut)

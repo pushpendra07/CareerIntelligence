@@ -76,3 +76,64 @@ def test_periods() -> None:
         date(2026, 10, 12), date(2026, 10, 19)]
     r = Range(date(2026, 10, 1), date(2026, 10, 10), "day")
     assert (r.prev_start, r.prev_end) == (date(2026, 9, 21), date(2026, 9, 30))
+
+
+def test_jobs_table_and_chart_filters_match_rows(client: TestClient) -> None:
+    ids = seed(client)
+    for name in ("overview", "jobs", "companies", "sources", "skills"):
+        body = client.get(f"/api/v1/reports/{name}").json()
+        jobs = body["jobs"] or body["table"]
+        assert {r["id"] for r in jobs["rows"]} >= {ids["a"]}, name
+        # Every clickable chart item finds at least one row in a table that has its field.
+        for c in body["charts"]:
+            if not c["filter"]:
+                continue
+            tables = [t for t in (body["table"], body["jobs"]) if t and t["rows"]
+                      and c["filter"] in t["rows"][0]]
+            assert tables, (name, c["id"])
+            for item in c["data"]:
+                if item.get("code") is None or not item.get("value", 1):
+                    continue
+                hits = [r for t in tables for r in t["rows"]
+                        if (item["code"] in r[c["filter"]] if isinstance(r[c["filter"]], list)
+                            else str(r[c["filter"]]) == item["code"])]
+                assert hits, (name, c["id"], item)
+
+
+def test_jobs_are_dated_by_when_they_were_found(client: TestClient) -> None:
+    """A sheet row's own "date added" counts, not the day the sheet was imported."""
+    import json
+
+    found = (date.today() - timedelta(days=20)).isoformat()
+    rows = [{"title": "Magento Lead", "company": "Delta", "date_added": found,
+             "url": "https://jobs.lever.co/delta/1"}]
+    r = client.post("/api/v1/import/jobs",
+                    files={"file": ("j.json", json.dumps(rows), "application/json")})
+    assert r.status_code == 200, r.text
+    today = date.today().isoformat()
+    assert client.get("/api/v1/reports/jobs", params={"from": today, "to": today}).json()[
+        "kpis"][0]["value"] == 0
+    then = client.get("/api/v1/reports/jobs", params={"from": found, "to": found}).json()
+    assert then["kpis"][0]["value"] == 1
+    assert then["table"]["rows"][0]["found"] == found
+    assert then["table"]["rows"][0]["added"] == today
+
+
+def test_place_groups_locations() -> None:
+    from app.services.report_service import place
+
+    assert place(None) == place("  ") == "Not stated"
+    assert place("Bengaluru / Bangalore") == place("Bangalore, Karnataka") == "Bengaluru"
+    assert place("Gurgaon / Gurugram") == "Gurugram"
+    assert place("Pune / Chennai") == "Several Indian cities"
+    assert place("India (Remote)") == "Remote (India)"
+    assert place("Remote (US / Global)") == "Remote (outside India / global)"
+    assert place("Plant 3, India") == "India (city not stated)"
+    assert place("Chicago, IL") == "Outside India"
+
+
+def test_job_types_are_spelled_one_way() -> None:
+    from app.jobs.jd_parser import normalize_employment_type as n
+
+    assert n("FULL_TIME") == n("Full time") == n("full-time") == n("Permanent") == "Full-time"
+    assert n("C2H") == "Contract-to-hire" and n("  ") is None and n("Apprentice") == "Apprentice"

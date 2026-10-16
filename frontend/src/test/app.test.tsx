@@ -41,12 +41,12 @@ describe("add job form", () => {
   it("validates required fields and URLs", () => {
     const base = { title: "", company: "", url: "", source: "", location: "", work_model: "", employment_type: "",
       experience: "", salary: "", salary_currency: "", posting_date: "", application_deadline: "",
-      recruiter_name: "", recruiter_linkedin: "", recruiter_email: "", jd: "", responsibilities: "",
+      recruiter_name: "", recruiter_linkedin: "", recruiter_email: "", recruiter_phone: "", jd: "", responsibilities: "",
       required_skills: "", preferred_skills: "", qualifications: "", notes: "" };
-    const bad = jobSchema.safeParse({ ...base, url: "not a url", recruiter_email: "nope" });
+    const bad = jobSchema.safeParse({ ...base, url: "not a url", recruiter_email: "nope", recruiter_phone: "123" });
     expect(bad.success).toBe(false);
     const fields = bad.error!.issues.map((i) => i.path[0]);
-    expect(fields).toEqual(expect.arrayContaining(["title", "company", "jd", "url", "recruiter_email"]));
+    expect(fields).toEqual(expect.arrayContaining(["title", "company", "jd", "url", "recruiter_email", "recruiter_phone"]));
     const ok = jobSchema.parse({ ...base, title: "Tech Lead", company: "Acme", jd: "PHP", required_skills: "PHP, Magento 2" });
     expect(toPayload(ok)).toEqual({ title: "Tech Lead", company: "Acme", jd: "PHP", required_skills: ["PHP", "Magento 2"] });
   });

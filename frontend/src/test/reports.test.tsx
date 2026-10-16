@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ReportsPage, toCsv, type Report } from "../features/reports/ReportsPage";
+import { ReportsPage, matches, toCsv, type Report } from "../features/reports/ReportsPage";
 import { mockApi, renderAt } from "./utils";
 
 const REPORT: Report = {
@@ -18,6 +18,11 @@ const REPORT: Report = {
     title: "Applications in the period", total: 2,
     columns: [{ key: "title", label: "Job", kind: "job" }, { key: "status", label: "Status", kind: "code" }, { key: "score", label: "Score", kind: "number" }],
     rows: [{ id: 5, title: "Magento Lead", status: "INTERVIEW", score: 91 }, { id: 6, title: "PHP Architect", status: "APPLIED", score: 70 }],
+  },
+  jobs: {
+    title: "Jobs found or applied to in the period", total: 1,
+    columns: [{ key: "title", label: "Job", kind: "job" }, { key: "work_model", label: "Work model", kind: "code" }],
+    rows: [{ id: 8, title: "Commerce Architect", work_model: "REMOTE" }],
   },
 };
 const CATALOG = [{ key: "overview", title: "Overview", description: "" }, { key: "applications", title: "Applications", description: "" }];
@@ -37,9 +42,9 @@ describe("ReportsPage", () => {
     const call = api.calls.find((c) => c.path === "/reports/applications");
     expect(call).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Filter rows"), { target: { value: "php" } });
+    fireEvent.change(screen.getByLabelText("Filter rows: Applications in the period"), { target: { value: "php" } });
     expect(screen.queryByText("Magento Lead")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Filter rows"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Filter rows: Applications in the period"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Score" })); // highest first
     fireEvent.click(screen.getByRole("button", { name: /Score/ })); // then lowest first
     const cells = screen.getAllByRole("row").slice(1).map((r) => r.textContent);
@@ -55,6 +60,37 @@ describe("ReportsPage", () => {
     fireEvent.change(await screen.findByLabelText("Group by"), { target: { value: "month" } });
     await waitFor(() => expect(urls.at(-1)).toContain("group=month"));
     expect(screen.getByRole("link", { name: "Applications" })).toHaveAttribute("href", "/reports/applications?from=2026-01-01&to=2026-03-31&group=month");
+  });
+
+  it("lists the jobs behind the numbers under the report", async () => {
+    mockApi({ "GET /reports": CATALOG, "GET /reports/applications": REPORT });
+    renderAt(<ReportsPage />, { path: "/reports/:name", route: "/reports/applications" });
+    expect(await screen.findByText(/Jobs found or applied to in the period \(1\)/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Commerce Architect" })).toHaveAttribute("href", "/jobs/8");
+  });
+
+  it("pages long tables (25 rows a page) and the filter starts again on page 1", async () => {
+    localStorage.removeItem("reports.pageSize.v1");
+    const rows = Array.from({ length: 60 }, (_, i) => ({ id: i + 1, title: `Job ${i + 1}`, work_model: "REMOTE" }));
+    mockApi({ "GET /reports": CATALOG, "GET /reports/applications": { ...REPORT, jobs: { ...REPORT.jobs!, rows, total: 60 } } });
+    renderAt(<ReportsPage />, { path: "/reports/:name", route: "/reports/applications" });
+    expect(await screen.findByRole("link", { name: "Job 1" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Job 26" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: /next/i }).at(-1)!);
+    expect(await screen.findByRole("link", { name: "Job 26" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Job 1" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Filter rows: Jobs found/), { target: { value: "Job 7" } });
+    expect(screen.getByRole("link", { name: "Job 7" })).toBeInTheDocument(); // back on page 1
+  });
+
+  it("filters rows by a clicked chart item (lists by membership; rows without the field stay)", () => {
+    const pick = { key: "work_model", code: "REMOTE", label: "Remote", chart: "wm" };
+    expect(matches({ work_model: "REMOTE" }, pick)).toBe(true);
+    expect(matches({ work_model: "HYBRID" }, pick)).toBe(false);
+    expect(matches({ period: "2026-10-01" }, pick)).toBe(true);
+    expect(matches({ skills: ["PHP", "Magento 2"] }, { ...pick, key: "skills", code: "PHP" })).toBe(true);
+    expect(matches({ skills: ["Java"] }, { ...pick, key: "skills", code: "PHP" })).toBe(false);
+    expect(matches({ work_model: "HYBRID" }, null)).toBe(true);
   });
 
   it("exports CSV with readable codes and quoted text", () => {

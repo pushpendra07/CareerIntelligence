@@ -121,7 +121,7 @@ export interface JobDetail extends Job {
   source_links: JobSourceLink[];
   match: MatchResult | null;
   recommended_cv: { id: number; name: string; target_role: string | null; version_id: number } | null;
-  recruiter: { id: number; name: string; email: string | null; linkedin_url: string | null; status: string } | null;
+  recruiter: { id: number; name: string; email: string | null; phone?: string | null; linkedin_url: string | null; status: string } | null;
   activity: { action: string; summary: string | null; occurred_at: string }[];
   comments?: JobComment[];
   career_ops: Record<string, unknown> | null;
@@ -272,12 +272,15 @@ export interface Contact {
   contact_type: string;
   linkedin_url: string | null;
   email: string | null;
+  phone?: string | null;
   source: string | null;
   location: string | null;
   notes: string | null;
   status: string;
   last_contacted_at: string | null;
   next_followup_at: string | null;
+  /** Jobs this person is the recruiter for. */
+  jobs?: { id: number; title: string; status: string }[];
 }
 
 export interface Application {

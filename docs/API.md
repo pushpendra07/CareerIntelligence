@@ -136,12 +136,18 @@ Conventions:
 - `POST /api/v1/offers/{offer_id}/negotiate`
 - `POST /api/v1/offers/{offer_id}/decision`
 
+### recruiters (additions)
+- `POST /api/v1/recruiters/find-in-jobs` — save emails / phones / LinkedIn profiles written in
+  jobs' notes, comments and descriptions as recruiters linked to the job →
+  `{jobs_checked, jobs_with_new_contacts, created, updated, linked}`. Recruiters now have
+  `phone` and `jobs` (`[{id, title, status}]`).
+
 ### reports
 - `GET /api/v1/reports` — the available reports (`key`, `title`, `description`)
 - `GET /api/v1/reports/{name}?from=&to=&group=day|week|month` — one report (default: last 90
   days, group chosen from the range): `kpis` (with `previous` = the period of equal length
   before), `charts` (`kind`: line, bar, stacked, donut, hbar; `series`; `data`) and `table`
-  (`columns`, `rows`, max 500). Names: overview, jobs, applications, interviews, offers,
+  (`columns`, `rows`, max 2000) and `jobs` (the jobs behind the numbers, or null). Names: overview, jobs, applications, interviews, offers,
   companies, sources, followups, skills, scans.
 
 ### career-ops

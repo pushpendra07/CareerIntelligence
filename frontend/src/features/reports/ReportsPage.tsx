@@ -5,18 +5,31 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api } from "../../api/client";
-import { Card, ErrorBox, PageIntro, Spinner } from "../../components/ui";
+import { Card, ErrorBox, PageIntro, Pagination, Spinner, usePageSize } from "../../components/ui";
 import { formatDate, formatMoney, humanize } from "../../utils/format";
 
 type Kpi = { key: string; label: string; value: number | null; previous: number | null; unit: string; better: "up" | "down" };
 type Chart = { id: string; title: string; kind: "line" | "bar" | "stacked" | "donut" | "hbar"; note: string | null;
-  series: { key: string; label: string }[]; data: Record<string, string | number>[] };
+  /** Row field that a click on a bar/slice filters the tables by (matching the item's `code`). */
+  filter?: string | null;
+  series: { key: string; label: string }[]; data: Record<string, string | number | null>[] };
+/** A clicked chart item: only rows whose `key` field equals `code` (or contains it) are shown. */
+export type Pick = { key: string; code: string; label: string; chart: string };
+type Table = { title: string; columns: Column[]; rows: Row[]; total: number };
 type Column = { key: string; label: string; kind: string };
-type Row = Record<string, string | number | null>;
+type Row = Record<string, string | number | null | string[]>;
 export type Report = {
   report: string; title: string; description: string; from: string; to: string; group: string;
   previous: { from: string; to: string }; kpis: Kpi[]; charts: Chart[];
-  table: { title: string; columns: Column[]; rows: Row[]; total: number };
+  table: Table;
+  /** The jobs behind the numbers (reports whose main table isn't already jobs). */
+  jobs?: Table | null;
+};
+
+export const matches = (row: Row, pick: Pick | null) => {
+  if (!pick || !(pick.key in row)) return true;
+  const v = row[pick.key];
+  return Array.isArray(v) ? v.includes(pick.code) : String(v) === pick.code;
 };
 type Catalog = { key: string; title: string; description: string }[];
 
@@ -37,10 +50,12 @@ export const RANGES: { key: string; label: string; dates: () => [string, string]
   { key: "12m", label: "Last 12 months", dates: () => [daysAgo(364), iso(new Date())] },
 ];
 
-function fmt(v: string | number | null | undefined, kind: string, row?: Row): string {
+function fmt(v: Row[string] | undefined, kind: string, row?: Row): string {
   if (v === null || v === undefined || v === "") return "—";
+  if (Array.isArray(v)) return v.join(", ");
   if (kind === "date") return formatDate(String(v));
-  if (kind === "money") return formatMoney(v, (row?.currency as string) ?? "INR");
+  if (kind === "money") return formatMoney(v, (row?.currency as string | undefined) ?? "INR");
+  if (v === "UNKNOWN") return "Not stated";
   if (kind === "code" || kind === "source") return humanize(String(v));
   return String(v);
 }
@@ -66,7 +81,17 @@ function KpiCard({ k }: { k: Kpi }) {
 const axis = { fontSize: 11, fill: "currentColor" };
 
 /** One chart, drawn by kind. Empty data shows a message instead of a blank frame. */
-export function ReportChart({ c }: { c: Chart }) {
+export function ReportChart({ c, pick, onPick }: { c: Chart; pick?: Pick | null; onPick?: (p: Pick | null) => void }) {
+  const clickable = !!(c.filter && onPick);
+  const mine = pick?.chart === c.id ? pick : null;
+  const click = (_: unknown, i: number) => {
+    const item = c.data[i];
+    if (!clickable || !item || item.code === null || item.code === undefined) return;
+    const code = String(item.code);
+    onPick!(mine?.code === code ? null : { key: c.filter!, code, label: `${c.title}: ${item.label}`, chart: c.id });
+  };
+  const dim = (i: number) => (mine && String(c.data[i]?.code) !== mine.code ? 0.3 : 1);
+  const cursor = clickable ? "pointer" : undefined;
   const empty = !c.data.length || c.data.every((d) => c.series.every((s) => !Number(d[s.key] ?? d.value ?? 0)));
   const many = c.series.length > 1;
   let body;
@@ -88,8 +113,8 @@ export function ReportChart({ c }: { c: Chart }) {
     };
     body = (
       <PieChart>
-        <Pie data={c.data} dataKey="value" nameKey="label" innerRadius="55%" outerRadius="85%" paddingAngle={1}>
-          {c.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+        <Pie data={c.data} dataKey="value" nameKey="label" innerRadius="55%" outerRadius="85%" paddingAngle={1} onClick={click} style={{ cursor }}>
+          {c.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} fillOpacity={dim(i)} />)}
         </Pie>
         <Tooltip /><Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 12 }} formatter={(v) => share(String(v))} />
       </PieChart>
@@ -101,7 +126,11 @@ export function ReportChart({ c }: { c: Chart }) {
         <XAxis type="number" allowDecimals={false} tick={axis} />
         <YAxis type="category" dataKey="label" width={130} tick={axis} interval={0} />
         <Tooltip />{many && <Legend wrapperStyle={{ fontSize: 12 }} />}
-        {c.series.map((s, i) => <Bar key={s.key} dataKey={s.key} name={s.label} fill={COLORS[i % COLORS.length]} radius={[0, 3, 3, 0]} />)}
+        {c.series.map((s, i) => (
+          <Bar key={s.key} dataKey={s.key} name={s.label} fill={COLORS[i % COLORS.length]} radius={[0, 3, 3, 0]} onClick={click} style={{ cursor }}>
+            {c.data.map((_, j) => <Cell key={j} fill={COLORS[i % COLORS.length]} fillOpacity={dim(j)} />)}
+          </Bar>
+        ))}
       </BarChart>
     );
   } else {
@@ -111,8 +140,10 @@ export function ReportChart({ c }: { c: Chart }) {
         <XAxis dataKey="label" tick={axis} /><YAxis allowDecimals={false} tick={axis} />
         <Tooltip />{many && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {c.series.map((s, i) => (
-          <Bar key={s.key} dataKey={s.key} name={s.label} fill={COLORS[i % COLORS.length]}
-            stackId={c.kind === "stacked" ? "a" : undefined} radius={c.kind === "stacked" ? undefined : [3, 3, 0, 0]} />
+          <Bar key={s.key} dataKey={s.key} name={s.label} fill={COLORS[i % COLORS.length]} onClick={click} style={{ cursor }}
+            stackId={c.kind === "stacked" ? "a" : undefined} radius={c.kind === "stacked" ? undefined : [3, 3, 0, 0]}>
+            {c.data.map((_, j) => <Cell key={j} fill={COLORS[i % COLORS.length]} fillOpacity={dim(j)} />)}
+          </Bar>
         ))}
       </BarChart>
     );
@@ -120,7 +151,7 @@ export function ReportChart({ c }: { c: Chart }) {
   const height = c.kind === "hbar" ? Math.max(200, Math.min(c.data.length, 15) * 26 + 40) : 260;
   return (
     <Card title={c.title} className="break-inside-avoid">
-      {c.note && <p className="-mt-1 mb-2 text-xs text-slate-500">{c.note}</p>}
+      {(c.note || clickable) && <p className="-mt-1 mb-2 text-xs text-slate-500">{[c.note, clickable && !empty ? "Click a bar or slice to list its rows below." : null].filter(Boolean).join(" ")}</p>}
       <div className="text-slate-500" style={{ height }} role="img" aria-label={`${c.title} chart`}>
         {empty ? body : <ResponsiveContainer width="100%" height="100%">{body}</ResponsiveContainer>}
       </div>
@@ -145,12 +176,18 @@ export function toCsv(columns: Column[], rows: Row[]): string {
   return [columns.map((c) => esc(c.label)).join(","), ...rows.map((r) => columns.map((c) => esc(c.kind === "code" ? humanize(String(r[c.key] ?? "")) || "" : r[c.key])).join(","))].join("\n");
 }
 
-function DetailTable({ t, name, from, to }: { t: Report["table"]; name: string; from: string; to: string }) {
+function DetailTable({ t, name, from, to, pick }: { t: Table; name: string; from: string; to: string; pick: Pick | null }) {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = usePageSize("reports.pageSize.v1", 25);
+  // A new chart pick starts again at page 1.
+  const [seenPick, setSeenPick] = useState(pick);
+  if (seenPick !== pick) { setSeenPick(pick); setPage(1); }
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    let out = needle ? t.rows.filter((r) => t.columns.some((c) => fmt(r[c.key], c.kind, r).toLowerCase().includes(needle))) : t.rows;
+    const picked = t.rows.filter((r) => matches(r, pick));
+    let out = needle ? picked.filter((r) => t.columns.some((c) => fmt(r[c.key], c.kind, r).toLowerCase().includes(needle))) : picked;
     if (sort) {
       out = [...out].sort((a, b) => {
         const x = a[sort.key], y = b[sort.key];
@@ -161,7 +198,7 @@ function DetailTable({ t, name, from, to }: { t: Report["table"]; name: string; 
       });
     }
     return out;
-  }, [t, q, sort]);
+  }, [t, q, sort, pick]);
   const download = () => {
     const blob = new Blob([toCsv(t.columns, rows)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -170,34 +207,42 @@ function DetailTable({ t, name, from, to }: { t: Report["table"]; name: string; 
     a.click();
     URL.revokeObjectURL(a.href);
   };
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const current = Math.min(page, pages);
+  const shown = rows.slice((current - 1) * size, current * size);
+  const id = `report-table-${name}`;
   return (
-    <Card title={`${t.title} (${rows.length}${t.total > t.rows.length ? ` of ${t.total}, first ${t.rows.length} shown` : ""})`}
+    <Card id={id} className="scroll-mt-16" title={`${t.title} (${rows.length}${t.total > t.rows.length ? ` of ${t.total}, first ${t.rows.length} loaded` : ""})`}
       actions={<span className="flex gap-2 print:hidden">
-        <input className="input w-48 py-1 text-xs" placeholder="Filter rows" aria-label="Filter rows" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input w-48 py-1 text-xs" placeholder="Filter rows" aria-label={`Filter rows: ${t.title}`} value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
         <button className="btn-secondary" onClick={download} disabled={!rows.length}>Download CSV</button>
       </span>}>
       {!rows.length ? <p className="text-sm text-slate-500">No rows.</p> : (
-        <div className="max-h-[32rem] overflow-auto print:max-h-none">
+        <>
+        {rows.length > size && <Pagination position="top" page={current} size={size} total={rows.length} onPage={setPage} noun="rows" />}
+        <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="sticky top-0 bg-surface"><tr className="text-left text-xs uppercase tracking-wide text-slate-500">
               {t.columns.map((c) => (
                 <th key={c.key} className={`whitespace-nowrap py-1.5 pr-4 ${c.kind === "number" || c.kind === "money" ? "text-right" : ""}`}
                   aria-sort={sort?.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
-                  <button className="uppercase hover:text-slate-800" onClick={() => setSort((s) => ({ key: c.key, dir: s?.key === c.key && s.dir === -1 ? 1 : -1 }))}>
+                  <button className="uppercase hover:text-slate-800" onClick={() => { setSort((s) => ({ key: c.key, dir: s?.key === c.key && s.dir === -1 ? 1 : -1 })); setPage(1); }}>
                     {c.label}{sort?.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
                   </button>
                 </th>
               ))}
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((r, i) => (
+              {shown.map((r, i) => (
                 <tr key={i}>
-                  {t.columns.map((c) => <td key={c.key} className={`py-1.5 pr-4 ${c.kind === "number" || c.kind === "money" ? "text-right tabular-nums" : ""}`}>{cell(c, r)}</td>)}
+                  {t.columns.map((c) => <td key={c.key} className={`py-1.5 pr-4 ${c.kind === "number" || c.kind === "money" ? "text-right tabular-nums" : ""} ${c.kind === "date" ? "whitespace-nowrap" : ""}`}>{cell(c, r)}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <Pagination page={current} size={size} total={rows.length} onPage={setPage} onSize={(n) => { setSize(n); setPage(1); }} scrollTo={id} noun="rows" />
+        </>
       )}
     </Card>
   );
@@ -225,6 +270,14 @@ export function ReportsPage() {
   };
   const keep = params.toString() ? `?${params.toString()}` : "";
   const r = report.data;
+  // A chart click narrows the tables; it belongs to one report and range.
+  const [picked, setPicked] = useState<(Pick & { at: string }) | null>(null);
+  const at = `${name}|${from}|${to}|${group}`;
+  const pick = picked?.at === at ? picked : null;
+  const onPick = (p: Pick | null) => {
+    setPicked(p && { ...p, at });
+    if (p) setTimeout(() => document.getElementById("report-tables")?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 50);
+  };
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -266,9 +319,18 @@ export function ReportsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{r.kpis.map((k) => <KpiCard key={k.key} k={k} />)}</div>
           <div className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
-            {r.charts.map((c) => <ReportChart key={c.id} c={c} />)}
+            {r.charts.map((c) => <ReportChart key={c.id} c={c} pick={pick} onPick={onPick} />)}
           </div>
-          <DetailTable key={`${r.report}-${r.from}-${r.to}`} t={r.table} name={r.report} from={r.from} to={r.to} />
+          <div id="report-tables" className="scroll-mt-16 space-y-4">
+            {pick && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">Showing: {pick.label}</span>
+                <button className="link text-xs" onClick={() => onPick(null)}>Show all</button>
+              </div>
+            )}
+            <DetailTable key={`${r.report}-${r.from}-${r.to}`} t={r.table} name={r.report} from={r.from} to={r.to} pick={pick} />
+            {r.jobs && <DetailTable key={`jobs-${r.report}-${r.from}-${r.to}`} t={r.jobs} name={`${r.report}-jobs`} from={r.from} to={r.to} pick={pick} />}
+          </div>
         </>
       )}
     </div>

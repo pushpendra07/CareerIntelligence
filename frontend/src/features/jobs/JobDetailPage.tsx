@@ -14,6 +14,7 @@ import { EmailDraft } from "./EmailDraft";
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
+import { ContactLinks } from "../../components/ContactLinks";
 import { APPLIED_STATUSES, JOB_STATUSES, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -279,9 +280,10 @@ export function JobDetailPage() {
           <JobComments jobId={j.id} comments={j.comments ?? []} />
           {j.recruiter && (
             <Card title="Recruiter">
-              <div className="text-sm">{j.recruiter.name} <StatusBadge value={j.recruiter.status} />
-                {j.recruiter.email && <div className="text-xs"><a className="link" href={`mailto:${j.recruiter.email}`}>{j.recruiter.email}</a></div>}
-                {j.recruiter.linkedin_url && <a className="link text-xs" href={j.recruiter.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>}
+              <div className="space-y-1 text-sm">
+                <div>{j.recruiter.name} <StatusBadge value={j.recruiter.status} /></div>
+                <ContactLinks email={j.recruiter.email} phone={j.recruiter.phone} linkedin={j.recruiter.linkedin_url} />
+                <Link className="link text-xs" to={`/recruiters?q=${encodeURIComponent(j.recruiter.email ?? j.recruiter.name)}`}>Open in Recruiters</Link>
               </div>
             </Card>
           )}

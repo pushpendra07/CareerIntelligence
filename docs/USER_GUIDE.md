@@ -314,7 +314,20 @@ top line counts open applications and follow-ups due; search finds a job or comp
   and shows the job's status; **✓ Done**, or push it **+1 day / +3 days / +1 week**. If the job
   is already rejected or closed, it says so and offers **Dismiss**. Applying plans a follow-up
   for you; add more from the job page or **+ New reminder**.
-- **Recruiters**: contacts with company, role, channel and notes; link them to jobs.
+- **Recruiters** (Pipeline → Recruiters): contacts with company, role, email, **phone /
+  WhatsApp** (click to call or open WhatsApp), LinkedIn, status and next follow-up, plus the
+  jobs they're the recruiter for.
+  - Emails, phone numbers and LinkedIn profiles written in a job are saved as recruiters
+    automatically when the job is added, edited or commented on — e.g. a sheet note *"Email:
+    hr@company.co | Phone: 98…"*. **Find contacts in jobs** does it for every job at once (safe
+    to run again). Your notes and comments always count; in a job description only addresses
+    after "send your resume to / contact / HR…" count, and accommodation, toll-free, privacy and
+    no-reply addresses are skipped. A person-like address gives a name ("ram.kumar@" → Ram
+    Kumar); otherwise the address is the name — nothing is made up. Each contact shows which
+    job it came from.
+  - Sheet / CSV columns *Recruiter, HR name, Contact person, Recruiter email, HR email,
+    Contact email, Phone, Mobile, Contact number, WhatsApp* are read too; **Add Job** has a
+    *Recruiter phone / WhatsApp* field.
 
 ## 11. Today, Insights and Reports
 
@@ -355,7 +368,18 @@ top line counts open applications and follow-ups due; search finds a job or comp
   - Charts: trends over time, stacked bars (e.g. jobs by source, applications by how you
     applied), donuts with counts and percentages (status, onsite / hybrid / remote, job type),
     and ranked bars (locations, companies, skills, sources).
-  - The table at the bottom holds the details behind the numbers. Click a column to sort,
+  - Jobs are dated by **when they were found**: the date your Google Sheet says the row was
+    added (so a sheet imported later still counts on the right days), otherwise the day the job
+    entered the app. The Jobs table shows both *Found* and *Added to app*.
+  - *Where the jobs are* groups locations: each Indian city (Bangalore = Bengaluru), several
+    Indian cities, Remote (India), Remote (outside India / global), India (city not stated),
+    outside India, not stated. Job types are spelled one way (FULL_TIME = Full-time).
+  - Tables show 25 rows a page (change it at the bottom: 10 / 25 / 50 / 100).
+  - **Click a bar or slice** (a status, *Remote*, a location, a source, a skill, a company…)
+    to list just those rows below; *Show all* clears it.
+  - At the bottom: the report's own table and a **Jobs** table with the jobs behind the
+    numbers (location, work model, type, score, job status, application status, applied date,
+    source, date added). Click a column to sort,
     type to filter, click a job / company / source / skill to open it, **Download CSV** for a
     spreadsheet. **Print / save as PDF** prints the report without the menu.
   - Applications marked *date approx.* were recorded automatically when a job was set to

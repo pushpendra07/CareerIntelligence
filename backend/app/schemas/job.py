@@ -39,6 +39,7 @@ class JobCreate(BaseModel):
     recruiter_name: str | None = Field(default=None, max_length=200)
     recruiter_linkedin: str | None = None
     recruiter_email: str | None = None
+    recruiter_phone: str | None = Field(default=None, max_length=40)
     jd: str = Field(min_length=1, max_length=100_000)
     responsibilities: list[str] | None = None
     required_skills: list[str] | None = None

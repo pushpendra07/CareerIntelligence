@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
+import { ContactLinks } from "../../components/ContactLinks";
 import { Card, Empty, ErrorBox, Field, Pagination, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Contact, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
 
 const STATUSES = ["NOT_CONTACTED", "CONTACTED", "REPLIED", "INTERESTED", "NOT_INTERESTED", "SCREENING", "CLOSED"];
-const EMPTY = { name: "", company_name: "", job_title: "", linkedin_url: "", email: "", source: "", location: "", notes: "" };
+const EMPTY = { name: "", company_name: "", job_title: "", email: "", phone: "", linkedin_url: "", source: "", location: "", notes: "" };
+type FindResult = { jobs_checked: number; jobs_with_new_contacts: number; created: number; updated: number; linked: number };
 
 export function RecruitersPage() {
   const qc = useQueryClient();
@@ -21,13 +23,31 @@ export function RecruitersPage() {
     mutationFn: () => api.post("/recruiters", Object.fromEntries(Object.entries(form).filter(([, v]) => v))),
     onSuccess: () => { setForm(EMPTY); qc.invalidateQueries({ queryKey: ["recruiters"] }); },
   });
+  const find = useMutation({
+    mutationFn: () => api.post<FindResult>("/recruiters/find-in-jobs"),
+    onSuccess: () => qc.invalidateQueries(),
+  });
   const update = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) => api.patch(`/recruiters/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["recruiters"] }),
   });
   return (
     <div className="space-y-4">
-      <div><h1>Recruiters & contacts</h1><PageIntro>People you're talking to about jobs — recruiters, hiring managers and referrers — with their company and how to reach them.</PageIntro></div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h1>Recruiters & contacts</h1><PageIntro>People you're talking to about jobs — recruiters, hiring managers and referrers — with their company and how to reach them.</PageIntro></div>
+        <div className="text-right">
+          <button className="btn-secondary" onClick={() => find.mutate()} disabled={find.isPending}
+            title="Look for emails, phone / WhatsApp numbers and LinkedIn profiles in your jobs' notes, comments and descriptions">
+            {find.isPending ? "Looking…" : "Find contacts in jobs"}
+          </button>
+          {find.data && (
+            <p className="mt-1 text-xs text-slate-600" role="status">
+              Checked {find.data.jobs_checked} jobs: {find.data.created} new contact{find.data.created === 1 ? "" : "s"}, {find.data.updated} updated, {find.data.linked} linked to a job.
+            </p>
+          )}
+          {find.error && <ErrorBox error={new Error(errorMessage(find.error))} />}
+        </div>
+      </div>
       <Card title="Add contact">
         <p className="mb-2 text-xs text-slate-500">Only store publicly available professional information.</p>
         <div className="grid gap-2 sm:grid-cols-4">
@@ -48,17 +68,22 @@ export function RecruitersPage() {
           </select>
         </div>
         {list.isLoading && <Spinner />}
-        {list.data && (!list.data.items.length ? <Empty>No contacts yet.</Empty> : (
+        {list.data && (!list.data.items.length ? <Empty>No contacts yet. Add one above, or click <b>Find contacts in jobs</b> to pick up emails and phone numbers written in your jobs.</Empty> : (
           <table className="min-w-full divide-y divide-slate-100">
-            <thead><tr><th className="th">Name</th><th className="th">Company</th><th className="th">Contact</th><th className="th">Status</th><th className="th">Last contacted</th><th className="th">Next follow-up</th></tr></thead>
+            <thead><tr><th className="th">Name</th><th className="th">Company</th><th className="th">Contact</th><th className="th">Jobs</th><th className="th">Status</th><th className="th">Last contacted</th><th className="th">Next follow-up</th></tr></thead>
             <tbody className="divide-y divide-slate-50">
               {list.data.items.map((c) => (
                 <tr key={c.id}>
                   <td className="td"><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.job_title}</div></td>
                   <td className="td text-sm">{c.company_name ?? "—"}</td>
-                  <td className="td text-xs">{c.email}{c.linkedin_url && <a className="link block" href={c.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>}</td>
+                  <td className="td"><ContactLinks email={c.email} phone={c.phone} linkedin={c.linkedin_url} />
+                    {c.source && <div className="text-[11px] text-slate-400" title={c.notes ?? undefined}>From {c.source}</div>}</td>
+                  <td className="td text-xs">
+                    {c.jobs?.length ? c.jobs.slice(0, 3).map((j) => <Link key={j.id} className="link block" to={`/jobs/${j.id}`}>{j.title}</Link>) : "—"}
+                    {(c.jobs?.length ?? 0) > 3 && <span className="text-slate-400">+{c.jobs!.length - 3} more</span>}
+                  </td>
                   <td className="td">
-                    <select className="input text-xs" aria-label={`Status for ${c.name}`} value={c.status}
+                    <select className="input min-w-36 text-xs" aria-label={`Status for ${c.name}`} value={c.status}
                       onChange={(e) => update.mutate({ id: c.id, body: { status: e.target.value, ...(e.target.value === "CONTACTED" ? { last_contacted_at: new Date().toISOString() } : {}) } })}>
                       {STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
                     </select>

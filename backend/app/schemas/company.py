@@ -1,9 +1,11 @@
+import re
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.urls import ensure_scheme, is_email, is_http_url, is_linkedin_profile_url
+from app.jobs.contacts import normalize_phone
 from app.models.company import (
     ContactStatus,
     HiringStatus,
@@ -148,6 +150,7 @@ class ContactBase(BaseModel):
     )
     linkedin_url: str | None = None
     email: str | None = None
+    phone: str | None = Field(default=None, max_length=40)
     source: str | None = Field(default=None, max_length=200)
     location: str | None = Field(default=None, max_length=200)
     notes: str | None = None
@@ -169,6 +172,16 @@ class ContactBase(BaseModel):
             raise ValueError("invalid email address")
         return v.strip().lower() if v else v
 
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            return None
+        phone = normalize_phone(v) or (v.strip() if len(re.sub(r"\D", "", v)) >= 8 else None)
+        if phone is None:
+            raise ValueError("invalid phone number")
+        return phone
+
 
 class ContactCreate(ContactBase):
     name: str = Field(min_length=1, max_length=200)
@@ -185,11 +198,14 @@ class ContactOut(BaseModel):
     contact_type: str
     linkedin_url: str | None
     email: str | None
+    phone: str | None = None
     source: str | None
     location: str | None
     notes: str | None
     status: str
     last_contacted_at: datetime | None
     next_followup_at: datetime | None
+    # Jobs this person is the recruiter for.
+    jobs: list[dict[str, Any]] = []
     created_at: datetime
     updated_at: datetime
