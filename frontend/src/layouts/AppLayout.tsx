@@ -20,11 +20,13 @@ export const SECTIONS: Section[] = [
   { to: "/jobs", label: "Jobs", icon: "jobs", hint: "Review new jobs, browse every job, companies you track",
     tabs: [{ to: "/jobs/review", label: "Review new" }, { to: "/jobs", label: "All jobs" }, { to: "/companies", label: "Companies" }],
     badge: (s) => s.new_jobs },
-  { to: "/applications", label: "Pipeline", icon: "pipeline", hint: "Applications, interviews, offers and recruiters",
-    tabs: [{ to: "/applications", label: "Applications" }, { to: "/interviews", label: "Interviews" },
+  { to: "/applications/board", label: "Pipeline", icon: "pipeline", hint: "Board of applications by stage, interviews, offers and recruiters",
+    tabs: [{ to: "/applications/board", label: "Board" }, { to: "/applications", label: "Applications" }, { to: "/interviews", label: "Interviews" },
       { to: "/offers", label: "Offers" }, { to: "/recruiters", label: "Recruiters" }] },
   { to: "/followups", label: "Follow-ups", icon: "followups", hint: "Who to chase and when", tabs: [{ to: "/followups", label: "Follow-ups" }],
     badge: (s) => s.due_followups },
+  { to: "/reports", label: "Reports", icon: "reports", hint: "Charts and details for any period: jobs, applications, interviews, offers, sources…",
+    tabs: [{ to: "/reports", label: "Reports" }] },
   { to: "/profile", label: "My profile", icon: "profile", hint: "Your experience, what you want, CVs and interview answers",
     tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Target roles" },
       { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
@@ -131,7 +133,7 @@ export function AppLayout() {
   );
   return (
     <div className="flex min-h-screen">
-      {!hidden && <aside className="sticky top-0 hidden h-screen w-56 shrink-0 overflow-y-auto border-r border-slate-200 bg-surface md:block">{brand}{menu}</aside>}
+      {!hidden && <aside className="sticky top-0 hidden h-screen print:!hidden w-56 shrink-0 overflow-y-auto border-r border-slate-200 bg-surface md:block">{brand}{menu}</aside>}
       {drawer && (
         <div className="fixed inset-0 z-40 md:hidden">
           <button aria-label="Close menu" className="absolute inset-0 bg-slate-900/40 dark:bg-black/60" onClick={() => setDrawer(false)} />
@@ -139,7 +141,7 @@ export function AppLayout() {
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-surface/85 px-4 py-2 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-30 flex print:hidden items-center gap-3 border-b border-slate-200 bg-surface/85 px-4 py-2 backdrop-blur md:px-6">
           <button type="button" onClick={toggle} aria-label={hidden ? "Show menu" : "Hide menu"} title={hidden ? "Show menu" : "Hide menu (full-width pages)"}
             aria-expanded={drawer || !hidden} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
             <Icon name="menu" className="h-5 w-5" />

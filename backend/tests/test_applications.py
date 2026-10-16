@@ -173,6 +173,11 @@ def test_applied_jobs_always_have_an_application(client: TestClient, db: Session
     assert len(apps) == 1 and apps[0]["status"] == "APPLIED"
     assert apps[0]["applied_on"] == str(date.today())
     assert "Recorded automatically" in (apps[0]["notes"] or "")
+    assert apps[0]["origin"] == "auto"
+    # Setting the real date makes it a normal (not approximate) record.
+    real = str(date.today() - timedelta(days=5))
+    fixed = client.patch(f"/api/v1/applications/{apps[0]['id']}", json={"applied_on": real})
+    assert fixed.json()["applied_on"] == real and fixed.json()["origin"] == "manual"
     # No follow-up flood for automatic records; the manual Apply form still plans one.
     assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 0
 

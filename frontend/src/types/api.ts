@@ -300,6 +300,7 @@ export interface Application {
   follow_up_date: string | null;
   notes: string | null;
   origin: string;
+  updated_at?: string;
   events: { id: number; event_type: string; from_status: string | null; to_status: string | null; note: string | null; occurred_at: string }[];
 }
 

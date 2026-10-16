@@ -13,6 +13,7 @@ import { PostingCheck } from "./PostingCheck";
 import { EmailDraft } from "./EmailDraft";
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
+import { EditJob } from "./EditJob";
 import { APPLIED_STATUSES, JOB_STATUSES, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -169,6 +170,7 @@ export function JobDetailPage() {
   const [search, setSearch] = useSearchParams();
   const qc = useQueryClient();
   const applying = search.get("apply") === "1";
+  const [editing, setEditing] = useState(false);
   const setApplying = (on: boolean) => { const n = new URLSearchParams(search); if (on) n.set("apply", "1"); else n.delete("apply"); setSearch(n, { replace: true }); };
   const job = useQuery({ queryKey: ["job", id], queryFn: () => api.get<JobDetail>(`/jobs/${id}`) });
   const apps = useQuery({ queryKey: ["applications", { job_id: id }], queryFn: () => api.get<Page<Application>>("/applications", { job_id: id }) });
@@ -204,7 +206,8 @@ export function JobDetailPage() {
               <WebSearch label="Find on other portals with" topic={jobTopic({ title: j.title, company: j.company.name, location: j.location, url: postingUrl(j) })} />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button className="btn-secondary" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>{editing ? "Close edit" : "Edit"}</button>
             {j.match_score !== null && (
               <span className="text-right" title="How well this job fits you, 0–100">
                 <span className="text-3xl font-bold text-indigo-700">{j.match_score}</span><span className="text-slate-400">/100</span>
@@ -213,7 +216,9 @@ export function JobDetailPage() {
             )}
           </div>
         </div>
-        <div className="mt-3"><KeyFacts job={j} /></div>
+        {editing
+          ? <div className="mt-3 border-t border-slate-100 pt-3"><EditJob key={j.id} job={j} onDone={() => setEditing(false)} /></div>
+          : <div className="mt-3"><KeyFacts job={j} /></div>}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm">
           <span className="text-slate-500">Status</span>
           <JobStatusBadge value={j.status} />
@@ -245,7 +250,7 @@ export function JobDetailPage() {
             <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending} title="Download the description from the posting">
               {fetchJd.isPending ? "Fetching…" : "Fetch description"}</button>) : undefined}>
             {fetchJd.error && <ErrorBox error={new Error(errorMessage(fetchJd.error))} />}
-            <JobDescription text={j.original_jd} empty="No description saved yet. Fetch it from the posting, or edit the job to paste it." />
+            <JobDescription text={j.original_jd} empty="No description saved yet. Fetch it from the posting, or click Edit above to paste it." />
           </Card>
         </div>
         <div className="space-y-4">

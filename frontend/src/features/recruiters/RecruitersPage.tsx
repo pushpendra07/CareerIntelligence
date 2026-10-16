@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Card, Empty, ErrorBox, Field, Pagination, Spinner, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Contact, Page } from "../../types/api";
@@ -11,7 +12,8 @@ const EMPTY = { name: "", company_name: "", job_title: "", linkedin_url: "", ema
 export function RecruitersPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [q, setQ] = useState("");
+  const [params] = useSearchParams();
+  const [q, setQ] = useState(params.get("q") ?? ""); // set by the top search
   const [status, setStatus] = useState("");
   const list = useQuery({ queryKey: ["recruiters", q, status, page], queryFn: () => api.get<Page<Contact>>("/recruiters", { q, status, page, size: PAGE_SIZE }) });
   const [form, setForm] = useState(EMPTY);

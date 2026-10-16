@@ -15,7 +15,7 @@ describe("menu", () => {
     renderAt(<AppLayout />, { path: "/interviews", route: "/interviews" });
     const menu = screen.getByRole("navigation", { name: "Main" });
     expect(within(menu).getAllByRole("link").map((l) => l.textContent?.replace(/\d+$/, ""))).toEqual(
-      ["Today", "Jobs", "Pipeline", "Follow-ups", "My profile", "Settings"]);
+      ["Today", "Jobs", "Pipeline", "Follow-ups", "Reports", "My profile", "Settings"]);
     expect(await within(menu).findByTitle("New jobs to review")).toHaveTextContent("12");
     expect(within(menu).getByTitle("Due today or overdue")).toHaveTextContent("3");
     expect(within(menu).getByRole("link", { name: "Pipeline" })).toHaveAttribute("aria-current", "page");

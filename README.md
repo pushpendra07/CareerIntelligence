@@ -144,6 +144,9 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Charts**: jobs by score, source, location and work model; top companies;
   most-requested skills; **skill gaps**.
 - **Analytics**: where scores are lost, and interview rate by score band.
+- **Reports**: ten reports (overview, jobs, applications, interviews, offers, companies,
+  sources, follow-ups, skills, scans) for any date range — trend, stacked and donut charts,
+  change vs the previous period, sortable detail tables, CSV download and print to PDF.
 - **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills.
 - **Backup & import** (CSV/JSON, including a full JSON backup of everything) and **Google Sheets** import.
 - **Audit log** of every important action.

@@ -9,6 +9,7 @@ import { Badge, Card, Chips, ErrorBox, Field, PageIntro } from "../../components
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import type { JobDetail } from "../../types/api";
 import { formatMoney, humanize, splitList } from "../../utils/format";
+import { EmploymentTypeSelect, LocationInput, WorkModelPicker } from "./JobFields";
 
 const optionalUrl = z.string().trim().refine((v) => !v || /^(https?:\/\/)?[^\s/]+\.[^\s]+$/i.test(v), "Enter a valid URL");
 const optionalEmail = z.string().trim().refine((v) => !v || /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(v), "Enter a valid email");
@@ -74,10 +75,10 @@ export function toPayload(v: JobForm): Record<string, unknown> {
 export function AddJobPage() {
   const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<JobForm>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<JobForm>({
     resolver: zodResolver(jobSchema), defaultValues: EMPTY,
   });
-  const [url, jd, title, company, jobLocation] = watch(["url", "jd", "title", "company", "location"]);
+  const [url, jd, title, company, jobLocation, workModel] = watch(["url", "jd", "title", "company", "location", "work_model"]);
   const [debounced, setDebounced] = useState({ url: "", jd: "", title: "" });
   useEffect(() => {
     const t = setTimeout(() => setDebounced({ url, jd, title }), 500);
@@ -106,11 +107,20 @@ export function AddJobPage() {
           <Field label="Job URL" error={errors.url?.message} hint="LinkedIn, Naukri, Indeed, ATS or careers page">
             <input className="input" placeholder="https://…" {...register("url")} />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Location" hint="Pick or type; leave empty to read it from the JD"><LocationInput {...register("location")} /></Field>
+            <div className="sm:col-span-2">
+              <span className="label">Work model</span>
+              <WorkModelPicker value={workModel} onChange={(v) => setValue("work_model", v, { shouldDirty: true })} />
+              {!workModel && p?.work_model && p.work_model !== "UNKNOWN" && <span className="mt-0.5 block text-xs text-slate-400">The description says {humanize(p.work_model)}</span>}
+            </div>
+            <Field label="Job type"><EmploymentTypeSelect {...register("employment_type")} /></Field>
+          </div>
           <Field label="Job Description *" error={errors.jd?.message}>
             <textarea className="input min-h-72 font-mono text-xs" placeholder="Paste the full job description" {...register("jd")} />
           </Field>
           <button type="button" className="link text-sm" onClick={() => setShowDetails((s) => !s)}>
-            {showDetails ? "Hide" : "Show"} optional details (location, salary, recruiter, skills…)
+            {showDetails ? "Hide" : "Show"} optional details (salary, experience, recruiter, skills…)
           </button>
           {showDetails && (
             <div className="grid gap-3 sm:grid-cols-3">
@@ -119,13 +129,6 @@ export function AddJobPage() {
                   {MANUAL_SOURCES.map((s) => <option key={s} value={s}>{s ? humanize(s) : "Detect from URL"}</option>)}
                 </select>
               </Field>
-              <Field label="Location"><input className="input" {...register("location")} /></Field>
-              <Field label="Work model">
-                <select className="input" {...register("work_model")}>
-                  <option value="">From JD</option><option value="REMOTE">Remote</option><option value="HYBRID">Hybrid</option><option value="ONSITE">Onsite</option>
-                </select>
-              </Field>
-              <Field label="Employment type"><input className="input" placeholder="Full-time" {...register("employment_type")} /></Field>
               <Field label="Experience" hint='e.g. "8-12 years"'><input className="input" {...register("experience")} /></Field>
               <Field label="Salary / CTC" hint='e.g. "30-40 LPA"'><input className="input" {...register("salary")} /></Field>
               <Field label="Currency"><input className="input" placeholder="INR" maxLength={3} {...register("salary_currency")} /></Field>

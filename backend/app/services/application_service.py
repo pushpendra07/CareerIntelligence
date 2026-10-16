@@ -175,6 +175,8 @@ def update_application(db: Session, application_id: int, changes: dict[str, Any]
     _contact(db, changes.get("referral_contact_id"))
     for key, value in changes.items():
         setattr(app, key, value)
+    if "applied_on" in changes and app.origin == "auto":
+        app.origin = "manual"  # the user set the real date: no longer approximate
     if "notes" in changes and changes["notes"]:
         app.events.append(ApplicationEvent(event_type="NOTE", note=changes["notes"]))
     record_activity(

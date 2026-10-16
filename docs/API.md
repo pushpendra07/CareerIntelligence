@@ -8,7 +8,7 @@ Conventions:
 - Lists: `?page=&size=` (max 200) → `{items, total, page, size}`.
 - Every response carries an `X-Request-ID` header (also accepted on requests).
 
-## Endpoints (114, generated from the OpenAPI schema)
+## Endpoints (116, generated from the OpenAPI schema)
 
 ### health
 - `GET /api/v1/health`
@@ -135,6 +135,14 @@ Conventions:
 - `PATCH /api/v1/offers/{offer_id}`
 - `POST /api/v1/offers/{offer_id}/negotiate`
 - `POST /api/v1/offers/{offer_id}/decision`
+
+### reports
+- `GET /api/v1/reports` — the available reports (`key`, `title`, `description`)
+- `GET /api/v1/reports/{name}?from=&to=&group=day|week|month` — one report (default: last 90
+  days, group chosen from the range): `kpis` (with `previous` = the period of equal length
+  before), `charts` (`kind`: line, bar, stacked, donut, hbar; `series`; `data`) and `table`
+  (`columns`, `rows`, max 500). Names: overview, jobs, applications, interviews, offers,
+  companies, sources, followups, skills, scans.
 
 ### career-ops
 - `GET /api/v1/career-ops/status`

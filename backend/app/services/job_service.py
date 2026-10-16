@@ -676,14 +676,31 @@ def update_job(db: Session, job_id: int, changes: dict[str, Any]) -> Job:
     for name, value in changes.items():
         if name in ("required_skills", "preferred_skills") and value is not None:
             value = normalize_skill_list(value)
+        if name == "work_model" and not value:  # cleared
+            value = WorkModel.UNKNOWN.value
+        if name in ("location", "employment_type") and isinstance(value, str):
+            value = value.strip() or None
         setattr(job, name, value)
         if name not in ("original_jd", "notes", "title", "posting_date", "application_deadline"):
             manual.add(name)
+    if "location" in changes:
+        manual.add("locations")
+    if "work_model" in changes and job.work_model == WorkModel.UNKNOWN.value:
+        # "Not stated": go back to what the description (or location) says.
+        manual.discard("work_model")
+        job.work_model = (
+            (job.parsed_jd or {}).get("work_model")
+            or detect_work_model(job.location or "")
+            or WorkModel.UNKNOWN.value
+        )
     job.manual_fields = sorted(manual)
     if "title" in changes:
         job.normalized_title = title_key(job.title)
     if {"original_jd", "title"} & set(changes):
         _apply_parsed(job, parse_jd(job.original_jd, job.title))
+    if "location" in changes:
+        # The edited location replaces the places read from the JD (used for the location score).
+        job.locations = [job.location] if job.location else []
     job.dedup_key = dedup.dedup_key(job.company_id, job.title, job.locations, job.location)
     record_activity(db, "job.updated", "job", job.id, job.title, {"fields": sorted(changes)})
     from app.services.match_service import analyze_job

@@ -33,7 +33,7 @@ right picks a **light**, **dark** or **same as my computer** theme (remembered i
 8. [Apply and track applications](#8-apply-and-track-applications)
 9. [Interviews, prep and the question bank](#9-interviews-prep-and-the-question-bank)
 10. [Offers, follow-ups and recruiters](#10-offers-follow-ups-and-recruiters)
-11. [Dashboard and analytics](#11-dashboard-and-analytics)
+11. [Today, Insights and Reports](#11-today-insights-and-reports)
 12. [Settings reference](#12-settings-reference)
 13. [Backups, exports and starting over](#13-backups-exports-and-starting-over)
 14. [Daily routine](#14-daily-routine)
@@ -189,6 +189,15 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 
 ## 7. Work through your jobs
 
+- **Edit a job:** on the job page click **Edit** — title, **location** (type or pick from
+  your preferred locations and common cities), **work model** (**Onsite · Hybrid · Remote ·
+  Not stated**), **job type** (Full-time, Contract, Contract-to-hire, Part-time, Internship,
+  Freelance), experience, salary, dates, **Applied on**, description and notes. *Applied on*
+  corrects the date of the job's application (automatic ones are marked "date approximate"
+  until you do); on a job you haven't applied to, picking a date records the application. Only changed fields are saved,
+  the job is re-scored, and your values are kept when the description is read again.
+  *Not stated* hands the work model back to the description. **Add Job** has the same
+  location, work model and job type choices right under the job URL.
 - **Fastest way to triage: Jobs → Review new** (or the button on Today). It shows
   new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
   description. **Shortlist** (`S`), **Not relevant** (`N`), **Skip for now** (`K`),
@@ -275,6 +284,14 @@ This creates an **Application** (sidebar → Applications) and moves the job to 
 On an application: update its status (Applied → Screening → Interview → Offer / Rejected /
 Withdrawn), see its **History**, and add **follow-ups** (reminders).
 
+**Pipeline → Board** (the Pipeline menu opens it): every application as a card in its stage's
+column — Applied · Recruiter contacted · Screening · Interview · Interview done – no reply ·
+Offer · Accepted · Rejected; On hold / Withdrawn / Closed sit underneath. **Drag a card** to
+another column (or use its **Move to…** menu) when something happens: the job's status and
+follow-ups update with it. Cards show the score, days since applying, a late follow-up in red,
+"No update in 14+ days", and "date approximate" for applications recorded automatically. The
+top line counts open applications and follow-ups due; search finds a job or company.
+
 ## 9. Interviews, prep and the question bank
 
 - **Interviews** (sidebar): schedule a round — **Job**, **Round**, **Date & time**, **Duration**,
@@ -299,7 +316,7 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
   for you; add more from the job page or **+ New reminder**.
 - **Recruiters**: contacts with company, role, channel and notes; link them to jobs.
 
-## 11. Today and Insights
+## 11. Today, Insights and Reports
 
 - **Today** (top to bottom):
   - **Getting started** checklist — shown until your CV, profile, target roles, salary target,
@@ -327,6 +344,22 @@ Withdrawn), see its **History**, and add **follow-ups** (reminders).
   - *Your matches* — score spread vs the jobs you applied to, and where scores are lost (with
     what to change).
   - *Skills* — the required skills you miss most, CV advice, most requested skills.
+
+- **Reports** (menu): one report per area — **Overview, Jobs found, Applications, Interviews,
+  Offers, Companies, Job sources, Follow-ups, Skills, Scans & imports**.
+  - Pick a **Period** (last 7 / 30 / 90 days, this or last month, this year, last 12 months, or
+    custom dates) and **Group by** (automatic, day, week, month). The choice stays in the
+    address, so a report link can be bookmarked.
+  - The top cards compare each number with the period of the same length just before
+    (▲ / ▼, green when it's better — e.g. fewer rejections is green).
+  - Charts: trends over time, stacked bars (e.g. jobs by source, applications by how you
+    applied), donuts with counts and percentages (status, onsite / hybrid / remote, job type),
+    and ranked bars (locations, companies, skills, sources).
+  - The table at the bottom holds the details behind the numbers. Click a column to sort,
+    type to filter, click a job / company / source / skill to open it, **Download CSV** for a
+    spreadsheet. **Print / save as PDF** prints the report without the menu.
+  - Applications marked *date approx.* were recorded automatically when a job was set to
+    Applied; open them to set the real date.
 
 ## 12. Settings reference
 

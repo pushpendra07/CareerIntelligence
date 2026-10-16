@@ -563,3 +563,23 @@ def test_bulk_status_and_delete(client: TestClient) -> None:
     assert client.get(f"/api/v1/jobs/{ids[2]}").status_code == 200
     empty = client.post("/api/v1/jobs/bulk", json={"job_ids": [], "action": "delete"})
     assert empty.status_code == 422
+
+
+def test_edit_location_and_work_model(client: TestClient) -> None:
+    job = add(client, location="Bengaluru", work_model="REMOTE")["job"]
+    assert job["work_model"] == "REMOTE"
+    r = client.patch(
+        f"/api/v1/jobs/{job['id']}",
+        json={"location": "  Pune, India ", "work_model": "HYBRID", "employment_type": "Contract"},
+    )
+    assert r.status_code == 200, r.text
+    edited = r.json()
+    assert edited["location"] == "Pune, India" and edited["locations"] == ["Pune, India"]
+    assert edited["work_model"] == "HYBRID" and edited["employment_type"] == "Contract"
+    assert {"location", "locations", "work_model"} <= set(edited["manual_fields"])
+    # "Not stated" hands the work model back to the description.
+    cleared = client.patch(f"/api/v1/jobs/{job['id']}", json={"work_model": None}).json()
+    assert "work_model" not in cleared["manual_fields"]
+    assert cleared["work_model"] in ("REMOTE", "HYBRID", "ONSITE", "UNKNOWN")
+    blank = client.patch(f"/api/v1/jobs/{job['id']}", json={"location": ""}).json()
+    assert blank["location"] is None and blank["locations"] == []

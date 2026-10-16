@@ -255,7 +255,7 @@ asks how to do something in the app, answer from it.
 8. Missing descriptions: Today → **Fetch for 40 best jobs** (`POST /api/v1/jobs/fetch-descriptions`,
    `services/description_service.py`, readers in `jobs/jd_fetch.py`). Never fetches LinkedIn,
    Indeed, Glassdoor or Naukri. Search `q=#123` finds a job by ID.
-9. Menu: Today · Jobs · Pipeline · Follow-ups · My profile · Settings; related pages are tabs
+9. Menu: Today · Jobs · Pipeline · Follow-ups · Reports · My profile · Settings; related pages are tabs
    (`SECTIONS` in `layouts/AppLayout.tsx`). The Jobs list remembers sort/filters in
    localStorage (`jobs.sort.v1`, `jobs.filters.v1`) until Reset.
 
@@ -422,6 +422,6 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
 
 `GET /api/v1/jobs` (filters: q, min_score, status[], closed, source, …) ·
 `POST /api/v1/jobs` · `DELETE /api/v1/jobs/{id}` · `POST /api/v1/matches/reanalyze` ·
-`GET /api/v1/dashboard` · `GET /api/v1/cv-advice` (skills to add to the CV / skills missing) · `POST /api/v1/scanner/run` · `GET /api/v1/scanner/status` ·
+`GET /api/v1/dashboard` · `GET /api/v1/reports/{name}?from=&to=&group=` (`services/report_service.py`) · `GET /api/v1/cv-advice` (skills to add to the CV / skills missing) · `POST /api/v1/scanner/run` · `GET /api/v1/scanner/status` ·
 `POST /api/v1/career-ops/import` · `POST /api/v1/career-ops/sync` · `GET /api/v1/sheets` ·
 `POST /api/v1/sheets/{id}/import-rows`. Full list: `docs/API.md` or `/docs`.
