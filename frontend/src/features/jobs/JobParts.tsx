@@ -66,7 +66,7 @@ export function JobDescription({ text, empty }: { text: string; empty?: string }
   if (!jd) return <p className="text-sm text-slate-500">{empty ?? "No description saved — the score is a rough guess from the title. Open the posting to read it."}</p>;
   return (
     <>
-      <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
+      <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 [overflow-wrap:anywhere]">
         {full || jd.length <= JD_PREVIEW ? jd : `${jd.slice(0, JD_PREVIEW)}…`}
       </p>
       {jd.length > JD_PREVIEW && <button className="link mt-1 text-sm" onClick={() => setFull((v) => !v)}>{full ? "Show less" : "Show the full description"}</button>}

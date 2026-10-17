@@ -50,9 +50,29 @@ Scanned when the company has **Job search** ticked and its careers URL is a supp
 | Lazer Technologies | | Ashby | https://jobs.ashbyhq.com/lazer |
 | Strix | | Ashby | https://jobs.ashbyhq.com/strix |
 | Magebit | | Teamtailor | https://careers.magebit.com |
+| Smile | | Teamtailor | https://jobs.smile.eu |
+| Space 48 | | Teamtailor | https://careers.glassatlas.com |
 | Vaimo | | Teamtailor | https://careers.vaimo.com |
 | WSA (APAC) | | Teamtailor | https://careersapac.wsa.com |
 | Scandiweb | | Pinpoint | https://scandiweb.pinpointhq.com |
+| Adobe | A | Workday | https://adobe.wd5.myworkdayjobs.com/external_experienced |
+| BigCommerce | A | Workday | https://bigcommerce.wd12.myworkdayjobs.com/Commerce |
+| Decima Digital | B | Lever | https://jobs.lever.co/decima-digital |
+| Perficient | A | SmartRecruiters | https://jobs.smartrecruiters.com/Perficient2 |
+| Third Essential IT Solution | B | SmartRecruiters | https://jobs.smartrecruiters.com/ThirdEssentialITSoluton |
+| 1stopbedrooms | B | SmartRecruiters | https://jobs.smartrecruiters.com/1stopbedrooms |
+| Acquia | A | Greenhouse | https://job-boards.greenhouse.io/acquia |
+| commercetools | A | Greenhouse | https://job-boards.greenhouse.io/commercetools |
+| Spryker Systems | B | Greenhouse | https://job-boards.greenhouse.io/spryker |
+| Bloomreach | B | Greenhouse | https://job-boards.greenhouse.io/bloomreach |
+| Yotpo | B | Greenhouse | https://job-boards.greenhouse.io/yotpo |
+| Klaviyo | A | Greenhouse | https://job-boards.greenhouse.io/klaviyo |
+| Signifyd | B | Greenhouse | https://job-boards.greenhouse.io/signifyd95 |
+| Gorgias | B | Ashby | https://jobs.ashbyhq.com/gorgias |
+| Wagento | A | Workable | https://apply.workable.com/wagento |
+| Youwe | A | Workable | https://apply.workable.com/youwe |
+| Human Made | B | Workable | https://apply.workable.com/humanmade |
+| Kanopi Studios | B | Workable | https://apply.workable.com/kanopi |
 
 ## Career-Ops — 14 companies (from its `portals.yml`)
 

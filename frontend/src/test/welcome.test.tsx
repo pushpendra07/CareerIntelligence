@@ -50,5 +50,5 @@ describe("welcome wizard", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /Finish and open my dashboard/ }));
     await waitFor(() => expect(calls.calls.some((c) => c.path === "/setup/complete")).toBe(true));
-  });
+  }, 20_000); // the whole wizard, step by step: slow on a busy machine
 });

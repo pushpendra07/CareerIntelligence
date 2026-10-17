@@ -69,10 +69,10 @@ describe("reminders", () => {
     }
     vi.stubGlobal("Notification", FakeNotification);
     renderAt(<ReminderToggle />);
-    fireEvent.click(screen.getByRole("button", { name: "Turn on reminders" }));
-    expect(await screen.findByText(/Browser reminders are on/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Turn on notifications" }));
+    expect(await screen.findByText(/Browser notifications are on/)).toBeInTheDocument();
     expect(shown).toEqual(["Reminders are on"]);
     fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
-    expect(screen.getByRole("button", { name: "Turn on reminders" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Turn on notifications" })).toBeInTheDocument();
   });
 });

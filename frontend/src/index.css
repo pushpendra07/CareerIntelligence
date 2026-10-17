@@ -168,6 +168,8 @@
   body {
     @apply bg-page font-sans text-slate-800 antialiased;
     font-feature-settings: "cv11", "ss01";
+    /* A word longer than its box (pasted descriptions, long links) wraps instead of spilling out. */
+    overflow-wrap: break-word;
     /* A soft brand tint at the top of every page. */
     background-image: radial-gradient(1200px 380px at 70% -120px, color-mix(in oklab, var(--color-indigo-500) 9%, transparent), transparent 70%);
     background-repeat: no-repeat;

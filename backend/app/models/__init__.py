@@ -11,10 +11,12 @@ from app.models.job import DeletedJob, Job, JobComment, JobSourceLink
 from app.models.match import JobMatch, ScoringConfigRow
 from app.models.offer import Offer
 from app.models.profile import ProfessionalProfile, TargetProfile
+from app.models.reminder import ReminderEvent
 from app.models.scan import ScanRun
 from app.models.sheet import SavedSheet
 
 __all__ = [
+    "ReminderEvent",
     "CV",
     "ActivityLog",
     "AppSettings",

@@ -474,6 +474,27 @@ Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI
 - **Shortcuts** (not while typing in a field): `/` search everything · `C` add a job ·
   `G` then `T` Today, `J` jobs, `R` review new, `C` companies, `P` pipeline board, `F` follow-ups,
   `I` reports, `M` my profile, `,` settings · `?` shows them all.
+- **Notifications:** the 🔔 bell at the top right lists what needs you now, grouped (and
+  filterable): interviews coming up, follow-ups due or late, jobs shortlisted but not applied to
+  (*Apply pending*), the best new jobs, and reminders that fired. Each shows the job, the
+  company, location, work model, score and **Applied <date>** or **Not applied**; click one to
+  open it. The red count is what you haven't read: **Mark as read** (the dot on an item, ✓ on
+  hover) or **Mark all as read**; opening an item marks it read too. Read ones leave the list
+  (**Show N read** brings them back). The tab title shows the same count, e.g.
+  *(26) Career Intelligence*, and the installed app's icon gets a badge.
+  **Turn on notifications** (bottom of the bell) lets the browser show pop-ups with the app icon
+  for follow-ups due, interviews 24 hours and 1 hour before, new jobs found by a scan, and your
+  scheduled reminders — while the app is open in a tab.
+- **Reminders** (Settings → Reminders, or *Reminder schedule →* in the bell): nudges on a
+  schedule, like a cron job — **Check job portals** (the portals you list; says how many new jobs
+  wait), **Apply to shortlisted jobs**, **Follow up**, and your own (**+ Add a reminder**). Each
+  can be turned on or off, with **How often**: every 5/15/30 minutes, every hour, every 2 or 4
+  hours, working hours, daily or weekdays at a time — or **Custom (cron)**, e.g.
+  `*/10 9-18 * * 1-5` (minute hour day month weekday, your local time). *Only when there's
+  something to do* keeps Apply / Follow up quiet when nothing waits. **Test now** sends one at
+  once; the next time each one runs is shown. The app checks the schedule every minute while it
+  runs. Reminders reach you in the bell, as a message in the app, as browser notifications, and
+  — on a Mac running the app directly — as **macOS notifications** even with the browser closed.
 - **Messages:** saving a job, changing a status, applying or backing up shows a short message at
   the bottom of the screen; failed one-click actions show the error there too.
 - **Phone:** the menu opens from ☰ (the theme switch is at its bottom); job lists show one card

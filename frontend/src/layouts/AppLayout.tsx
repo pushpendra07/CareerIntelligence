@@ -4,7 +4,8 @@ import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { Icon } from "../components/icons";
-import { useBrowserReminders } from "../components/Reminders";
+import { NotificationBell, useBrowserReminders, useScheduledReminders, type ReminderEvent } from "../components/Reminders";
+import { toast } from "../components/Toaster";
 import { LogoutButton } from "../components/AuthGate";
 import { CommandPalette } from "../components/CommandPalette";
 import { Toaster } from "../components/Toaster";
@@ -36,7 +37,8 @@ export const SECTIONS: Section[] = [
       { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
   { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
     tabs: [{ to: "/settings", label: "Job sources" }, { to: "/settings/scoring", label: "Scoring" },
-      { to: "/settings/data", label: "Backup & import" }, { to: "/settings/about", label: "About & AI" }] },
+      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/data", label: "Backup & import" },
+      { to: "/settings/about", label: "About & AI" }] },
 ];
 
 const matches = (path: string, to: string) => (to === "/" ? path === "/" : path === to || path.startsWith(`${to}/`));
@@ -94,13 +96,14 @@ function ThemeSwitch({ onDark = false }: { onDark?: boolean }) {
 
 const SIDEBAR_KEY = "layout.sidebar";
 
+const showReminder = (e: ReminderEvent) => toast(`🔔 ${e.title} — ${e.body}`, "info");
+
 /** Every page in the menu, for the command palette ("Jobs › Companies"). */
 const PAGES = SECTIONS.flatMap((s) => s.tabs.map((t) => ({ to: t.to, label: t.label === s.label || s.tabs.length === 1 ? s.label : t.label, group: s.label })));
 
 export function AppLayout() {
   const { pathname } = useLocation();
   const { section, tab } = locate(pathname);
-  useBrowserReminders(); // follow-up / interview notifications, when turned on (Today)
   // A fresh install (no CVs, no jobs, setup not finished) opens the Welcome wizard once.
   const setup = useQuery({ queryKey: ["setup"], queryFn: () => api.get<{ needs_setup: boolean }>("/setup"),
     staleTime: Infinity, retry: false });
@@ -118,6 +121,8 @@ export function AppLayout() {
     queryKey: ["dashboard"], queryFn: () => api.get<{ summary: Record<string, number> }>("/dashboard"),
     refetchInterval: 60_000,
   }).data?.summary;
+  useBrowserReminders(summary); // notifications (when turned on), tab-title count, app badge
+  useScheduledReminders(showReminder); // Settings → Reminders: a toast (and notification) when one fires
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => api.get<{ full_name?: string | null; headline?: string | null }>("/profile"),
     staleTime: 300_000, retry: false }).data;
   // The dark sidebar uses fixed colours (white/…): the dark theme remaps the slate shades.
@@ -188,6 +193,7 @@ export function AppLayout() {
           </button>
           {hidden && <span className="hidden text-sm font-semibold text-slate-900 md:inline">{section?.label}</span>}
           <div className="min-w-0 flex-1"><GlobalSearch /></div>
+          <NotificationBell summary={summary} />
           <Link to="/jobs/new" className="btn-primary hidden sm:inline-flex"><span aria-hidden className="text-base leading-none">+</span>Add job</Link>
           <LogoutButton />
           {hidden && <div className="hidden sm:block"><ThemeSwitch /></div>}

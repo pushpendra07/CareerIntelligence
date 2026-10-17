@@ -125,13 +125,41 @@ def weekly(db: Session, targets: dict[str, int], today: date | None = None) -> d
     }
 
 
+NEW_JOB_STATUSES = ("NEW", "DISCOVERED")
+APPLY_PENDING_STATUSES = ("SHORTLISTED", "READY_TO_APPLY")
+LIST_LIMIT = 8
+
+
+def _latest_applications(db: Session, job_ids: set[int]) -> dict[int, Application]:
+    if not job_ids:
+        return {}
+    out: dict[int, Application] = {}
+    for app in db.scalars(select(Application).where(Application.job_id.in_(job_ids))
+                          .order_by(Application.applied_on, Application.id)):
+        out[app.job_id] = app  # the latest one wins
+    return out
+
+
+def _job_row(job: Job, company: str, app: Application | None) -> dict[str, Any]:
+    return {"job_id": job.id, "job_title": job.title, "company": company,
+            "location": job.location, "work_model": job.work_model, "score": job.match_score,
+            "job_status": job.status,
+            "applied": app is not None, "applied_on": app.applied_on.isoformat() if app else None,
+            "application_status": app.status if app else None,
+            "application_id": app.id if app else None,
+            "added_on": job.created_at.isoformat() if job.created_at else None}
+
+
 def reminders(db: Session, now: datetime | None = None) -> dict[str, Any]:
-    """What the browser should remind you about: follow-ups due today or late, and interviews
-    in the next 24 hours."""
+    """What needs you (the bell and browser notifications): follow-ups due today or late,
+    interviews in the next 24 hours, the best new jobs and shortlisted jobs not applied to —
+    each with the job, company and whether / when you applied."""
     now = now or datetime.now(UTC)
     today = now.astimezone().date()
     due = db.execute(
-        select(FollowUp.id, FollowUp.title, FollowUp.due_date, FollowUp.job_id)
+        select(FollowUp, Job, Company.name)
+        .outerjoin(Job, Job.id == FollowUp.job_id)
+        .outerjoin(Company, Company.id == func.coalesce(FollowUp.company_id, Job.company_id))
         .where(FollowUp.completed.is_(False), FollowUp.due_date <= today)
         .order_by(FollowUp.due_date, FollowUp.id).limit(50)
     ).all()
@@ -143,12 +171,31 @@ def reminders(db: Session, now: datetime | None = None) -> dict[str, Any]:
                Interview.scheduled_at >= now, Interview.scheduled_at <= now + timedelta(hours=24))
         .order_by(Interview.scheduled_at)
     ).all()
+    new_jobs = db.execute(
+        select(Job, Company.name).join(Company, Company.id == Job.company_id)
+        .where(Job.status.in_(NEW_JOB_STATUSES))
+        .order_by(Job.match_score.desc().nulls_last(), Job.id.desc()).limit(LIST_LIMIT)
+    ).all()
+    pending = db.execute(
+        select(Job, Company.name).join(Company, Company.id == Job.company_id)
+        .where(Job.status.in_(APPLY_PENDING_STATUSES),
+               ~select(Application.id).where(Application.job_id == Job.id).exists())
+        .order_by(Job.match_score.desc().nulls_last(), Job.id.desc()).limit(LIST_LIMIT)
+    ).all()
+    apps = _latest_applications(db, {j.id for _, j, _ in due if j is not None})
+    followups = []
+    for f, job, company in due:
+        row = _job_row(job, company or "", apps.get(job.id)) if job is not None else {
+            "job_id": None, "job_title": None, "company": company, "applied": None}
+        followups.append({**row, "id": f.id, "title": f.title, "due_date": f.due_date.isoformat(),
+                          "late_days": (today - f.due_date).days})
     return {
-        "followups": [{"id": i, "title": t, "due_date": d.isoformat(),
-                       "late_days": (today - d).days, "job_id": j} for i, t, d, j in due],
+        "followups": followups,
         "interviews": [{"id": i, "job_id": j, "round": rn, "round_type": rt,
                         "scheduled_at": at.isoformat(), "meeting_link": link, "job_title": t,
                         "company": c,
                         "minutes_until": int((at - now).total_seconds() // 60)}
                        for i, j, rn, rt, at, link, t, c in soon if at is not None],
+        "new_jobs": [_job_row(job, company, None) for job, company in new_jobs],
+        "apply_pending": [_job_row(job, company, None) for job, company in pending],
     }

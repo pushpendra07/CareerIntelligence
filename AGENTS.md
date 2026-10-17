@@ -246,6 +246,11 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   `index.html`; never for `/api`), plus `pg_dump` 16 for backups. Services `db` + `app`; volumes
   `pgdata` and `appdata` (`/data/storage`, `/data/backups`). CI job `docker` runs
   `./install.sh --docker` and checks it. Career-Ops scanning is native-only.
+- **Notifications & reminders:** the bell (`components/Reminders.tsx`, data from `GET /reminders`
+  + `GET /reminder-events`; read state per browser) also sets the tab-title count. Scheduled
+  reminders: `services/reminder_service.py` (cron parser, scheduler thread started in `main.py`,
+  rules in app settings `reminders`, fired ones in `reminder_events`; macOS notifications via
+  `osascript` with arguments, never a built script), UI at Settings → Reminders.
 - **Welcome wizard** (`/welcome`, `features/setup/WelcomePage.tsx`, `services/setup_service.py`):
   `AppLayout` redirects there while `GET /setup` says `needs_setup` (no CVs, no jobs, not
   finished). A new install has **no** default target titles/locations — never seed one user's

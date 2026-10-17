@@ -159,12 +159,22 @@ Conventions:
   not scannable yet) or `error`. At most 50.
 - `POST /api/v1/setup/complete` — setup finished (or skipped); it doesn't open again.
 
+### scheduled reminders
+- `GET /api/v1/reminder-rules` → `{desktop, desktop_available, rules: [{id, kind (check_portals |
+  apply | follow_up | custom), enabled, label, cron, portals, message, only_when_needed, schedule,
+  next_run}]}`. `PUT /api/v1/reminder-rules` saves `{desktop, rules}` (cron: 5 fields, local time;
+  invalid → 422). `POST /api/v1/reminder-rules/{id}/test` fires one now.
+- `GET /api/v1/reminder-events?after=&limit=` — reminders that fired (newest first). The API checks
+  the schedules every 30 s (`services/reminder_service.py`).
+
 ### goals & reminders
 - `GET /api/v1/goals/week` — this week's goals (Mon–Sun): per goal `target, done, left,
   per_day, last_week, approximate`; `days_left`, `streak`, `all_met`. Targets:
   `PATCH /api/v1/settings/app {"goals": {"applications", "reviewed", "followups", "outreach"}}`
   (0–500, 0 = off).
-- `GET /api/v1/reminders` — follow-ups due today or late, interviews in the next 24 hours.
+- `GET /api/v1/reminders` — follow-ups due today or late, interviews in the next 24 hours, the best
+  new jobs (`new_jobs`) and shortlisted jobs not applied to (`apply_pending`); each with job,
+  company, location, score and `applied` / `applied_on` / `application_status`.
 
 ### reports
 - `GET /api/v1/reports` — the available reports (`key`, `title`, `description`)

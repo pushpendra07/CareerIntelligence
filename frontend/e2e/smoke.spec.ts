@@ -5,7 +5,7 @@ const PAGES = [
   "/", "/analytics", "/jobs", "/jobs/review", "/jobs/closed", "/jobs/new", "/companies",
   "/applications/board", "/applications", "/interviews", "/offers", "/recruiters", "/followups",
   "/reports", "/reports/jobs", "/reports/applications", "/profile", "/preferences", "/cvs",
-  "/questions", "/settings", "/settings/scoring", "/settings/data", "/settings/about",
+  "/questions", "/settings", "/settings/scoring", "/settings/reminders", "/settings/data", "/settings/about",
 ];
 
 /** Fails the test on uncaught errors and console errors (ignoring the browser's own noise). */
