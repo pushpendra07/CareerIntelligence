@@ -11,6 +11,8 @@ export const routes: RouteObject[] = [
   {
     path: "/",
     element: <AppLayout />,
+    // Shown while the first page's code loads (avoids React Router's missing-fallback warning).
+    hydrateFallbackElement: <div className="p-6 text-sm text-slate-400">Loading…</div>,
     children: [
       { index: true, ...page(() => import("../features/dashboard/DashboardPage"), (m) => m.DashboardPage) },
       { path: "jobs", ...page(() => import("../features/jobs/JobsPage"), (m) => m.JobsPage) },

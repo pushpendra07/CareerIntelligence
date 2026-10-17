@@ -31,8 +31,10 @@ FINISHED = [JobStatus.CLOSED.value, JobStatus.REJECTED.value, JobStatus.NOT_RELE
 
 
 def _url(job: Job) -> str | None:
-    links = (s.original_url for s in job.source_links if s.original_url)
-    return job.source_url or next(links, None)
+    """The job's link to read: the first one the app may fetch (a careers page or job board,
+    not LinkedIn / Indeed / Naukri), else the first link at all."""
+    links = [u for u in (job.source_url, *(s.original_url for s in job.source_links)) if u]
+    return next((u for u in links if not not_fetched_reason(u)), links[0] if links else None)
 
 
 def candidates_query(min_score: int = 0) -> Any:
@@ -92,8 +94,9 @@ def fetch_descriptions(
             else:
                 stats["failed"] += 1
                 stats.setdefault("failed_jobs", []).append({"id": job.id, "title": job.title})
-        if not text and url and not not_fetched_reason(url):
-            job.jd_status = "FETCH_FAILED"  # tried; the next run moves on to other jobs
+        if not text and url:
+            # Tried (or only on sites that can't be read automatically): the next run moves on.
+            job.jd_status = "PASTE_NEEDED" if not_fetched_reason(url) else "FETCH_FAILED"
         stats["checked"] += 1
         run.stats = dict(stats)
         db.commit()

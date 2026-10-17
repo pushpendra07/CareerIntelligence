@@ -15,8 +15,15 @@ function watchErrors(page: Page): string[] {
   page.on("console", (m) => {
     if (m.type() === "error" && !/favicon|Download the React DevTools/i.test(m.text())) errors.push(`console: ${m.text()}`);
   });
+  const calls = new Map<string, number>();
   page.on("response", (r) => {
-    if (r.url().includes("/api/") && r.status() >= 500) errors.push(`${r.status()} ${r.url()}`);
+    if (!r.url().includes("/api/")) return;
+    if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
+    // The same endpoint again and again means a render loop (an auth check once looped).
+    const key = r.url().split("?")[0];
+    const n = (calls.get(key) ?? 0) + 1;
+    calls.set(key, n);
+    if (n === 6) errors.push(`called 6+ times while loading: ${key}`);
   });
   return errors;
 }

@@ -229,7 +229,7 @@ def _apply_parsed(job: Job, parsed: ParsedJD) -> None:
         job.location = ", ".join(job.locations[:3])
     if job.original_jd.strip():
         job.jd_status = "OK"
-    elif job.jd_status != "FETCH_FAILED":  # keep "already tried": re-parsing doesn't change that
+    elif job.jd_status not in ("FETCH_FAILED", "PASTE_NEEDED"):  # keep "already tried"
         job.jd_status = "MISSING"
 
 
@@ -793,6 +793,7 @@ def set_status(
     if status == JobStatus.AWAITING_FEEDBACK:
         _plan_feedback_follow_up(db, job)
     _record_application(db, job, status)
+    _sync_application(db, job, status, note)
     if commit:
         db.commit()
     return job
@@ -815,6 +816,38 @@ def _record_application(db: Session, job: Job, status: JobStatus) -> None:
                                     "notes": AUTO_NOTE.replace(" The applied date is approximate"
                                                                " — edit it if you know it.", "")},
                        origin="auto", commit=False)
+
+
+# Job statuses the application follows (On hold / Not relevant are about the job, not the
+# application, so they don't change it).
+APPLICATION_FOLLOWS = {
+    JobStatus.APPLIED, JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW,
+    JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER, JobStatus.ACCEPTED, JobStatus.REJECTED,
+    JobStatus.WITHDRAWN, JobStatus.CLOSED,
+}
+# The search for this job is over: its open follow-ups are no longer needed.
+JOB_FINISHED = {JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.CLOSED, JobStatus.NOT_RELEVANT}
+
+
+def _sync_application(db: Session, job: Job, status: JobStatus, note: str | None) -> None:
+    """The job's status changed (job page, bulk action, import): its latest application and
+    open follow-ups follow, as they do when the application's status is changed."""
+    from app.models.application import Application, ApplicationEvent, FollowUp
+
+    if status in APPLICATION_FOLLOWS:
+        app = db.scalar(select(Application).where(Application.job_id == job.id)
+                        .order_by(Application.id.desc()).limit(1))
+        if app is not None and app.status != status.value:
+            before = app.status
+            app.status = status.value
+            db.add(ApplicationEvent(application_id=app.id, event_type="STATUS_CHANGED",
+                                    from_status=before, to_status=status.value,
+                                    note=note or "Changed with the job's status"))
+    if status in JOB_FINISHED:
+        now = datetime.now(UTC)
+        for f in db.scalars(select(FollowUp).where(FollowUp.job_id == job.id,
+                                                   FollowUp.completed.is_(False))):
+            f.completed, f.completed_at = True, now
 
 
 FEEDBACK_FOLLOW_UP_DAYS = 3

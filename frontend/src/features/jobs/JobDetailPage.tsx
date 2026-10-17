@@ -235,7 +235,7 @@ export function JobDetailPage() {
       <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <Card title="Does it fit you?">
             {j.match && j.match.confidence !== "HIGH" && (
               <p className="mb-3 rounded bg-amber-50 p-2 text-xs text-amber-800">
@@ -247,14 +247,16 @@ export function JobDetailPage() {
             <div className="mt-3"><ScoreDetails job={j} /></div>
           </Card>
           <EmailDraft key={j.id} job={j} />
-          <Card title="Job description" actions={j.jd_status !== "OK" ? (
+          <Card title="Job description" actions={j.jd_status !== "OK" && j.jd_status !== "PASTE_NEEDED" ? (
             <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending} title="Download the description from the posting">
               {fetchJd.isPending ? "Fetching…" : "Fetch description"}</button>) : undefined}>
             {fetchJd.error && <ErrorBox error={new Error(errorMessage(fetchJd.error))} />}
-            <JobDescription text={j.original_jd} empty="No description saved yet. Fetch it from the posting, or click Edit above to paste it." />
+            <JobDescription text={j.original_jd} empty={j.jd_status === "PASTE_NEEDED"
+              ? "This job is only on LinkedIn, Indeed or Naukri, which the app doesn't read automatically. Open the posting, copy the description, then click Edit above and paste it — the score becomes reliable."
+              : "No description saved yet. Fetch it from the posting, or click Edit above to paste it."} />
           </Card>
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div id="follow-ups" className="scroll-mt-16">
             <Card title="Follow-ups">
               {followups.data?.items.length ? (

@@ -86,7 +86,7 @@ export function CompanyDetailPage() {
       {scan.error && <ErrorBox error={new Error(errorMessage(scan.error))} />}
       {check.data && <div className="rounded bg-slate-50 p-2 text-xs">{Object.entries(check.data.results).map(([k, v]) => <div key={k}>{k}: {v}</div>)}</div>}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <CompanyJobs companyId={co.id} companyName={co.name} total={co.job_count ?? 0} open={co.open_job_count ?? 0}
             onScan={() => scan.mutate()} scanning={scan.isPending} />
           <Card title="Overview">
@@ -105,7 +105,7 @@ export function CompanyDetailPage() {
           </Card>
           <Card title="Verification evidence">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
+              <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100">
                 <thead><tr><th className="th">Field</th><th className="th">Value</th><th className="th">Source</th><th className="th">Status</th></tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {co.sources.map((s) => (
@@ -117,12 +117,12 @@ export function CompanyDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
             <div className="mt-4 border-t border-slate-100 pt-3"><EvidenceForm companyId={co.id} onDone={refresh} /></div>
           </Card>
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card title="Recruiters">
             {contacts.data?.items.length ? contacts.data.items.map((r) => <div key={r.id} className="text-sm">{r.name} <span className="text-xs text-slate-500">{r.job_title}</span> <StatusBadge value={r.status} /></div>)
               : <p className="text-sm text-slate-500">None</p>}

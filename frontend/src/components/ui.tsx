@@ -9,9 +9,9 @@ export function Card({ title, actions, children, className = "", id }: {
   return (
     <section id={id} className={`card ${className}`}>
       {(title || actions) && (
-        <div className="mb-3 flex items-center justify-between gap-2">
-          {title ? <h2>{title}</h2> : <span />}
-          {actions && <div className="flex gap-2">{actions}</div>}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          {title ? <h2 className="min-w-0">{title}</h2> : <span />}
+          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       )}
       {children}
@@ -304,11 +304,11 @@ export function BackButton({ fallback, label = "Back" }: { fallback: string; lab
 
 export function KeyValue({ items }: { items: [string, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-x-6 gap-y-2">
+    <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(17rem,100%),1fr))] gap-x-6 gap-y-2">
       {items.map(([k, v]) => (
         <div key={k} className="flex gap-2 text-sm">
           <dt className="w-32 shrink-0 text-slate-500">{k}</dt>
-          <dd className="min-w-0 break-words">{v ?? "—"}</dd>
+          <dd className="min-w-0 [overflow-wrap:anywhere]">{v ?? "—"}</dd>
         </div>
       ))}
     </dl>

@@ -6,7 +6,10 @@ export type AuthStatus = { required: boolean; authenticated: boolean };
 export const AUTH_KEY = ["auth", "status"];
 
 export function useAuthStatus() {
-  return useQuery({ queryKey: AUTH_KEY, queryFn: () => api.get<AuthStatus>("/auth/status"), staleTime: Infinity, retry: false });
+  // Fetched once; refetched only when an API call answers 401 (see AuthGate). Never on mount or
+  // focus: the gate re-mounting the app must not trigger another check (that looped).
+  return useQuery({ queryKey: AUTH_KEY, queryFn: () => api.get<AuthStatus>("/auth/status"), staleTime: Infinity,
+    retry: false, refetchOnMount: false, refetchOnWindowFocus: false, refetchOnReconnect: false });
 }
 
 function Login() {
@@ -41,7 +44,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     window.addEventListener("auth-required", again);
     return () => window.removeEventListener("auth-required", again);
   }, [qc]);
-  if (status.isLoading) return null;
+  // Only the very first check holds the page back; if the check fails (older API), show the app.
+  if (status.isPending && status.fetchStatus === "fetching") return null;
   if (status.data?.required && !status.data.authenticated) return <Login />;
   return <>{children}</>;
 }

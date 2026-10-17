@@ -69,7 +69,7 @@ export function RecruitersPage() {
         </div>
         {list.isLoading && <Spinner />}
         {list.data && (!list.data.items.length ? <Empty>No contacts yet. Add one above, or click <b>Find contacts in jobs</b> to pick up emails and phone numbers written in your jobs.</Empty> : (
-          <table className="min-w-full divide-y divide-slate-100">
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100">
             <thead><tr><th className="th">Name</th><th className="th">Company</th><th className="th">Contact</th><th className="th">Jobs</th><th className="th">Status</th><th className="th">Last contacted</th><th className="th">Next follow-up</th></tr></thead>
             <tbody className="divide-y divide-slate-50">
               {list.data.items.map((c) => (
@@ -96,7 +96,7 @@ export function RecruitersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ))}
         {list.data && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>

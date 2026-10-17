@@ -12,6 +12,14 @@ describe("AuthGate", () => {
     expect(await screen.findByText("The app")).toBeInTheDocument();
   });
 
+  it("shows the app, and checks only once, when the status check fails", async () => {
+    const api = mockApi({}); // every call answers 404
+    renderAt(<AuthGate><p>The app</p></AuthGate>);
+    expect(await screen.findByText("The app")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(api.calls.filter((c) => c.path === "/auth/status")).toHaveLength(1);
+  });
+
   it("asks for the password, shows a wrong one, and lets you in", async () => {
     let loggedIn = false;
     const api = mockApi({

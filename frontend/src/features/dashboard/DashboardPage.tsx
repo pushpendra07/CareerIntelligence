@@ -132,13 +132,13 @@ export function DashboardPage() {
         </div>
       </section>
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <Card title="Today's priorities">
             <TodaysPriorities items={dash.data!.priorities} />
           </Card>
           <BestMatches />
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <WeeklyGoals />
           <ComingUp />
           <JobSources newThisWeek={s.new_this_week ?? 0} />

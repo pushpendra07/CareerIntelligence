@@ -42,7 +42,7 @@ export function CVsPage() {
       {list.data && (!list.data.items.length ? <Empty>No CVs yet.</Empty> : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.data.items.map((cv) => (
-            <Card key={cv.id} title={<Link className="hover:text-indigo-700" to={`/cvs/${cv.id}`}>{cv.name}</Link>}
+            <Card key={cv.id} title={<Link className="[overflow-wrap:anywhere] hover:text-indigo-700" to={`/cvs/${cv.id}`}>{cv.name}</Link>}
               actions={<>{cv.is_active && <Badge tone="green">active</Badge>}{cv.is_archived && <Badge>archived</Badge>}</>}>
               <p className="text-sm text-slate-600">{cv.target_role ?? "No target role"} · {cv.versions.length} version(s) · {cv.total_experience_years ?? "?"} yrs · updated {formatDate(cv.versions.at(-1)?.created_at)}</p>
               <div className="mt-2"><Chips items={cv.top_skills} tone="indigo" /></div>

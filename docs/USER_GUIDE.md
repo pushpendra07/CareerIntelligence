@@ -219,6 +219,9 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   recruiter addresses at the company (the AI tools are told not to guess addresses);
   **Polish with ChatGPT · Gemini · Claude** asks them to tighten your edited draft. Nothing is
   sent from the app. Known recruiters for the company appear as suggestions in *To*.
+- **Status in one place:** changing a job's status (job page, bulk action) also moves its
+  application (Interview, Offer, Rejected…), and a rejected / closed / not-relevant / withdrawn
+  job's open follow-ups are closed — the same as changing the application.
 - **Interview done, HR not replying:** on a job in *Interview*, click **Interview done – no
   reply** (or pick it in the Status menu or on the application). The job stays in the
   **Interview** tab, a reminder *Ask for interview feedback* is added for 3 days later, and the
@@ -358,7 +361,9 @@ top line counts open applications and follow-ups due; search finds a job or comp
   first: job-board APIs (Greenhouse, Lever, SmartRecruiters, Workday), the structured job data
   many career sites publish, and Career-Ops' fetcher when it's set up. LinkedIn, Indeed,
   Glassdoor and Naukri are never read automatically (their terms forbid it) — open those and
-  paste the description. Jobs whose page has no description are marked and skipped next time.
+  paste the description. When a job has several links (e.g. LinkedIn and the company's careers
+  page), the readable one is used. Jobs whose page has no description, and jobs only on
+  LinkedIn / Indeed / Naukri, are marked and skipped next time; their job page says to paste it.
   Scores are recalculated as soon as a description arrives.
 - **Insights** (tab next to Today): every chart comes with a one-line takeaway.
   - *How your search is going* — response and interview rate, the application funnel, and

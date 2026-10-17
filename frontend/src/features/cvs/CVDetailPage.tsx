@@ -51,7 +51,7 @@ export function CVDetailPage() {
       {importProfile.isSuccess && <p className="text-sm text-emerald-700">Profile updated. <Link className="link" to="/profile">Review it</Link> — scores are now stale until re-analyzed.</p>}
       {mutationError && <ErrorBox error={new Error(errorMessage(mutationError))} />}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           {p && (
             <Card title="Parsed profile">
               <KeyValue items={[

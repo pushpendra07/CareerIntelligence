@@ -30,7 +30,7 @@ export function ApplicationsPage() {
         {list.isLoading && <Spinner />}
         {list.error && <ErrorBox error={list.error} />}
         {list.data && (!list.data.items.length ? <Empty>No applications yet. Use "Apply" on a job.</Empty> : (
-          <table className="min-w-full divide-y divide-slate-100">
+          <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100">
             <thead><tr><th className="th">Job</th><th className="th">Applied</th><th className="th">Method</th><th className="th">CV</th><th className="th">Score</th><th className="th">Follow-up</th><th className="th">Status</th></tr></thead>
             <tbody className="divide-y divide-slate-50">
               {list.data.items.map((a) => (
@@ -45,7 +45,7 @@ export function ApplicationsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ))}
         {list.data && <Pagination page={page} size={PAGE_SIZE} total={list.data.total} onPage={setPage} />}
       </Card>

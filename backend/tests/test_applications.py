@@ -199,3 +199,18 @@ def test_applied_jobs_always_have_an_application(client: TestClient, db: Session
     other = client.post("/api/v1/jobs", json=new).json()["job"]
     client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "REJECTED"})
     assert client.get("/api/v1/applications", params={"job_id": other["id"]}).json()["total"] == 0
+
+
+def test_job_status_changes_carry_to_the_application(client: TestClient) -> None:
+    job, _ = setup(client)
+    app = client.post("/api/v1/applications", json={"job_id": job["id"]}).json()
+    assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 1
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "INTERVIEW"})
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "INTERVIEW"
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "REJECTED"})
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "REJECTED"
+    # The search for this job is over: its reminders are closed.
+    assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 0
+    # On hold is about the job, not the application.
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "ON_HOLD"})
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "REJECTED"

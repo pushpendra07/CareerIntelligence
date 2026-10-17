@@ -66,7 +66,21 @@ def test_bulk_fetch_best_first_and_moves_on(db: Session, settings: Settings) -> 
     freshness.refresh(db)
     db.refresh(fails)
     assert fails.jd_status == "FETCH_FAILED"
-    assert linkedin.jd_status == "MISSING"  # never fetched; the user pastes it
+    db.refresh(linkedin)
+    assert linkedin.jd_status == "PASTE_NEEDED"  # never fetched; the user pastes it
     assert not any("linkedin" in url for _, url in http.calls)
     status = description_service.status(db)
-    assert status["missing"] == 1 and status["last_run"]["stats"]["fetched"] == 1
+    assert status["missing"] == 0 and status["last_run"]["stats"]["fetched"] == 1
+
+
+def test_uses_a_readable_link_when_the_first_is_linkedin(db: Session, settings: Settings) -> None:
+    job = _job(db, "Magento Lead", "https://www.linkedin.com/jobs/view/123")
+    same = _job(db, "Magento Lead", GH_JOB)  # the same job, also on the company's board
+    assert same.id == job.id
+    db.commit()
+    http = FakeHttp({GH_API: {"content": LONG}})
+    no_career_ops = settings.model_copy(update={"career_ops_path": None})
+    run = description_service.start(db, wait=True, http=http, settings=no_career_ops)
+    assert (run.stats["fetched"], run.stats["not_allowed"]) == (1, 0)
+    db.refresh(job)
+    assert job.jd_status == "OK"
