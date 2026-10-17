@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { Icon } from "../components/icons";
 import { useBrowserReminders } from "../components/Reminders";
+import { LogoutButton } from "../components/AuthGate";
 import { prefs } from "../utils/storage";
 import { useTheme, type Theme } from "../utils/theme";
 
@@ -150,6 +151,7 @@ export function AppLayout() {
           </button>
           {hidden && <span className="hidden text-sm font-semibold text-slate-900 md:inline">{section?.label}</span>}
           <div className="min-w-0 flex-1"><GlobalSearch /></div>
+          <LogoutButton />
           <ThemeSwitch />
         </header>
         <main className={`mx-auto w-full flex-1 px-4 py-6 md:px-6 ${hidden ? "" : "max-w-[1440px]"}`}>

@@ -28,6 +28,9 @@ pgdata/
 *.docx
 *.doc
 
+# Automatic backups (backend/backups/: database dump + data + CVs)
+backups/
+
 # Data exports and imports (downloads from the app, sheet/CSV/JSON dumps)
 career-data.json
 exports/
@@ -56,6 +59,8 @@ venv/
 htmlcov/
 node_modules/
 dist/
+test-results/
+playwright-report/
 *.tsbuildinfo
 .vite/
 

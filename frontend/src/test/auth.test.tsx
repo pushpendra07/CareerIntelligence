@@ -1,0 +1,35 @@
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthGate } from "../components/AuthGate";
+import { mockApi, renderAt } from "./utils";
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("AuthGate", () => {
+  it("shows the app when no password is set", async () => {
+    mockApi({ "GET /auth/status": { required: false, authenticated: true } });
+    renderAt(<AuthGate><p>The app</p></AuthGate>);
+    expect(await screen.findByText("The app")).toBeInTheDocument();
+  });
+
+  it("asks for the password, shows a wrong one, and lets you in", async () => {
+    let loggedIn = false;
+    const api = mockApi({
+      "GET /auth/status": () => ({ required: true, authenticated: loggedIn }),
+      "POST /auth/login": (_u: URL, init?: RequestInit) => {
+        const ok = JSON.parse(String(init?.body)).password === "pw";
+        loggedIn = ok;
+        return ok ? { authenticated: true } : new Response(JSON.stringify({ error: { code: "unauthorized", message: "Wrong password" } }), { status: 401, headers: { "content-type": "application/json" } });
+      },
+    });
+    renderAt(<AuthGate><p>The app</p></AuthGate>);
+    const input = await screen.findByLabelText("Password");
+    fireEvent.change(input, { target: { value: "nope" } });
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Wrong password");
+    fireEvent.change(input, { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    expect(await screen.findByText("The app")).toBeInTheDocument();
+    await waitFor(() => expect(api.calls.filter((c) => c.path === "/auth/login")).toHaveLength(2));
+  });
+});

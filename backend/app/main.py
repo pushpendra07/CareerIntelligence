@@ -6,8 +6,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
+from app.core import auth
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging, request_id_var
@@ -26,9 +28,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         stops = []
         if settings.environment != "test":
             from app.scanner.runner import start_scheduler
+            from app.services.backup_service import start_scheduler as start_backups
             from app.services.freshness import start_refresher
 
-            stops = [start_scheduler(), start_refresher()]
+            stops = [start_scheduler(), start_refresher(), start_backups(settings)]
         yield
         for stop in stops:
             stop.set()
@@ -41,6 +44,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "X-Request-ID"],
     )
+
+    @app.middleware("http")
+    async def require_login(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # Optional password (APP_PASSWORD). Uses the settings the app was created with, or the
+        # test override, so tests can switch it on.
+        active = app.dependency_overrides.get(get_settings, lambda: settings)()
+        if (auth.required(active) and not auth.is_open(request.url.path)
+                and not auth.valid_token(active, request.cookies.get(auth.COOKIE))):
+            return JSONResponse(
+                {"error": {"code": "unauthorized", "message": "Log in first", "details": None}},
+                status_code=401)
+        return await call_next(request)
 
     @app.middleware("http")
     async def request_context(

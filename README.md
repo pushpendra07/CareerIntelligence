@@ -144,6 +144,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Charts**: jobs by score, source, location and work model; top companies;
   most-requested skills; **skill gaps**.
 - **Analytics**: where scores are lost, and interview rate by score band.
+- **Reliability**: automatic daily backups (database + data + CVs, with a restore script),
+  optional login password, GitHub Actions CI and a Playwright smoke test.
 - **Reports**: ten reports (overview, jobs, applications, interviews, offers, companies,
   sources, follow-ups, skills, scans) for any date range — trend, stacked and donut charts,
   change vs the previous period, sortable detail tables, CSV download and print to PDF.
@@ -434,6 +436,8 @@ Never commit it.
 | `AI_PROVIDER` | `none` | `none`, `anthropic`, `openai`, `gemini` or `ollama` |
 | `AI_MODEL` / `AI_API_KEY` / `AI_BASE_URL` | — | Optional AI settings (e.g. a local Ollama at `http://localhost:11434/v1`) |
 | `STORAGE_PATH` | `storage` | Where original CV files are stored |
+| `BACKUP_PATH` | `backups` | Automatic backups (Settings → Backup & import); restore with `scripts/restore-backup.sh` |
+| `APP_PASSWORD` | — | Optional login password (empty = no login) |
 | `MAX_UPLOAD_BYTES` | `10485760` | Upload size limit |
 | `CORS_ORIGINS` | `localhost:5173` | Allowed browser origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Structured logging |

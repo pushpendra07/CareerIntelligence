@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     ai_timeout_seconds: int = 60
 
     storage_path: Path = Path("storage")
+    # Automatic backups (zip files: database dump, JSON copy, uploaded CVs). Git-ignored.
+    backup_path: Path = Path("backups")
+    # Optional: require this password to use the app (empty = no login).
+    app_password: SecretStr | None = None
     max_upload_bytes: int = 10 * 1024 * 1024
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
@@ -51,7 +55,7 @@ class Settings(BaseSettings):
     @field_validator(
         "career_ops_path", "career_ops_data_path", "career_ops_url", "career_ops_api_key",
         "ai_api_key", "ai_model", "ai_base_url", "redis_url", "google_service_account_file",
-        mode="before",
+        "app_password", mode="before",
     )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:

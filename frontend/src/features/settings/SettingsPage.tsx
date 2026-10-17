@@ -6,6 +6,7 @@ import { Card, ErrorBox, Field, KeyValue, Spinner, PageIntro } from "../../compo
 import { formatDateTime, humanize } from "../../utils/format";
 import { ScannerSettings } from "../scanner/ScannerSettings";
 import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
+import { BackupSettings } from "./BackupSettings";
 
 interface ScoringConfig {
   weights: Record<string, number>;
@@ -162,7 +163,8 @@ function DataSettings() {
   const result = imp.data as { created?: number; merged?: number; skipped?: number; errors?: unknown[] } | undefined;
   return (
     <div className="space-y-4">
-      <Card title="Back up your data">
+      <BackupSettings />
+      <Card title="Download your data">
         <p className="mb-3 text-sm text-slate-600">Download everything in one file to keep a copy, or one list as a spreadsheet (CSV).</p>
         <div className="flex flex-wrap gap-2 text-sm">
           <a className="btn-primary" href="/api/v1/export/all">Download full backup (JSON)</a>

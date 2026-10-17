@@ -76,6 +76,8 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `AI_PROVIDER` | `none` | Optional AI: `none`, `openai`, `anthropic`, `gemini`, `ollama` |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | — | Only when an AI provider is set (costs tokens) |
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
+| `BACKUP_PATH` | `backups` | Automatic backup zips (database dump, data.json, CVs; git-ignored). Restore: `scripts/restore-backup.sh` |
+| `APP_PASSWORD` | — | Optional: require this password to open the app (login cookie, 30 days) |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | `secrets/google-service-account.json` if present | Google service-account key for importing private Google Sheets |
 | `CORS_ORIGINS` | 5173 origins | Allowed UI origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Logging |
@@ -298,6 +300,10 @@ search for jobs, follow `.agent/workflows/find-jobs.md` and deliver a ranked lis
 cd backend  && uv run pytest -q && uv run ruff check . && uv run mypy app
 cd frontend && npx tsc -b && npx vitest run && npm run build
 ```
+
+End-to-end smoke test (read-only, against the running app, uses installed Chrome):
+`cd frontend && npm run e2e`. GitHub Actions (`.github/workflows/ci.yml`) runs all of the
+above on every push and pull request, the smoke test against a fresh database.
 
 Backend tests use a separate `career_intelligence_test` database and never read `backend/.env`.
 Network is never used in tests: inject fakes (see `tests/test_scanner.py` `FakeHttp`).

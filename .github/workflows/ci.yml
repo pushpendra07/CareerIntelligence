@@ -1,0 +1,127 @@
+# Runs the same checks as AGENTS.md "Checks" on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest, ruff, mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: career_intelligence_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/career_intelligence_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run mypy app
+      - run: uv run pytest -q
+
+  frontend:
+    name: Frontend (types, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npx vitest run
+      - run: npm run build
+
+  e2e:
+    name: End-to-end smoke test (Playwright, Chrome)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: career_intelligence
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/career_intelligence
+      VITE_API_TARGET: http://127.0.0.1:8010
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Start the API
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          uv run alembic upgrade head
+          nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8010 > ../api.log 2>&1 &
+          for i in $(seq 30); do curl -sf http://127.0.0.1:8010/api/v1/health && break; sleep 1; done
+      - name: Add a sample job
+        run: |
+          curl -sf -X POST http://127.0.0.1:8010/api/v1/jobs -H 'Content-Type: application/json' \
+            -d '{"title":"Senior Magento Developer","company":"Example Commerce","location":"Pune","work_model":"HYBRID","jd":"Requirements\n- 8+ years PHP, Magento 2, MySQL"}'
+      - name: Build and serve the UI
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          nohup npx vite preview --host 127.0.0.1 --port 4173 > ../ui.log 2>&1 &
+          for i in $(seq 30); do curl -sf http://127.0.0.1:4173 > /dev/null && break; sleep 1; done
+      - name: Smoke test
+        working-directory: frontend
+        run: npm run e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:4173
+      - name: Logs and traces on failure
+        if: failure()
+        run: tail -100 api.log ui.log || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/

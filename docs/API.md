@@ -142,6 +142,14 @@ Conventions:
   `{jobs_checked, jobs_with_new_contacts, created, updated, linked}`. Recruiters now have
   `phone` and `jobs` (`[{id, title, status}]`).
 
+### backups & login
+- `GET /api/v1/backups` — settings, folder, pg_dump available, last / next, backups (newest
+  first). `POST /api/v1/backups` — back up now. `GET /api/v1/backups/{name}` — download a zip.
+  Schedule: `PATCH /api/v1/settings/app {"backups": {"enabled", "every_hours", "keep"}}`.
+- `GET /api/v1/auth/status` → `{required, authenticated}`; `POST /api/v1/auth/login
+  {"password"}` sets the session cookie; `POST /api/v1/auth/logout`. With `APP_PASSWORD` set,
+  every other endpoint (except `/health`) answers 401 until logged in.
+
 ### goals & reminders
 - `GET /api/v1/goals/week` — this week's goals (Mon–Sun): per goal `target, done, left,
   per_day, last_week, approximate`; `days_left`, `streak`, `all_met`. Targets:

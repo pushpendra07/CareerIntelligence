@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Query, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from app.ai.features import suggest_interview_questions, summarize_job
@@ -11,7 +11,7 @@ from app.core.errors import AppError, DomainValidationError
 from app.matching.config import ENGINE_VERSION
 from app.models.app_settings import AppSettings as AppSettingsRow
 from app.scanner.filters import DEFAULT_SCANNER_SETTINGS, validate_scanner_settings
-from app.services import data_io, goals_service
+from app.services import backup_service, data_io, goals_service
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
 
@@ -69,6 +69,7 @@ def ai_summary(db: DB, settings: AppSettings, job_id: int) -> dict[str, Any]:
 DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "scanner": DEFAULT_SCANNER_SETTINGS,
     "goals": goals_service.DEFAULT_GOALS,  # weekly targets on Today (0 = off)
+    "backups": backup_service.DEFAULTS,  # automatic backups (Settings -> Backup & import)
 }
 
 
@@ -101,9 +102,29 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         merged["scanner"] = validate_scanner_settings(merged["scanner"])
     if "goals" in body:
         merged["goals"] = goals_service.validate_goals(merged["goals"])
+    if "backups" in body:
+        merged["backups"] = backup_service.validate_settings(merged["backups"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}
+
+
+@router.get("/backups")
+def backups(db: DB, settings: AppSettings) -> dict[str, Any]:
+    """Backup settings, folder, whether pg_dump is available, and the backups (newest first)."""
+    return backup_service.status(db, settings)
+
+
+@router.post("/backups", status_code=201)
+def backup_now(db: DB, settings: AppSettings) -> dict[str, Any]:
+    """Make a backup now (database dump + data.json + uploaded files, zipped)."""
+    return backup_service.create_backup(db, settings)
+
+
+@router.get("/backups/{name}")
+def download_backup(settings: AppSettings, name: str) -> FileResponse:
+    path = backup_service.backup_file(settings, name)
+    return FileResponse(path, media_type="application/zip", filename=path.name)
 
 
 @router.get("/goals/week")

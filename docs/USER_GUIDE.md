@@ -415,10 +415,21 @@ when their job board is known (**Find job boards**).
 
 ## 13. Backups, exports and starting over
 
-- **Export**: Settings → Backup & import → Back up your data → jobs, companies, applications… as CSV/JSON,
-  or **export everything**.
-- Your data lives in `backend/.devdb/` (database) and `storage/` (CV files). Back up both
-  folders while the app is stopped (`./stop.sh`).
+- **Automatic backups** (Settings → Backup & import): every day by default, while the app runs,
+  a zip lands in `backend/backups/` with the **whole database** (`database.dump`), a readable
+  copy of your data (`data.json`) and your **uploaded CVs**. The newest 14 are kept; change how
+  often (6 hours … a week) and how many to keep, or click **Back up now**. Each backup can be
+  downloaded from the list. The zips hold personal data: they're git-ignored and readable only
+  by you — copy them somewhere safe (another disk, cloud drive) now and then.
+- **Restore a backup** (replaces all current data): `./stop.sh --keep-db`, then
+  `./scripts/restore-backup.sh backend/backups/career-backup-….zip` and type `restore`; then
+  `./start.sh`.
+- **Export**: Settings → Backup & import → Download your data → jobs, companies,
+  applications… as CSV/JSON, or everything as one JSON file.
+- Your data lives in `backend/.devdb/` (database) and `storage/` (CV files).
+- **Password (optional)**: set `APP_PASSWORD=…` in `backend/.env` and restart — the app then
+  asks for it (stays logged in 30 days per browser; **Log out** at the top). Changing it logs
+  every browser out. Leave it empty for no login.
 - **Start completely fresh** (deletes all your data!): `./stop.sh`, then delete
   `backend/.devdb/` and `storage/`, then `./start.sh`. The app creates an empty database.
   Export first if you may want anything back.

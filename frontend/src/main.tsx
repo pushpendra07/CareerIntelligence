@@ -5,13 +5,14 @@ import { RouterProvider } from "react-router-dom";
 import "./index.css";
 import { router } from "./router";
 import { createQueryClient } from "./api/queryClient";
+import { AuthGate } from "./components/AuthGate";
 
 const queryClient = createQueryClient();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthGate><RouterProvider router={router} /></AuthGate>
     </QueryClientProvider>
   </StrictMode>,
 );
