@@ -145,10 +145,10 @@ def test_profile_import_merge_and_manual_edits(client: TestClient, db: Session) 
 
 def test_preferences_defaults_and_validation(client: TestClient) -> None:
     prefs = client.get("/api/v1/preferences").json()
-    assert "Technical Lead" in prefs["target_titles"]
+    # A new install starts empty: nobody else's titles or cities (the Welcome wizard asks).
+    assert prefs["target_titles"] == [] and prefs["preferred_locations"] == []
     assert prefs["include_architect_roles"] is False
     assert not any("Architect" in t for t in prefs["effective_titles"])
-    assert "Jodhpur" in prefs["preferred_locations"]
 
     r = client.patch("/api/v1/preferences", json={"include_architect_roles": True})
     assert "Adobe Commerce Architect" in r.json()["effective_titles"]

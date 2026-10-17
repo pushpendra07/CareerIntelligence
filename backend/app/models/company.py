@@ -109,6 +109,11 @@ class Company(TimestampMixin, Base):
         back_populates="company", cascade="all, delete-orphan", order_by="CompanyFieldSource.id"
     )
 
+    @property
+    def scan_excluded(self) -> bool:
+        """Left out of "Search every company" scans (unticked Job search on the company page)."""
+        return bool((self.attributes or {}).get("scan_excluded"))
+
 
 class CompanyFieldSource(Base):
     """Provenance for one field value: where it came from and how well it is verified."""

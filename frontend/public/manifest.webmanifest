@@ -1,0 +1,10 @@
+{
+  "name": "Career Intelligence",
+  "short_name": "Career",
+  "description": "Your job search, in one place: jobs, scores, applications, interviews and offers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#4f46e5",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

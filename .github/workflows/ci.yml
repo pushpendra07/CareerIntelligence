@@ -125,3 +125,31 @@ jobs:
         with:
           name: playwright-traces
           path: frontend/test-results/
+
+  docker:
+    name: Docker install (./install.sh --docker)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and start with one command
+        run: ./install.sh --docker
+      - name: A fresh install opens the Welcome setup, UI and API on one port
+        run: |
+          set -e
+          curl -fs http://127.0.0.1:8010/ | grep -q '<div id="root">'
+          curl -fs http://127.0.0.1:8010/jobs/1 | grep -q '<div id="root">'
+          curl -fs http://127.0.0.1:8010/api/v1/setup | grep -q '"needs_setup":true'
+          curl -fs http://127.0.0.1:8010/api/v1/preferences | grep -q '"target_titles":\[\]'
+          curl -fs -X POST http://127.0.0.1:8010/api/v1/backups | grep -q '"database_dump":true'
+          curl -fsI http://127.0.0.1:8010/ | grep -qi 'x-frame-options: DENY'
+          test "$(stat -c %a .env)" = 600
+      - name: Data survives a restart
+        run: |
+          docker compose restart app
+          for i in $(seq 60); do curl -fs http://127.0.0.1:8010/api/v1/health >/dev/null && break; sleep 2; done
+          curl -fs http://127.0.0.1:8010/api/v1/backups | grep -q 'career-backup-'
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail 200

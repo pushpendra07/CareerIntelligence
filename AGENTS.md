@@ -32,6 +32,7 @@ Everything runs locally (no Docker needed): FastAPI + PostgreSQL backend, React 
 ## Run it
 
 ```bash
+./install.sh          # buyers / end users: Docker image (UI + API on 8010) + PostgreSQL, or --native
 ./start.sh            # dev DB + migrations + API (8010) + UI (5173), opens Chrome
 ./start.sh --no-open  # same, no browser
 ./stop.sh             # stop API, UI and dev DB
@@ -78,6 +79,8 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
 | `BACKUP_PATH` | `backups` | Automatic backup zips (database dump, data.json, CVs; git-ignored). Restore: `scripts/restore-backup.sh` |
 | `APP_PASSWORD` | — | Optional: require this password to open the app (login cookie, 30 days) |
+| `STATIC_DIR` | — | Built UI (`frontend/dist`) to serve from the API on one port (the Docker image sets it) |
+| `POSTGRES_PASSWORD` / `APP_PORT` / `APP_BIND` | — / `8010` / `127.0.0.1` | Docker only (`docker-compose.yml`; `./install.sh` writes a random password) |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | `secrets/google-service-account.json` if present | Google service-account key for importing private Google Sheets |
 | `CORS_ORIGINS` | 5173 origins | Allowed UI origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Logging |
@@ -235,6 +238,18 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
       --research-csv /path/master.csv --myjob-db /path/portal.sqlite --career-ops ../career-ops
   ```
 - **Export:** Settings → Backup & import → Back up your data (`GET /api/v1/export/{entity}`, `/export/all`).
+
+## Packaging and first run
+
+- **Docker** (`Dockerfile`, `docker-compose.yml`, `./install.sh`): one image — the UI is built in
+  a Node stage and served by FastAPI (`STATIC_DIR`, `_serve_ui` in `main.py`: real files, else
+  `index.html`; never for `/api`), plus `pg_dump` 16 for backups. Services `db` + `app`; volumes
+  `pgdata` and `appdata` (`/data/storage`, `/data/backups`). CI job `docker` runs
+  `./install.sh --docker` and checks it. Career-Ops scanning is native-only.
+- **Welcome wizard** (`/welcome`, `features/setup/WelcomePage.tsx`, `services/setup_service.py`):
+  `AppLayout` redirects there while `GET /setup` says `needs_setup` (no CVs, no jobs, not
+  finished). A new install has **no** default target titles/locations — never seed one user's
+  preferences for everyone.
 
 ## Day-to-day flow
 
@@ -407,7 +422,9 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
   `.agent/workflows/add-migration.md`.
 - Line length 100 (ruff), mypy strict-ish: keep it clean.
 - Frontend: TanStack Query for data (`queryKey` arrays), `api` client from `api/client.ts`,
-  shared components from `components/ui.tsx`, Tailwind utility classes. No browser
+  shared components from `components/ui.tsx`, Tailwind utility classes. Feedback after an action:
+  `meta: { success: "…" }` / `meta: { toastError: true }` on a mutation (toast, `components/Toaster.tsx`).
+  Phone layouts: `usePhone()` (`utils/media.ts`). Global shortcuts and ⌘K: `components/CommandPalette.tsx`. No browser
   `alert/confirm/prompt` — use inline confirmations (see `features/jobs/DeleteJobButton.tsx`).
 - Every feature gets tests: pytest for API/services, Vitest for UI behavior.
 - Update `README.md` / `docs/API.md` when user-visible behavior or endpoints change.

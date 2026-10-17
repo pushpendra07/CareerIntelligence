@@ -150,6 +150,15 @@ Conventions:
   {"password"}` sets the session cookie; `POST /api/v1/auth/logout`. With `APP_PASSWORD` set,
   every other endpoint (except `/health`) answers 401 until logged in.
 
+### setup (first run)
+- `GET /api/v1/setup` → `{needs_setup, completed_at, steps: {cv, targets, companies, jobs},
+  counts}`. `needs_setup` is true for a fresh install (no CVs, no jobs, setup not finished);
+  the UI then opens `/welcome`.
+- `POST /api/v1/setup/companies {"companies": [{"url", "name"?}]}` — save each careers page /
+  job board as a company with Job search on; per URL: `company_id, name, created, board` (null =
+  not scannable yet) or `error`. At most 50.
+- `POST /api/v1/setup/complete` — setup finished (or skipped); it doesn't open again.
+
 ### goals & reminders
 - `GET /api/v1/goals/week` — this week's goals (Mon–Sun): per goal `target, done, left,
   per_day, last_week, approximate`; `days_left`, `streak`, `all_met`. Targets:

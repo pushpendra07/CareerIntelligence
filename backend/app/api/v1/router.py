@@ -15,6 +15,7 @@ from app.api.v1 import (
     profile,
     reports,
     scanner,
+    setup,
     sheets,
     system,
 )
@@ -33,6 +34,7 @@ api_router.include_router(offers.router)
 api_router.include_router(reports.router)
 api_router.include_router(career_ops.router)
 api_router.include_router(scanner.router)
+api_router.include_router(setup.router)
 api_router.include_router(sheets.router)
 api_router.include_router(advisor.router)
 api_router.include_router(system.router)

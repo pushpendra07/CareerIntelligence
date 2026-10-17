@@ -3,10 +3,11 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.v1.router import api_router
 from app.core import auth
@@ -60,6 +61,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await call_next(request)
 
     @app.middleware("http")
+    async def security_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
+    @app.middleware("http")
     async def request_context(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
@@ -84,7 +95,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_error_handlers(app)
     app.include_router(api_router)
+    if settings.static_dir:
+        _serve_ui(app, settings.static_dir)
     return app
+
+
+def _serve_ui(app: FastAPI, folder: Path) -> None:
+    """Serve the built UI: real files as they are, every other page path gets index.html (the
+    UI's router shows the page). API paths are never answered with the UI."""
+    root = folder.resolve()
+    index = root / "index.html"
+    if not index.is_file():
+        logger.warning("STATIC_DIR has no index.html; the UI is not served",
+                       extra={"dir": str(root)})
+        return
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def ui(path: str) -> Response:
+        if path.startswith(("api/", "docs", "redoc", "openapi.json")):
+            return JSONResponse({"error": {"code": "not_found", "message": "Not found",
+                                           "details": None}}, status_code=404)
+        file = (root / path).resolve()
+        if path and file.is_file() and file.is_relative_to(root):
+            # Hashed build files never change; index.html must always be fresh.
+            immutable = path.startswith("assets/")
+            cache = "public, max-age=31536000, immutable" if immutable else "no-cache"
+            return FileResponse(file, headers={"Cache-Control": cache})
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 app = create_app()

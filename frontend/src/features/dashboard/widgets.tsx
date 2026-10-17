@@ -65,6 +65,7 @@ export function BestMatches() {
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => api.post(`/jobs/${id}/status`, { status }),
     onSuccess: () => qc.invalidateQueries(),
+    meta: { toastError: true },
   });
   const all = "/jobs?tab=new&min_score=70&has_application=false";
   return (

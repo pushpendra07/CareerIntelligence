@@ -43,17 +43,16 @@ export type SearchProfile = Pick<Preferences, "effective_titles" | "required_ski
 /** Open jobs at this company that fit the target profile. */
 export function companyTopic(company: string, profile?: SearchProfile | null): SearchTopic | null {
   if (!company.trim()) return null;
+  // No locations: a company's openings anywhere are worth seeing (the user filters later).
   const titles = (profile?.effective_titles ?? []).slice(0, 4);
-  const places = (profile?.preferred_locations ?? []).slice(0, 3);
   const skills = (profile?.required_skills ?? []).slice(0, 8);
   const years = join([profile?.min_experience_years, profile?.max_experience_years], "–");
   return {
-    google: join([`"${company}"`, anyOf(titles), "jobs", anyOf(places)]),
+    google: join([`"${company}"`, anyOf(titles), "jobs"]),
     prompt: `Find open job postings at ${company} that fit this profile. `
       + join([
         titles.length ? `Roles: ${titles.join(", ")}.` : "",
         skills.length ? `Key skills: ${skills.join(", ")}.` : "",
-        places.length ? `Locations: ${places.join(", ")} (or remote).` : "",
         years ? `Experience: ${years} years.` : "",
       ])
       + " For each job give the title, location, posted date and a direct link to the posting on the company's"

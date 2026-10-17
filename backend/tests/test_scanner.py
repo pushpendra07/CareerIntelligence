@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.html_text import html_to_text
 from app.core.http import FetchResult
+from app.models.company import Company
 from app.models.job import Job
 from app.models.scan import ScanRun
 from app.scanner import service
@@ -285,3 +286,23 @@ def test_search_every_company_switch(client: TestClient, db: Session) -> None:
     assert client.get(f"/api/v1/companies/{off}").json()["job_search_enabled"] is False
     client.patch("/api/v1/settings/app", json={"scanner": {"search_all_companies": False}})
     assert client.get("/api/v1/scanner/status").json()["scannable"] == 1
+
+
+def test_a_company_can_opt_out_of_search_every_company(client: TestClient, db: Session) -> None:
+    keep = company(db, "Keep Co", "https://jobs.lever.co/keepco")
+    skip = company(db, "Skip Co", "https://jobs.lever.co/skipco")
+    db.commit()
+    client.patch("/api/v1/settings/app", json={"scanner": {"search_all_companies": True}})
+
+    out = client.patch(f"/api/v1/companies/{skip}", json={"scan_excluded": True}).json()
+    assert out["scan_excluded"] is True
+    assert {c.id for c, _ in service.scan_targets(db, all_companies=True)} == {keep}
+    assert client.get("/api/v1/scanner/status").json()["scannable"] == 1
+    # Scanning that one company by hand still works.
+    assert [c.id for c, _ in service.scan_targets(db, [skip], all_companies=True)] == [skip]
+
+    back = client.patch(f"/api/v1/companies/{skip}", json={"scan_excluded": False}).json()
+    assert back["scan_excluded"] is False
+    row = db.get(Company, skip)
+    assert row is not None and "scan_excluded" not in row.attributes
+    assert {c.id for c, _ in service.scan_targets(db, all_companies=True)} == {keep, skip}

@@ -80,6 +80,8 @@ def scan_targets(db: Session, company_ids: list[int] | None = None,
         stmt = stmt.where(Company.job_search_enabled.is_(True))
     out = []
     for company in db.scalars(stmt):
+        if all_companies and not company_ids and company.scan_excluded:
+            continue  # unticked on its page: left out of "search every company"
         if board := board_for(company):
             out.append((company, board))
     return out

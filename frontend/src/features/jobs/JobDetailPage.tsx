@@ -77,6 +77,7 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
       notice_period_days: form.notice_period_days ? Number(form.notice_period_days) : undefined,
     }),
     onSuccess: onDone,
+    meta: { success: "Application recorded. Good luck!" },
   });
   return (
     <div className="grid gap-2 sm:grid-cols-3">
@@ -178,7 +179,8 @@ export function JobDetailPage() {
   const ivs = useQuery({ queryKey: ["interviews", { job_id: id }], queryFn: () => api.get<Page<Interview>>("/interviews", { job_id: id }) });
   const followups = useQuery({ queryKey: ["followups", { job_id: id }], queryFn: () => api.get<Page<FollowUp>>("/followups", { job_id: id, completed: false }) });
   const refresh = () => qc.invalidateQueries();
-  const status = useMutation({ mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }), onSuccess: refresh });
+  const status = useMutation({ mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }), onSuccess: refresh,
+    meta: { success: "Status updated", toastError: true } });
   const fetchJd = useMutation({ mutationFn: () => api.post(`/career-ops/jobs/${id}/fetch-jd`), onSuccess: refresh });
   // Arriving from "Follow up" in the list: jump to the follow-ups card.
   const loaded = !!job.data;

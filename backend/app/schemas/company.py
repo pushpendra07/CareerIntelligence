@@ -53,6 +53,7 @@ class CompanyOut(BaseModel):
     tier: str | None
     hiring_status: str
     job_search_enabled: bool
+    scan_excluded: bool = False
     verification_status: str
     verification_override: str | None
     verification_score: int
@@ -81,6 +82,7 @@ class CompanyWrite(BaseModel):
     priority: str | None = Field(default=None, max_length=10)
     hiring_status: HiringStatus | None = None
     job_search_enabled: bool | None = None
+    scan_excluded: bool | None = None
     notes: str | None = None
     verification_override: VerificationStatus | None = None
     website: str | None = None

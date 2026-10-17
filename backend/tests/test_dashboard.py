@@ -45,6 +45,8 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     assert hidden["total_jobs"] == 1  # not-relevant (and applied/rejected) jobs aren't open
     kinds = [p["type"] for p in d["priorities"]]
     assert kinds[0] == "INTERVIEW" and "FOLLOW_UP" in kinds
+    follow = next(p for p in d["priorities"] if p["type"] == "FOLLOW_UP")
+    assert follow["title"] == "Follow up: Ping recruiter" and follow["overdue"]
     assert d["priorities"][0]["title"].startswith("Interview tomorrow — Acme")
     if other["match_score"] >= 80:
         assert any(p["type"] == "APPLY" and p["link"]["id"] == other["id"] for p in d["priorities"])

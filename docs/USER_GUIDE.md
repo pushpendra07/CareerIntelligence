@@ -3,12 +3,20 @@
 A step-by-step walk through the web app (http://127.0.0.1:5173) for a brand-new setup:
 from an empty database to scored jobs, applications and interviews.
 
-> First install and start the app: see the README → *Run locally* (`./start.sh`).
+> First install and start the app: `./install.sh` (Docker, http://127.0.0.1:8010) or
+> `./start.sh` (native, http://127.0.0.1:5173) — see the README.
 > Everything below happens in the browser; nothing needs an API key.
 
+**Welcome setup:** a new, empty install opens a short setup first — upload your CV, say which
+roles, skills, locations and salary you want (roles and skills from the CV are suggested), paste
+the careers pages or job boards of companies to watch, then scan for your first jobs. Every step
+can be skipped; *Skip setup* goes straight to Today. Open it again any time with ⌘K → *Setup
+guide* (or `/welcome`). The sections below explain each part in depth.
+
 **Look and layout:** the ☰ button at the top left hides the menu so lists use the full screen
-width (remembered; on a phone it opens the menu as a panel). The ☀ / ☾ / 🖥 switch at the top
-right picks a **light**, **dark** or **same as my computer** theme (remembered in this browser).
+width (remembered; on a phone it opens the menu as a panel). The ☀ / ☾ / 🖥 switch at the bottom
+of the menu picks a **light**, **dark** or **same as my computer** theme (remembered in this
+browser). **+ Add job** is always at the top right.
 
 **The menu** has six entries; related pages are tabs at the top of each one:
 
@@ -37,6 +45,7 @@ right picks a **light**, **dark** or **same as my computer** theme (remembered i
 12. [Settings reference](#12-settings-reference)
 13. [Backups, exports and starting over](#13-backups-exports-and-starting-over)
 14. [Daily routine](#14-daily-routine)
+15. [Keyboard, phone and install](#15-keyboard-phone-and-install)
 
 ---
 
@@ -292,8 +301,15 @@ column — Applied · Recruiter contacted · Screening · Interview · Interview
 Offer · Accepted · Rejected; On hold / Withdrawn / Closed sit underneath. **Drag a card** to
 another column (or use its **Move to…** menu) when something happens: the job's status and
 follow-ups update with it. Cards show the score, days since applying, a late follow-up in red,
-"No update in 14+ days", and "date approximate" for applications recorded automatically. The
-top line counts open applications and follow-ups due; search finds a job or company.
+"No update in 14+ days", and "date approximate" for applications recorded automatically; a red
+(follow-up late) or amber (quiet) stripe marks cards that need you. **Next stage →** on a card
+moves it one column on in one click.
+
+Above the board, the **funnel** shows how many applications got a reply, an interview and an
+offer (with %; a rejected application still counts for the stage it reached), and **Needs
+attention** (click it to show only those cards). The toolbar searches a job or company, sorts
+cards (newest, best match, waiting longest), shows **Needs attention only** and can **Hide
+accepted & rejected**; these choices are remembered in this browser.
 
 ## 9. Interviews, prep and the question bank
 
@@ -449,3 +465,18 @@ when their job board is known (**Find job boards**).
 6. After changing your CV or profile, scores update by themselves.
 
 Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI coding agents*.
+
+## 15. Keyboard, phone and install
+
+- **Command palette:** `⌘ K` (Mac) or `Ctrl K` (or **Commands** in the top bar). Type to go to any
+  page, run an action (add a job, scan job boards, back up now, import a file) or open a job or
+  company by name. `↑`/`↓` to choose, `Enter` to open, `Esc` to close.
+- **Shortcuts** (not while typing in a field): `/` search everything · `C` add a job ·
+  `G` then `T` Today, `J` jobs, `R` review new, `C` companies, `P` pipeline board, `F` follow-ups,
+  `I` reports, `M` my profile, `,` settings · `?` shows them all.
+- **Messages:** saving a job, changing a status, applying or backing up shows a short message at
+  the bottom of the screen; failed one-click actions show the error there too.
+- **Phone:** the menu opens from ☰ (the theme switch is at its bottom); job lists show one card
+  per job instead of a table; wide tables and the Pipeline board scroll sideways.
+- **Install as an app:** in Chrome or Edge, use *Install Career Intelligence* in the address bar
+  (or ⋮ → *Cast, save and share → Install page as app*) to open it in its own window.

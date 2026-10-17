@@ -66,9 +66,12 @@ export function CompanyDetailPage() {
             <option value="">No tier</option><option value="TIER_A">Tier A</option><option value="TIER_B">Tier B</option><option value="TIER_C">Tier C</option>
           </select>
           {searchAll ? (
-            <span className="flex items-center gap-2 text-sm" title="Settings → Job scanner → Search every company is on, so this company is scanned">
-              <input type="checkbox" checked disabled aria-label="Job search" />Job search <span className="text-xs text-slate-500">(all companies)</span>
-            </span>
+            <label className="flex items-center gap-2 text-sm"
+              title="Settings → Job scanner → Search every company is on. Untick to leave this company out of scans.">
+              <input type="checkbox" aria-label="Job search" checked={!co.scan_excluded}
+                onChange={(e) => patch.mutate({ scan_excluded: !e.target.checked })} />
+              Job search <span className="text-xs text-slate-500">{co.scan_excluded ? "(left out of all-company scans)" : "(all companies)"}</span>
+            </label>
           ) : (
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={co.job_search_enabled} onChange={(e) => patch.mutate({ job_search_enabled: e.target.checked })} />Job search</label>
           )}

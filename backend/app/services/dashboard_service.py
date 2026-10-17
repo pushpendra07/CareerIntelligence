@@ -4,6 +4,7 @@ All aggregation happens in SQL (GROUP BY / jsonb_array_elements) so it stays fas
 10,000+ jobs; the frontend only ever receives small summaries.
 """
 
+import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -412,23 +413,27 @@ def priorities(db: Session, limit: int = 12) -> list[dict[str, Any]]:
                 "prep_link": {"entity": "interview_prep", "id": iv.id},
             }
         )
-    for f, contact in db.execute(
-        select(FollowUp, Contact.name)
+    for f, contact, company in db.execute(
+        select(FollowUp, Contact.name, Company.name)
         .outerjoin(Contact, FollowUp.contact_id == Contact.id)
+        .outerjoin(Company, FollowUp.company_id == Company.id)
         .where(FollowUp.completed.is_(False), FollowUp.due_date <= today)
         .order_by(FollowUp.due_date)
         .limit(10)
     ).all():
-        who = f" — {contact}" if contact else ""
+        # "Follow up: Senior Developer" + "Acme · Priya", linked to the job when there is one.
+        what = re.sub(r"^follow[ -]?up\s*[:\-—]\s*", "", f.title, flags=re.I) or f.title
+        detail = " · ".join(x for x in (company, contact) if x)
         items.append(
             {
                 "type": "FOLLOW_UP",
                 "rank": 2,
-                "title": f"Follow up{who}",
-                "detail": f.title,
+                "title": f"Follow up: {what}",
+                "detail": detail,
                 "due": f.due_date,
                 "overdue": f.due_date < today,
-                "link": {"entity": "followup", "id": f.id},
+                "link": {"entity": "job", "id": f.job_id} if f.job_id
+                else {"entity": "followup", "id": f.id},
             }
         )
     for o, company in db.execute(

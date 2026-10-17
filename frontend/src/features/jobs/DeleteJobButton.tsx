@@ -17,6 +17,7 @@ export function DeleteJobButton({ jobId, title, onDeleted, compact = false }: {
   const [linkedMessage, setLinkedMessage] = useState("");
   const del = useMutation({
     mutationFn: (force: boolean) => api.delete(`/jobs/${jobId}`, force ? { force: "true" } : undefined),
+    meta: { success: "Job deleted" },
     onSuccess: () => {
       setStep("idle");
       qc.invalidateQueries();

@@ -314,6 +314,10 @@ def create_company(db: Session, data: dict[str, Any]) -> Company:
 
 def _apply_changes(company: Company, data: dict[str, Any]) -> None:
     source_url = data.pop("source_url", None)
+    excluded = data.pop("scan_excluded", None)
+    if excluded is not None:  # kept in attributes: no column needed
+        rest = {k: v for k, v in (company.attributes or {}).items() if k != "scan_excluded"}
+        company.attributes = {**rest, "scan_excluded": True} if excluded else rest
     for key, value in data.items():
         if key in EDITABLE:
             if key == "name":

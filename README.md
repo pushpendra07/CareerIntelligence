@@ -298,19 +298,34 @@ VITE_API_TARGET=http://127.0.0.1:8010 npm run dev   # http://127.0.0.1:5173
 
 ---
 
-## 🐳 Run with Docker (optional)
+## 🐳 Install with one command (Docker)
+
+For people who just want to use the app: no Python or Node.js needed, only
+[Docker](https://docs.docker.com/get-docker/).
 
 ```bash
-cp .env.example .env          # set POSTGRES_PASSWORD (Career-Ops: ./scripts/setup-career-ops.sh)
-docker compose up -d          # postgres + backend + frontend
-open http://127.0.0.1:8080
+git clone https://github.com/<owner>/CareerIntelligence.git career-intelligence
+cd career-intelligence
+./install.sh                  # Docker if installed, else the native setup (--docker / --native)
 ```
 
-| Service | Description |
+It creates `.env` (random database password, readable by you only), builds one image with the
+API **and** the web UI, starts it with PostgreSQL 16 and opens **http://127.0.0.1:8010**. A new
+install opens the **Welcome** setup: upload your CV → what you want → companies to watch → first
+jobs (about five minutes, every step can be skipped).
+
+| | |
 |---|---|
-| `postgres` | PostgreSQL 16, with data in a named volume |
-| `backend` | FastAPI. It applies migrations on start, and the Career-Ops folder is mounted **read-only** |
-| `frontend` | nginx serving the built app and proxying `/api` to the backend |
+| Stop / start | `docker compose down` / `docker compose up -d` (data is kept in volumes) |
+| Update | `git pull && ./install.sh` (migrations run on start) |
+| Logs | `docker compose logs -f app` |
+| Settings | `.env`: `APP_PASSWORD`, `AI_PROVIDER`, `APP_PORT`, `APP_BIND` (`0.0.0.0` = reachable from your network; set `APP_PASSWORD` then) |
+| Backups | Settings → Backup & import (full `pg_dump` + CVs, in the `appdata` volume) |
+
+Career-Ops scanning needs the native setup (it runs Node.js scripts); everything else works in
+Docker. Without Docker, `./install.sh --native` installs the dependencies and runs `./start.sh`.
+To serve the built UI from the API natively too, build it (`cd frontend && npm run build`) and
+set `STATIC_DIR=../frontend/dist` in `backend/.env`.
 
 ---
 

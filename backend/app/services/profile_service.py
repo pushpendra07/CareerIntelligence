@@ -18,15 +18,9 @@ def _stale(db: Session, reason: str) -> None:
     mark_all_stale(db, reason)
 
 
-DEFAULT_TARGET_TITLES = [
-    "Senior Software Developer",
-    "Senior PHP Developer",
-    "Technical Lead",
-    "Tech Lead",
-    "Senior Adobe Commerce Developer",
-    "Adobe Commerce Developer",
-    "Lead Software Developer",
-]
+# A new install starts with no target titles or locations: the Welcome wizard (or My profile →
+# Target roles) asks for them, and the CV's roles are suggested there.
+DEFAULT_TARGET_TITLES: list[str] = []
 # Added to the effective target titles only when include_architect_roles is on.
 ARCHITECT_TITLES = [
     "Adobe Commerce Architect",
@@ -34,20 +28,7 @@ ARCHITECT_TITLES = [
     "Solution Architect",
     "Technical Architect",
 ]
-DEFAULT_LOCATIONS = [
-    "Remote India",
-    "Jaipur",
-    "Jodhpur",
-    "Delhi",
-    "Gurugram",
-    "Noida",
-    "Ahmedabad",
-    "Pune",
-    "Bengaluru",
-    "Chennai",
-    "Mumbai",
-    "Chandigarh",
-]
+DEFAULT_LOCATIONS: list[str] = []
 
 
 def get_profile(db: Session) -> ProfessionalProfile:
@@ -182,10 +163,10 @@ def get_target(db: Session) -> TargetProfile:
         target = TargetProfile(
             id=PROFILE_ID,
             version=1,
-            target_titles=DEFAULT_TARGET_TITLES,
+            target_titles=list(DEFAULT_TARGET_TITLES),
             include_architect_roles=False,
-            preferred_domains=["E-commerce", "Adobe Commerce", "Enterprise Software"],
-            preferred_locations=DEFAULT_LOCATIONS,
+            preferred_domains=[],
+            preferred_locations=list(DEFAULT_LOCATIONS),
             remote_ok=True,
             hybrid_ok=True,
             onsite_ok=True,

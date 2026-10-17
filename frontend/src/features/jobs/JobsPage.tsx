@@ -8,6 +8,7 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
 import { prefs } from "../../utils/storage";
+import { usePhone } from "../../utils/media";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
   "source", "status", "posted_after", "posted_within", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
@@ -125,7 +126,7 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
     return extra ? `${href}${href.includes("?") ? "&" : "?"}${extra}` : href;
   };
   return (
-    <div role="tablist" aria-label="Job status" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+    <div role="tablist" aria-label="Job status" className="tabs-scroll flex gap-1 border-b border-slate-200">
       {JOB_TABS.map((t) => {
         const on = t.key === active;
         const n = counts ? defaultStatuses(t).reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
@@ -147,6 +148,7 @@ function NextStep({ job }: { job: Job }) {
   const status = useMutation({
     mutationFn: (s: string) => api.post(`/jobs/${job.id}/status`, { status: s }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    meta: { toastError: true },
   });
   if (NEW_STATUSES.includes(job.status)) {
     return (
@@ -165,6 +167,39 @@ function NextStep({ job }: { job: Job }) {
     return <Link className="btn-secondary px-2 py-1 text-xs" to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
   }
   return null;
+}
+
+/** Phones: one card per job instead of an 11-column table. */
+function JobCards({ jobs, selected, toggle }: { jobs: Job[]; selected: Set<number>; toggle: (id: number) => void }) {
+  return (
+    <ul className="divide-y divide-slate-100">
+      {jobs.map((j) => (
+        <li key={j.id} className={`flex gap-3 py-3 ${selected.has(j.id) ? "bg-indigo-50/60" : ""}`}>
+          <input type="checkbox" className="mt-1 self-start" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <Link to={`/jobs/${j.id}`} className="font-medium leading-snug text-slate-800 hover:text-indigo-700">{j.title}</Link>
+              <ScoreBadge score={j.match_score} stale={j.score_stale} />
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
+              {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600">
+              <span>{j.location ?? "Location unknown"}{j.work_model !== "UNKNOWN" && ` · ${humanize(j.work_model)}`}</span>
+              {(j.experience_min != null || j.experience_max != null) && <span>{experienceRange(j.experience_min, j.experience_max)}</span>}
+              {j.salary_text && <span>{j.salary_text}</span>}
+              <span className="text-slate-400">posted {formatDate(j.posting_date)} · #{j.id}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <JobStatusBadge value={j.status} /><AddedViaTags values={j.added_via} />
+              <span className="ml-auto inline-flex items-center gap-2"><NextStep job={j} /><DeleteJobButton jobId={j.id} title={j.title} compact /></span>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** Act on the jobs ticked in the list: change their status or delete them. */
@@ -259,6 +294,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   });
   // Ticked jobs; cleared when the page, filters or rows-per-page change.
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const phone = usePhone();
   const listKey = JSON.stringify([listQuery, page, size]);
   useEffect(() => setSelected(new Set()), [listKey]);
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -282,8 +318,11 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     prefs.set(VIEW_KEY, keep.toString());
   };
   const set = (key: string, value: string) => {
+    // Leaving a filter box unchanged (e.g. clicking a blank area) must not reset the page or
+    // clear the ticked jobs.
+    if ((params.get(key) ?? "") === value.trim()) return;
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value); else next.delete(key);
+    if (value.trim()) next.set(key, value.trim()); else next.delete(key);
     update(next);
   };
   const setStatuses = (values: string[]) => {
@@ -315,7 +354,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
-        <Link className="btn-primary" to="/jobs/new">Add Job</Link>
+        <Link className="btn-primary sm:hidden" to="/jobs/new">Add Job</Link>
       </div>
       <StatusTabs active={tab.key} query={query} />
       <Card>
@@ -377,6 +416,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (
             <div className="overflow-x-auto">
               <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />
+              {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} /> : <>
               <p className="mb-2 text-xs text-slate-500"><b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100">
                 <thead><tr>
@@ -425,6 +465,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   ))}
                 </tbody>
               </table>
+              </>}
             </div>
           )}
           <Pagination page={page} size={size} total={data.total} onPage={setPage} scrollTo="jobs-list"

@@ -1,44 +1,46 @@
-# Optional: one-command start with Docker (`docker compose up -d`).
-# Not required — see README for the native setup.
+# Career Intelligence with Docker: the app (API + web UI on one port) and PostgreSQL 16.
+#
+#   ./install.sh                 creates .env with a random database password and starts it
+#   docker compose up -d --build start / update     docker compose down   stop (data is kept)
+#
+# Open http://127.0.0.1:8010 (APP_PORT in .env). It listens on this computer only; to open it to
+# your network set APP_BIND=0.0.0.0 in .env — and set APP_PASSWORD too.
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: career
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (./install.sh does it)}
       POSTGRES_DB: career_intelligence
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U career -d career_intelligence"]
       interval: 5s
-      retries: 10
+      retries: 20
 
-  backend:
-    build: ./backend
-    env_file: .env
+  app:
+    build: .
+    image: career-intelligence:latest
+    restart: unless-stopped
+    # Your settings (APP_PASSWORD, AI_PROVIDER, …). The lines below always win over it.
+    env_file:
+      - path: .env
+        required: false
     environment:
-      DATABASE_URL: postgresql+psycopg://career:${POSTGRES_PASSWORD}@postgres:5432/career_intelligence
-      CAREER_OPS_PATH: /career-ops
+      DATABASE_URL: postgresql+psycopg://career:${POSTGRES_PASSWORD}@db:5432/career_intelligence
+      STATIC_DIR: /app/ui
       STORAGE_PATH: /data/storage
-    volumes:
-      # Career-Ops is mounted read-only: this app never writes to it.
-      - ${CAREER_OPS_PATH:-./career-ops}:/career-ops:ro
-      - storage:/data/storage
-    expose:
-      - "8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  frontend:
-    build: ./frontend
+      BACKUP_PATH: /data/backups
     ports:
-      # Open http://127.0.0.1:8080 — nginx serves the app and proxies /api to the backend.
-      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8010}:8010"
+    volumes:
+      - appdata:/data   # uploaded CVs and automatic backups
     depends_on:
-      - backend
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
-  storage:
+  appdata:

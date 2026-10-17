@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { MOD } from "./CommandPalette";
+import { Icon } from "./icons";
 
 type Hit = { id: number | null; title: string; subtitle?: string | null; score?: number | null };
 type Results = Record<string, Hit[]>;
@@ -68,9 +70,18 @@ export function GlobalSearch() {
   let index = -1;
   return (
     <div className="relative w-full max-w-md">
+      <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      {!text && (
+        // The one search box: ⌘K opens the bigger palette (pages, actions, shortcuts) from anywhere.
+        <button type="button" tabIndex={-1} title="Commands: pages, actions and shortcuts"
+          onMouseDown={(e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, ctrlKey: true })); }}
+          className="absolute right-2 top-1/2 hidden -translate-y-1/2 sm:block">
+          <kbd className="kbd ml-0 text-slate-500">{MOD} K</kbd>
+        </button>
+      )}
       <input
         ref={input}
-        className="input"
+        className="input pl-8 sm:pr-14"
         placeholder="Search jobs, companies, recruiters, skills…"
         aria-label="Global search"
         role="combobox"

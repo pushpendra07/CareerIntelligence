@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { humanize } from "../utils/format";
 import { prefs } from "../utils/storage";
+import { Icon } from "./icons";
 
 export function Card({ title, actions, children, className = "", id }: {
   title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string;
@@ -273,17 +274,42 @@ export function Chips({ items, tone = "gray", empty = "—" }: { items: string[]
   return <div className="flex flex-wrap gap-1">{items.map((i) => <Badge key={i} tone={tone}>{i}</Badge>)}</div>;
 }
 
-export function Stat({ label, value, tone = "text-slate-900", to }: { label: string; value: ReactNode; tone?: string; to?: string }) {
-  const body = (
-    <>
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
-    </>
+/** Icon chip colours: a soft tint and a strong icon colour per accent. */
+export const ACCENTS = {
+  indigo: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+  violet: "bg-violet-50 text-violet-600 ring-violet-100",
+  sky: "bg-sky-50 text-sky-600 ring-sky-100",
+  emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+  amber: "bg-amber-50 text-amber-600 ring-amber-100",
+  rose: "bg-rose-50 text-rose-600 ring-rose-100",
+  slate: "bg-slate-100 text-slate-500 ring-slate-200",
+} as const;
+export type Accent = keyof typeof ACCENTS;
+
+export function IconChip({ icon, accent = "indigo", size = "md" }: { icon: string; accent?: Accent; size?: "sm" | "md" }) {
+  return (
+    <span aria-hidden className={`inline-flex shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${ACCENTS[accent]} ${size === "sm" ? "h-8 w-8" : "h-10 w-10"}`}>
+      <Icon name={icon} className={size === "sm" ? "h-4 w-4" : "h-5 w-5"} />
+    </span>
   );
-  if (!to) return <div className="card p-3">{body}</div>;
+}
+
+export function Stat({ label, value, tone = "text-slate-900", to, icon, accent = "indigo" }: {
+  label: string; value: ReactNode; tone?: string; to?: string; icon?: string; accent?: Accent;
+}) {
+  const body = (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className={`mt-1.5 font-display text-2xl font-bold tabular-nums tracking-tight ${tone}`}>{value}</div>
+      </div>
+      {icon && <IconChip icon={icon} accent={accent} size="sm" />}
+    </div>
+  );
+  if (!to) return <div className="card p-4">{body}</div>;
   return (
     <Link to={to} aria-label={`${label}: view results`}
-      className="card block p-3 transition hover:border-indigo-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      className="card lift block p-4 focus:outline-none focus:ring-2 focus:ring-indigo-500">
       {body}
     </Link>
   );

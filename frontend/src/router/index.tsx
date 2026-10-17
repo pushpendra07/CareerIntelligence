@@ -8,6 +8,9 @@ function page<M>(load: () => Promise<M>, pick: (m: M) => React.ComponentType): P
 }
 
 export const routes: RouteObject[] = [
+  // First-run setup: full screen, outside the menu layout. A fresh install is sent here.
+  { path: "/welcome", hydrateFallbackElement: <div className="p-6 text-sm text-slate-400">Loading…</div>,
+    ...page(() => import("../features/setup/WelcomePage"), (m) => m.WelcomePage) },
   {
     path: "/",
     element: <AppLayout />,

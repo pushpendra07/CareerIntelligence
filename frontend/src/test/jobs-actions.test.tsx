@@ -260,3 +260,33 @@ describe("bulk actions", () => {
     expect(await screen.findByText(/Deleted 1 job\. Kept 1 with an application/)).toBeInTheDocument();
   });
 });
+
+describe("ticked jobs", () => {
+  it("stay ticked when a filter box loses focus without a change (clicking a blank area)", async () => {
+    // 60 jobs, so page 2 exists.
+    const items = [JOB, { ...JOB, id: 8, title: "PHP Lead" }];
+    const api = mockApi({ "GET /jobs": (url: URL) => (url.searchParams.get("size") === "1"
+      ? { items: [], total: 60, page: 1, size: 1 } : { items, total: 60, page: 2, size: 25 }), "GET /jobs/status-counts": {} });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?page=2" });
+    await screen.findByLabelText("Select Magento Lead");
+    await vi.waitFor(() => expect(api.fn.mock.calls.length).toBeGreaterThan(1)); // list and counts loaded
+    await new Promise((r) => setTimeout(r, 50));
+    await userEvent.click(screen.getByLabelText("Select Magento Lead"));
+    await userEvent.click(screen.getByLabelText("Select PHP Lead"));
+    expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
+    await userEvent.click(screen.getByRole("button", { name: /More filters/ }));
+    expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
+    const calls = listUrls(api.fn).length;
+    for (const name of ["Location", "Technology", "Experience fits"]) {
+      await userEvent.click(screen.getByLabelText(name));
+      await userEvent.click(document.body); // blank area
+    }
+    expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
+    expect(listUrls(api.fn).length).toBe(calls); // nothing reloaded
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("page")).toBe("2"); // still page 2
+
+    await userEvent.type(screen.getByLabelText("Location"), "Pune");
+    await userEvent.click(document.body);
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("location")).toBe("Pune"); // a real change still filters
+  });
+});

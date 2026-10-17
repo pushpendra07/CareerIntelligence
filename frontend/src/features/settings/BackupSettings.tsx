@@ -19,7 +19,8 @@ export function BackupSettings() {
   const status = useQuery({ queryKey: ["backups"], queryFn: () => api.get<BackupStatus>("/backups") });
   const [error, setError] = useState<unknown>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["backups"] });
-  const now = useMutation({ mutationFn: () => api.post<Backup>("/backups"), onSuccess: refresh, onError: setError });
+  const now = useMutation({ mutationFn: () => api.post<Backup>("/backups"), onSuccess: refresh, onError: setError,
+    meta: { success: "Backup saved" } });
   const save = useMutation({
     mutationFn: (backups: Partial<BackupStatus["settings"]>) => api.patch("/settings/app", { backups }),
     onSuccess: refresh, onError: setError,

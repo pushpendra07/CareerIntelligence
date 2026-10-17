@@ -10,8 +10,11 @@ const href = (name: string) => new URL(screen.getByRole("link", { name }).getAtt
 describe("web search buttons", () => {
   it("company: searches for jobs there that fit the target profile", () => {
     render(<WebSearch topic={companyTopic("Acme", PROFILE)} />);
-    expect(href("Google").searchParams.get("q")).toBe('"Acme" ("Magento Architect" OR "Tech Lead") jobs ("Pune" OR "Bengaluru")');
+    // No location: the company's openings anywhere.
+    expect(href("Google").searchParams.get("q")).toBe('"Acme" ("Magento Architect" OR "Tech Lead") jobs');
     const ask = href("ChatGPT").searchParams.get("q")!;
+    expect(ask).not.toContain("Pune");
+    expect(ask).not.toContain("Locations");
     expect(ask).toContain("open job postings at Acme");
     expect(ask).toContain("Key skills: Magento, PHP.");
     expect(ask).toContain("Experience: 10–15 years.");

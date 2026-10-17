@@ -1,0 +1,25 @@
+# Keep the image small and free of personal data: only source code goes in.
+**/.env
+**/.env.*
+!.env.example
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/.devdb
+backend/storage
+backend/backups
+backend/secrets
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+career-ops
+graphify-out
+scratch
+.run
+.git
+*.pdf
+*.docx
+*.csv

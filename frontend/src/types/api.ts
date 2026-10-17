@@ -166,6 +166,7 @@ export interface Company {
   tier: string | null;
   hiring_status: string;
   job_search_enabled: boolean;
+  scan_excluded?: boolean;
   job_count?: number;
   open_job_count?: number;
   verification_status: string;

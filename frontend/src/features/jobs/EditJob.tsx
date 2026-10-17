@@ -76,6 +76,7 @@ export function EditJob({ job, onDone }: { job: JobDetail; onDone: () => void })
       }
     },
     onSuccess: () => { qc.invalidateQueries(); onDone(); },
+    meta: { success: "Job saved" },
   });
   return (
     <form className="space-y-3" noValidate onSubmit={(e) => { e.preventDefault(); if (!bad && dirty) save.mutate(); }}>

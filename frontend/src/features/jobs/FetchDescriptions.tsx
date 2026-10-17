@@ -50,10 +50,12 @@ export function FetchDescriptions({ compact = false }: { compact?: boolean }) {
         </button>
       )}
       {!running && last?.stats.total !== undefined && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500" title={compact ? `Last run: ${last.stats.fetched ?? 0} of ${last.stats.total} found` : undefined}>
+          {compact ? <>Last run: {last.stats.fetched ?? 0} of {last.stats.total} found</> : <>
           Last run: {last.stats.fetched ?? 0} of {last.stats.total} found
           {last.stats.not_allowed ? ` · ${last.stats.not_allowed} on sites that don't allow it (open and paste)` : ""}
           {last.stats.failed ? ` · ${last.stats.failed} pages had none` : ""}
+          </>}
         </p>
       )}
       {start.error && <p className="text-xs text-rose-600">{errorMessage(start.error)}</p>}

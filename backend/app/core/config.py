@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     backup_path: Path = Path("backups")
     # Optional: require this password to use the app (empty = no login).
     app_password: SecretStr | None = None
+    # Built web UI (frontend/dist) to serve from this API on one port, as the Docker image and
+    # `scripts/install.sh` do. Empty = the UI runs separately (Vite dev server, port 5173).
+    static_dir: Path | None = None
     max_upload_bytes: int = 10 * 1024 * 1024
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
@@ -55,7 +58,7 @@ class Settings(BaseSettings):
     @field_validator(
         "career_ops_path", "career_ops_data_path", "career_ops_url", "career_ops_api_key",
         "ai_api_key", "ai_model", "ai_base_url", "redis_url", "google_service_account_file",
-        "app_password", mode="before",
+        "app_password", "static_dir", mode="before",
     )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:

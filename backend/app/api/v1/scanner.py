@@ -37,7 +37,7 @@ def status(db: DB) -> dict[str, Any]:
     all_companies = bool(cfg.get("search_all_companies"))
     if all_companies:  # every company is searched; nothing is left out by its Job search flag
         ready_off: list[Company] = []
-        enabled = list(db.scalars(select(Company)))
+        enabled = [c for c in db.scalars(select(Company)) if not c.scan_excluded]
     else:
         disabled = db.scalars(select(Company).where(Company.job_search_enabled.is_(False)))
         ready_off = [c for c in disabled if service.board_for(c)]

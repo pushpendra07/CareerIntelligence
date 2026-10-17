@@ -5,9 +5,16 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Headings, big numbers and the brand. */
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   /* Cards, menus and inputs. White in light mode; a raised dark surface in dark mode. */
   --color-surface: #ffffff;
-  --color-page: #f6f7fb;
+  --color-page: #f4f5fa;
+  /* The sidebar is dark in both themes. */
+  --color-sidebar: #0f1426;
+  --color-sidebar-hover: #1b2238;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.05);
+  --shadow-lift: 0 10px 30px -12px rgb(30 41 82 / 0.22), 0 2px 6px rgb(16 24 40 / 0.06);
 }
 
 /*
@@ -20,6 +27,10 @@
   color-scheme: dark;
   --color-surface: #121a2e;
   --color-page: #0a1020;
+  --color-sidebar: #080d1a;
+  --color-sidebar-hover: #141b2e;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-lift: 0 10px 30px -12px rgb(0 0 0 / 0.6);
   --color-slate-50: #0a1020;
   --color-slate-100: #172036;
   --color-slate-200: #222d45;
@@ -154,23 +165,37 @@
 }
 
 @layer base {
-  body { @apply bg-page font-sans text-slate-800 antialiased; }
-  h1 { @apply text-xl font-semibold tracking-tight text-slate-900; }
-  h2 { @apply text-base font-semibold text-slate-900; }
+  body {
+    @apply bg-page font-sans text-slate-800 antialiased;
+    font-feature-settings: "cv11", "ss01";
+    /* A soft brand tint at the top of every page. */
+    background-image: radial-gradient(1200px 380px at 70% -120px, color-mix(in oklab, var(--color-indigo-500) 9%, transparent), transparent 70%);
+    background-repeat: no-repeat;
+  }
+  h1 { @apply font-display text-2xl font-bold tracking-tight text-slate-900; }
+  h2 { @apply font-display text-[15px] font-bold tracking-tight text-slate-900; }
   ::selection { @apply bg-indigo-200; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-indigo-500; }
 }
 
 /* Tailwind v4: reusable classes are declared as utilities so they can compose with @apply. */
-@utility input { @apply w-full rounded-lg border border-slate-300 bg-surface px-3 py-1.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100; }
+@utility input { @apply w-full rounded-xl border border-slate-200 bg-surface px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 disabled:bg-slate-100; }
 @utility label { @apply mb-1 block text-xs font-medium text-slate-600; }
-@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50; }
-/* Solid buttons keep their brand colour in both themes (shade 600 turns light in dark mode). */
-@utility btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:text-white; }
-@utility btn-secondary { @apply btn border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50 hover:border-slate-400; }
-@utility btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-400; }
-@utility card { @apply min-w-0 rounded-xl border border-slate-200 bg-surface p-4 shadow-sm shadow-slate-900/[0.03]; }
+@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50; }
+/* Solid buttons keep their brand colour in both themes (fixed colours, not the remapped shades). */
+@utility btn-primary { @apply btn bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white shadow-[0_1px_2px_rgb(16_24_40/0.1),0_4px_12px_-4px_rgb(79_70_229/0.55),inset_0_1px_0_rgb(255_255_255/0.15)] hover:from-[#5b5ff0] hover:to-[#4338ca]; }
+@utility btn-secondary { @apply btn border border-slate-200 bg-surface text-slate-700 shadow-[0_1px_2px_rgb(16_24_40/0.05)] hover:border-slate-300 hover:bg-slate-50; }
+@utility btn-danger { @apply btn bg-[#e11d48] text-white shadow-sm hover:bg-[#be123c]; }
+@utility card { @apply min-w-0 rounded-2xl border border-slate-200/80 bg-surface p-5 shadow-(--shadow-card); }
 @utility link { @apply text-indigo-600 hover:underline; }
-@utility th { @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
+@utility th { @apply bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:rounded-l-lg last:rounded-r-lg; }
 @utility td { @apply px-3 py-2 text-sm align-top; }
 @utility kbd { @apply ml-1 rounded border border-current/30 px-1 font-mono text-[10px] leading-4 opacity-70; }
+/* Tab bars: swipe sideways on narrow screens, but no scroll bars (the 1px tab underline overlap
+   would otherwise make a vertical one appear). */
+@utility tabs-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+/* Lifts on hover: clickable cards. */
+@utility lift { @apply transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-(--shadow-lift); }
+/* Pill tabs (Today | Insights, Jobs | Companies…). */
+@utility pill-tabs { @apply inline-flex max-w-full gap-1 rounded-xl border border-slate-200/80 bg-surface/70 p-1 shadow-(--shadow-card) backdrop-blur; }
