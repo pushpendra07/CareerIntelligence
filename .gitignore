@@ -10,6 +10,8 @@
 
 # Uploaded CVs, documents and attachments (backend/storage/)
 storage/
+# …but not the storage *code* package (it was hidden by the line above)
+!backend/app/storage/
 uploads/
 
 # Local database (dev PostgreSQL data dir) and any database files/dumps
