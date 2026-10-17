@@ -287,7 +287,9 @@ A company is searched by the built-in scanner only when **both** are true:
 Check one company: `GET /api/v1/scanner/companies/{id}/board` (`null` = not scannable).
 
 To find careers pages / job boards for companies that can't be scanned yet (web research, then
-save via the API), use the ready prompt `docs/prompts/find-company-job-boards.md`.
+save via the API), use the ready prompt `docs/prompts/find-company-job-boards.md`. To research
+and update every company's details (verification evidence, India presence, careers URL, tier for
+untiered companies, then scan for jobs), use `docs/prompts/update-company-details.md`.
 
 **Adding companies is not the goal — jobs are.** When asked to add companies, follow
 `.agent/workflows/add-company-for-scanning.md`: find and verify the real job board, save it
