@@ -11,7 +11,7 @@ from app.core.errors import AppError, DomainValidationError
 from app.matching.config import ENGINE_VERSION
 from app.models.app_settings import AppSettings as AppSettingsRow
 from app.scanner.filters import DEFAULT_SCANNER_SETTINGS, validate_scanner_settings
-from app.services import data_io
+from app.services import data_io, goals_service
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
 
@@ -68,6 +68,7 @@ def ai_summary(db: DB, settings: AppSettings, job_id: int) -> dict[str, Any]:
 # nothing read them. Jobs list sort/filters are remembered in the browser.)
 DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "scanner": DEFAULT_SCANNER_SETTINGS,
+    "goals": goals_service.DEFAULT_GOALS,  # weekly targets on Today (0 = off)
 }
 
 
@@ -98,9 +99,25 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         merged[section] = {**DEFAULT_APP_SETTINGS[section], **merged.get(section, {}), **values}
     if "scanner" in body:
         merged["scanner"] = validate_scanner_settings(merged["scanner"])
+    if "goals" in body:
+        merged["goals"] = goals_service.validate_goals(merged["goals"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}
+
+
+@router.get("/goals/week")
+def goals_week(db: DB) -> dict[str, Any]:
+    """This week's goals (Mon–Sun): target, done, left, per day needed, last week, streak."""
+    targets = {**goals_service.DEFAULT_GOALS, **_app_settings(db).data.get("goals", {})}
+    return goals_service.weekly(db, targets)
+
+
+@router.get("/reminders")
+def reminders(db: DB) -> dict[str, Any]:
+    """Follow-ups due today or late, and interviews in the next 24 hours (for browser
+    notifications)."""
+    return goals_service.reminders(db)
 
 
 @router.get("/settings/system")

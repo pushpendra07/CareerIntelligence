@@ -142,6 +142,13 @@ Conventions:
   `{jobs_checked, jobs_with_new_contacts, created, updated, linked}`. Recruiters now have
   `phone` and `jobs` (`[{id, title, status}]`).
 
+### goals & reminders
+- `GET /api/v1/goals/week` — this week's goals (Mon–Sun): per goal `target, done, left,
+  per_day, last_week, approximate`; `days_left`, `streak`, `all_met`. Targets:
+  `PATCH /api/v1/settings/app {"goals": {"applications", "reviewed", "followups", "outreach"}}`
+  (0–500, 0 = off).
+- `GET /api/v1/reminders` — follow-ups due today or late, interviews in the next 24 hours.
+
 ### reports
 - `GET /api/v1/reports` — the available reports (`key`, `title`, `description`)
 - `GET /api/v1/reports/{name}?from=&to=&group=day|week|month` — one report (default: last 90

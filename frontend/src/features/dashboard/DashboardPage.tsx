@@ -7,6 +7,7 @@ import type { Priority } from "../../types/api";
 import { formatDate, formatDateTime } from "../../utils/format";
 import { FetchDescriptions } from "../jobs/FetchDescriptions";
 import { BestMatches, ComingUp, GettingStarted, JobSources } from "./widgets";
+import { WeeklyGoals } from "./WeeklyGoals";
 import { CVAdviceSummary } from "../cvs/CVAdvice";
 
 interface Dashboard {
@@ -138,6 +139,7 @@ export function DashboardPage() {
           <BestMatches />
         </div>
         <div className="space-y-4">
+          <WeeklyGoals />
           <ComingUp />
           <JobSources newThisWeek={s.new_this_week ?? 0} />
           <CVAdviceSummary />

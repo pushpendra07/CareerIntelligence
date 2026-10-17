@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import { GlobalSearch } from "../components/GlobalSearch";
 import { Icon } from "../components/icons";
+import { useBrowserReminders } from "../components/Reminders";
 import { prefs } from "../utils/storage";
 import { useTheme, type Theme } from "../utils/theme";
 
@@ -91,6 +92,7 @@ const SIDEBAR_KEY = "layout.sidebar";
 export function AppLayout() {
   const { pathname } = useLocation();
   const { section, tab } = locate(pathname);
+  useBrowserReminders(); // follow-up / interview notifications, when turned on (Today)
   // Desktop: the sidebar can be hidden (remembered) to give lists the full width.
   // Phones: it opens as a drawer over the page and closes after picking a page.
   const [hidden, setHidden] = useState(() => prefs.get(SIDEBAR_KEY) === "hidden");

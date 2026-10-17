@@ -340,6 +340,18 @@ top line counts open applications and follow-ups due; search finds a job or comp
     **Fetch for 40 best jobs** (see below).
   - **Progress** — applied this week, applications, **response rate** (applications that got any
     answer), interviews, offers, open jobs.
+  - **This week's goals** (right column) — Monday to Sunday: **applications sent**, **new jobs
+    reviewed** (moved out of New), **follow-ups done**, **recruiters contacted** (set to
+    Contacted). Each shows done / target, how many a day you still need, last week, and the
+    weeks in a row you met every goal. Counted from what you actually did — nothing to tick
+    off. **Change goals** sets the targets (0 turns one off; defaults 10 / 30 / 5 / 3).
+    Applications recorded automatically (a job set to Applied, e.g. by a sheet import) are
+    flagged "dates approximate".
+  - **Browser reminders** (under the goals): **Turn on reminders** asks the browser for
+    permission, then — while the app is open in a tab — it notifies you about follow-ups due
+    or late (once a day each; one summary when there are more than 3) and interviews in the
+    next 24 hours and again within the hour. Clicking a reminder opens the job / interview.
+    The choice is per browser; **Turn off** stops them.
   - **Today's priorities**, **Best new matches** (★ Shortlist / Not relevant in one click),
     **Coming up**, **Job sources** (when each source last ran, **Scan now**), CV advice.
 - **Fetch missing descriptions** — reads the description from each job's own link, best scores
