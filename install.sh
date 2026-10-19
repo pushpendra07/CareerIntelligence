@@ -29,7 +29,10 @@ case "$mode" in
     if [[ ! -f .env ]]; then
       cp .env.example .env
       # A random database password; the database is only reachable from the app container.
-      password="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+      # Read a fixed amount first: `tr </dev/urandom | head` makes tr die of a broken pipe, which
+      # `set -o pipefail` treats as a failure (it always does on Linux, e.g. in CI).
+      password="$(head -c 2048 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-32)"
+      [[ ${#password} -eq 32 ]] || fail "Could not generate a database password"
       sed -i.bak "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${password}/" .env && rm -f .env.bak
       chmod 600 .env
       say "Created .env (edit it for a login password, AI provider, port…)"
