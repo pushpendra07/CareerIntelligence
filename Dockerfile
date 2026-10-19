@@ -35,6 +35,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY backend/ ./
 RUN uv sync --frozen --no-dev
 COPY --from=ui /ui/dist /app/ui
+COPY browser-extension/ /app/browser-extension/
 
 # Run as a normal user; /data (CVs and backups) is a volume it owns.
 RUN useradd --create-home --uid 10001 app \

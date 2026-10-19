@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Card, ErrorBox, Field, KeyValue, Spinner, PageIntro } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
+import { collectorOutdated, collectorVersion, extensionDownloadUrl } from "../jobs/collector";
 import { ScannerSettings } from "../scanner/ScannerSettings";
 import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
 import { BackupSettings } from "./BackupSettings";
@@ -146,8 +147,92 @@ function CareerOpsSettings() {
       )}
       {s?.error && <p className="mt-2 text-sm text-rose-600">{s.error}</p>}
       {run.error && <ErrorBox error={new Error(errorMessage(run.error))} />}
+      {s?.configured && <CareerOpsAutomation automation={s.automation} />}
+      {s?.configured && <CareerOpsPortals />}
       <p className="mt-2 text-xs text-slate-500">Uses Career-Ops' scanner only — no AI, no tokens. Career Intelligence only reads Career-Ops' files; Career-Ops' own scanner updates its pipeline as usual.</p>
     </Card>
+  );
+}
+
+interface CareerOpsAuto { schedule_hours: number; auto_import: boolean; scan_ready: boolean; next_scan_at: string | null }
+
+/** Run Career-Ops by itself: Scan + import every N hours, and import whenever its files change. */
+function CareerOpsAutomation({ automation }: { automation?: CareerOpsAuto }) {
+  const qc = useQueryClient();
+  const [hours, setHours] = useState(automation?.schedule_hours ?? 0);
+  const [autoImport, setAutoImport] = useState(automation?.auto_import ?? false);
+  useEffect(() => {
+    setHours(automation?.schedule_hours ?? 0);
+    setAutoImport(automation?.auto_import ?? false);
+  }, [automation?.schedule_hours, automation?.auto_import]);
+  const save = useMutation({
+    mutationFn: () => api.patch("/settings/app", { career_ops: { schedule_hours: hours, auto_import: autoImport } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["career-ops"] }),
+    meta: { success: "Career-Ops automation saved", toastError: true },
+  });
+  const changed = hours !== (automation?.schedule_hours ?? 0) || autoImport !== (automation?.auto_import ?? false);
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 p-3">
+      <h3 className="mb-2 text-sm font-semibold">Run automatically</h3>
+      <div className="flex flex-wrap items-end gap-4">
+        <Field label="Scan + import every (hours, 0 = off)">
+          <input className="input w-28" type="number" min={0} max={168} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
+        </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={autoImport} onChange={(e) => setAutoImport(e.target.checked)} />
+          Import as soon as Career-Ops finds something new (e.g. after <code>npm run scan</code> in a terminal)
+        </label>
+        <button className="btn-primary" disabled={!changed || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</button>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        {hours > 0 && !automation?.scan_ready
+          ? "Scheduled scans need Node.js and CAREER_OPS_SCAN_ENABLED=true."
+          : automation?.next_scan_at && automation.schedule_hours > 0
+            ? `Next scan: ${new Date(automation.next_scan_at) <= new Date() ? "within 5 minutes" : formatDateTime(automation.next_scan_at)}.`
+            : "Checked every 5 minutes while the app is running."}
+      </p>
+    </div>
+  );
+}
+
+interface CareerOpsPortalsData {
+  path: string | null; max_posting_age_days: number | null; title_keep: string[]; title_skip: string[]; locations: string[];
+  companies: { name: string; careers_url: string | null; enabled: boolean; notes: string | null }[];
+}
+
+/** What Career-Ops searches (its portals.yml), read-only — edit it in Career-Ops. */
+function CareerOpsPortals() {
+  const [open, setOpen] = useState(false);
+  const q = useQuery({ queryKey: ["career-ops", "portals"], queryFn: () => api.get<CareerOpsPortalsData>("/career-ops/portals"), enabled: open });
+  const p = q.data;
+  const on = p?.companies.filter((c) => c.enabled) ?? [];
+  return (
+    <details className="mt-3 rounded-lg border border-slate-200 p-3" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="cursor-pointer text-sm font-semibold">What Career-Ops searches</summary>
+      {!p ? (q.isError ? <ErrorBox error={q.error} /> : <Spinner />) : !p.path ? (
+        <p className="mt-2 text-sm text-slate-600">No portals.yml found in the Career-Ops folder.</p>
+      ) : (
+        <div className="mt-2 space-y-2 text-sm">
+          <KeyValue items={[
+            ["Companies", `${on.length} on${p.companies.length > on.length ? ` · ${p.companies.length - on.length} off` : ""}`],
+            ["Titles to keep", p.title_keep.join(", ") || "—"],
+            ["Titles to skip", p.title_skip.join(", ") || "—"],
+            ["Locations", p.locations.join(", ") || "—"],
+            ["Max posting age", p.max_posting_age_days ? `${p.max_posting_age_days} days` : "—"],
+          ]} />
+          <ul className="max-h-72 overflow-y-auto rounded border border-slate-200 divide-y divide-slate-100">
+            {p.companies.map((c) => (
+              <li key={c.name} className={`flex flex-wrap items-baseline gap-x-2 px-2 py-1 ${c.enabled ? "" : "text-slate-400"}`}>
+                <span className="font-medium">{c.name}</span>
+                {!c.enabled && <span className="text-xs">(off)</span>}
+                {c.careers_url && <a className="link truncate text-xs" href={c.careers_url} target="_blank" rel="noopener noreferrer">{c.careers_url}</a>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-slate-500">Read from <code>{p.path}</code>. To change companies or filters, edit that file in Career-Ops.</p>
+        </div>
+      )}
+    </details>
   );
 }
 
@@ -218,6 +303,35 @@ function AboutSettings() {
   );
 }
 
+/** The Job collector Chrome extension: download (set up for this app) and install steps. */
+function ExtensionSettings() {
+  const [installed, setInstalled] = useState<string | null>(collectorVersion);
+  useEffect(() => {
+    const t = window.setTimeout(() => setInstalled(collectorVersion()), 800); // its script may load after the page
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <Card title="Chrome extension: Job collector" actions={<a className="btn-primary" href={extensionDownloadUrl()} download>Download extension (.zip)</a>}>
+      <p className="mb-2 text-sm text-slate-600">
+        On any job page — LinkedIn, Naukri, Indeed, Glassdoor, a company careers page — click the extension's icon and the job is added here
+        (duplicates are merged). It can also collect a portal's search results from <Link className="link" to="/jobs/ai-search">Jobs → AI search</Link>. No AI, no tokens.
+      </p>
+      <p className="mb-2 text-sm">{installed
+        ? collectorOutdated(installed)
+          ? <span className="text-amber-700">Installed, but an older version ({installed}): click the reload icon on it in <code>chrome://extensions</code>, or download again.</span>
+          : <span className="text-emerald-700">Installed in this browser (version {installed}).</span>
+        : <span className="text-slate-500">Not installed in this browser.</span>}</p>
+      <ol className="list-decimal space-y-1 pl-5 text-sm">
+        <li><b>Download</b> the zip (it is set up for this app's address) and unzip it.</li>
+        <li>In Chrome, open <code>chrome://extensions</code> and turn on <b>Developer mode</b> (top right).</li>
+        <li>Click <b>Load unpacked</b> and choose the unzipped <code>career-intelligence-extension</code> folder.</li>
+        <li>Pin it: puzzle-piece icon in the toolbar → pin <b>Career Intelligence – Job collector</b>. Reload this page.</li>
+      </ol>
+      <p className="mt-2 text-xs text-slate-500">To update it later, download again, replace the folder, and click the reload icon on its card in <code>chrome://extensions</code>.</p>
+    </Card>
+  );
+}
+
 /** One line per job source: is it set up, and when did it last bring jobs in. */
 function SourcesOverview() {
   const scanner = useQuery({ queryKey: ["scanner"], queryFn: () => api.get<{ scannable: number; search_all_companies?: boolean; last_run: { started_at: string } | null; running: unknown }>("/scanner/status") }).data;
@@ -225,21 +339,22 @@ function SourcesOverview() {
   const access = useQuery({ queryKey: ["sheets", "access"], queryFn: () => api.get<{ service_account: string | null }>("/sheets/access") }).data;
   const co = useQuery({ queryKey: ["career-ops"], queryFn: () => api.get<{ configured?: boolean; last_import?: { started_at: string } | null }>("/career-ops/status") }).data;
   const lastSheet = (sheets ?? []).map((x) => x.last_imported_at).filter(Boolean).sort().at(-1) ?? null;
-  const row = (href: string, name: string, state: ReactNode, last: string | null | undefined, ok: boolean) => (
+  const row = (href: string, name: string, state: ReactNode, last: string | null | undefined | false, ok: boolean) => (
     <a href={href} className="flex items-start gap-2 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
       <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${ok ? "bg-emerald-500" : "bg-slate-300"}`} aria-hidden />
       <span className="min-w-0 text-sm">
         <b>{name}</b>
         <span className="block text-xs text-slate-500">{state}</span>
-        <span className="block text-xs text-slate-400">{last ? `Last run ${formatDateTime(last)}` : "Never run"}</span>
+        {last !== false && <span className="block text-xs text-slate-400">{last ? `Last run ${formatDateTime(last)}` : "Never run"}</span>}
       </span>
     </a>
   );
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Job sources">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5" aria-label="Job sources">
       {row("#scanner", "Built-in job scanner", scanner ? `${scanner.scannable} companies scanned${scanner.search_all_companies ? " (all companies)" : ""}` : "…", scanner?.last_run?.started_at, !!scanner?.scannable)}
       {row("#sheets", "Google Sheets", sheets ? `${sheets.length} saved · ${access?.service_account ? "private sheets connected" : "only link-shared sheets"}` : "…", lastSheet, !!sheets?.length)}
       {row("#career-ops", "Career-Ops", co ? (co.configured ? "Set up" : "Not set up (optional)") : "…", co?.last_import?.started_at, !!co?.configured)}
+      {row("#extension", "Chrome extension", collectorVersion() ? "Installed — click it on any job page" : "Not installed — download it below", false, !!collectorVersion())}
       <Link to="/jobs/new" className="flex items-start gap-2 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
         <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
         <span className="text-sm"><b>Add Job by hand</b><span className="block text-xs text-slate-500">For LinkedIn, Naukri, Indeed — paste the link and description.</span></span>
@@ -266,6 +381,7 @@ export function SettingsPage({ view = "sources" }: { view?: SettingsView }) {
         <section id="scanner" className="scroll-mt-16"><ScannerSettings /></section>
         <section id="sheets" className="scroll-mt-16"><SavedSheetsSettings /></section>
         <section id="career-ops" className="scroll-mt-16"><CareerOpsSettings /></section>
+        <section id="extension" className="scroll-mt-16"><ExtensionSettings /></section>
       </>}
       {view === "scoring" && <ScoringSettings />}
       {view === "data" && <DataSettings />}

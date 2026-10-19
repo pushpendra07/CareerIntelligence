@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, String, case, cast, func, or_, select
+from sqlalchemy import Select, String, case, cast, func, or_, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, selectinload
 
@@ -43,6 +43,8 @@ from app.services.contact_extraction import link_job_contacts
 from app.skills.catalog import normalize_skill_list
 
 logger = logging.getLogger(__name__)
+
+INGEST_LOCK_ID = 4_210_772  # pg advisory lock: one job intake at a time (see ingest_job)
 
 PARSED_FIELDS = (
     "experience_min",
@@ -94,14 +96,14 @@ class JobInput:
     recruiter_phone: str | None = None
     status: JobStatus = JobStatus.NEW
     raw: dict[str, Any] = field(default_factory=dict)
-    origin: str = "manual"  # "manual" | "sheet" | "import" | "career_ops" | "scan"
+    origin: str = "manual"  # "manual" | "sheet" | "import" | "career_ops" | "scan" | "agent"
     # False for search/listing pages: kept as provenance, never used to identify the job.
     url_identifies_job: bool = True
 
 
 # JobInput.origin -> the "Added via" tag stored on the job.
 ADDED_VIA = {"manual": "manual", "sheet": "sheet", "import": "file", "career_ops": "career_ops",
-             "scan": "scanner"}
+             "scan": "scanner", "agent": "ai_search"}
 
 
 def _tag_origin(job: Job, origin: str) -> None:
@@ -255,52 +257,119 @@ def find_duplicate(
             return db.get(Job, link.job_id), "external_id"
     if company.id is None:
         return None, None
+    key = title_key(data.title)
+    # Every job with the same title (however old), plus recent ones for the fuzzy JD match.
+    recent = select(Job.id).where(Job.company_id == company.id).order_by(Job.id.desc()).limit(200)
     candidates = list(
         db.scalars(
             select(Job)
             .options(selectinload(Job.source_links))
             .where(Job.company_id == company.id)
+            .where(or_(Job.normalized_title == key, Job.id.in_(recent.scalar_subquery())))
             .order_by(Job.id.desc())
-            .limit(200)
         )
     )
-    new_locs = [data.location] if data.location else []
-    new_req = dedup.requisition_id(data.jd_text) or dedup.requisition_id(data.notes)
+    new = _Posting(
+        title=data.title,
+        locations=[data.location] if data.location else [],
+        posting_date=data.posting_date,
+        jd=data.jd_text,
+        req=dedup.requisition_id(data.jd_text) or dedup.requisition_id(data.notes),
+        sources={(source.value, external_id)} if external_id else set(),
+        urls=[data.url] if data.url and normalized else [],
+    )
     for job in candidates:
-        if (
-            job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT)
-            and job.posting_date
-            and data.posting_date
-            and (data.posting_date - job.posting_date).days > 60
-        ):
-            continue
-        old_req = dedup.requisition_id(job.original_jd) or dedup.requisition_id(job.notes)
-        if new_req and old_req and new_req != old_req:
-            continue  # two different requisitions
-        if (
-            external_id
-            and source in AGGREGATORS
-            and any(
-                s.source == source.value and s.external_id and s.external_id != external_id
-                for s in job.source_links
-            )
-        ):
-            continue  # same aggregator, different posting ids => different openings
-        same_title = job.normalized_title == title_key(data.title)
-        locs_ok = dedup.locations_compatible(
-            job.locations or ([job.location] if job.location else []), new_locs
-        )
-        dates_ok = dedup.dates_compatible(job.posting_date, data.posting_date)
-        if same_title and locs_ok and dates_ok:
-            return job, "company_title_location"
-        if (
-            dedup.title_similarity(job.title, data.title) >= 0.85
-            and data.jd_text
-            and job.original_jd
-            and dedup.jd_similarity(job.original_jd, data.jd_text) >= 0.8
-        ):
-            return job, "similar_jd"
+        if matched_by := _same_posting(job, new):
+            return job, matched_by
     return None, None
+
+
+@dataclass
+class _Posting:
+    """What dedup compares: an incoming JobInput or a job already saved."""
+
+    title: str
+    locations: list[str]
+    posting_date: date | None
+    jd: str
+    req: str | None
+    sources: set[tuple[str, str]]  # (source, external_id) from aggregators and boards
+    urls: list[str] = field(default_factory=list)
+
+    @classmethod
+    def of(cls, job: Job) -> "_Posting":
+        return cls(
+            title=job.title,
+            locations=job.locations or ([job.location] if job.location else []),
+            posting_date=job.posting_date,
+            jd=job.original_jd,
+            req=dedup.requisition_id(job.original_jd) or dedup.requisition_id(job.notes),
+            sources={(s.source, s.external_id) for s in job.source_links if s.external_id},
+            urls=[s.original_url for s in job.source_links if s.original_url],
+        )
+
+
+def _url_ids(urls: list[str]) -> dict[str, set[str]]:
+    ids: dict[str, set[str]] = {}
+    for url in urls:
+        host, found = dedup.url_ids(url)
+        if found:
+            ids.setdefault(host, set()).update(found)
+    return ids
+
+
+def _same_posting(job: Job, new: _Posting) -> str | None:
+    """How `new` was recognised as `job` (see the return values below), else None.
+
+    One company + one title is one job to apply to, whichever city it is posted in.
+    """
+    if (
+        job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT)
+        and job.posting_date
+        and new.posting_date
+        and (new.posting_date - job.posting_date).days > 60
+    ):
+        return None
+    old_req = dedup.requisition_id(job.original_jd) or dedup.requisition_id(job.notes)
+    if new.req and old_req and new.req != old_req:
+        return None  # two different requisitions
+    aggregators = {s.value for s in AGGREGATORS}
+    for src, ext in new.sources:
+        if src in aggregators and any(
+            s.source == src and s.external_id and s.external_id != ext for s in job.source_links
+        ):
+            return None  # same aggregator, different posting ids => different openings
+    old_ids = _url_ids([s.original_url for s in job.source_links if s.original_url])
+    new_ids = _url_ids(new.urls)
+    if set().union(*old_ids.values()) & set().union(*new_ids.values()):
+        return "url_id"  # same posting ID in the link, on any site
+    locs_ok = dedup.locations_compatible(
+        job.locations or ([job.location] if job.location else []), new.locations
+    )
+    if not locs_ok and job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT):
+        return None  # maybe rejected for its city: a posting elsewhere stays visible
+    if job.normalized_title == title_key(new.title) and dedup.dates_compatible(
+        job.posting_date, new.posting_date
+    ):
+        return "company_title_location" if locs_ok else "company_title"
+    if not (dedup.same_level(job.title, new.title) and new.jd and job.original_jd):
+        return None
+    if dedup.title_words_contained(job.title, new.title):
+        # Reposted with a new link/ID and a reworded title and JD ("Software Engineer -
+        # Ecommerce SFCC" -> "Software Engineer, Ecommerce").
+        if dedup.jd_similarity(job.original_jd, new.jd) >= 0.6:
+            return "reposted"
+        return None
+    other_id_same_site = any(
+        host in old_ids and not (old_ids[host] & ids) for host, ids in new_ids.items()
+    )
+    if (
+        not other_id_same_site  # "... (Digital Experience Strategy)" vs "(... Architecture)"
+        and dedup.title_similarity(job.title, new.title) >= 0.85
+        and dedup.jd_similarity(job.original_jd, new.jd) >= 0.8
+    ):
+        return "similar_jd"
+    return None
 
 
 def _attach_source(
@@ -385,8 +454,11 @@ def ingest_job(
         if data.origin != "manual":
             raise DeletedJobError(f"'{deleted.title}' at {deleted.company_name} was deleted")
         db.delete(deleted)  # added again by hand: imports may update it from now on
+    # Scans, imports and Add Job may run at the same time; take turns so two of them can't
+    # both decide "not seen yet" and save the same posting twice. Held until commit.
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": INGEST_LOCK_ID})
     company = find_or_create_by_name(db, data.company_name)
-    manual = _manual_values(data) if data.origin in ("manual", "import", "sheet") else {}
+    manual = _manual_values(data) if data.origin in ("manual", "import", "sheet", "agent") else {}
 
     existing, matched_by = find_duplicate(db, company, data, normalized, source, external_id)
     if existing is not None:
@@ -400,6 +472,8 @@ def ingest_job(
         for name in ("posting_date", "application_deadline"):
             if getattr(job, name) is None and getattr(data, name):
                 setattr(job, name, getattr(data, name))
+        if matched_by == "company_title" and data.location:
+            _add_locations(job, [data.location])  # same job, posted in another city too
         for name, value in manual.items():
             if getattr(job, name) in (None, [], "", WorkModel.UNKNOWN.value):
                 setattr(job, name, value)
@@ -528,7 +602,7 @@ class JobFilters:
     salary_min: Decimal | None = None
     status: list[str] | None = None
     closed: bool | None = None  # True: only closed positions; False: hide them
-    added_via: str | None = None  # manual | sheet | scanner | career_ops | file
+    added_via: str | None = None  # manual | sheet | scanner | career_ops | file | ai_search
     stale: bool | None = None
     has_application: bool | None = None
     sort: str = "-match_score"
@@ -901,6 +975,31 @@ def merge_jobs(db: Session, keep_id: int, merge_id: int) -> Job:
     if keep_id == merge_id:
         raise DomainValidationError("Cannot merge a job into itself")
     keep, other = get_job(db, keep_id), get_job(db, merge_id)
+    _merge_into(db, keep, other)
+    from app.services.match_service import analyze_job
+
+    analyze_job(db, keep)
+    db.commit()
+    return get_job(db, keep_id)
+
+
+# Which status says more about the user's progress; a merge keeps the furthest one.
+_STATUS_RANK = [
+    JobStatus.DISCOVERED, JobStatus.NEW, JobStatus.CLOSED, JobStatus.NOT_RELEVANT,
+    JobStatus.ON_HOLD, JobStatus.REVIEWING, JobStatus.SHORTLISTED, JobStatus.READY_TO_APPLY,
+    JobStatus.WITHDRAWN, JobStatus.REJECTED, JobStatus.APPLIED, JobStatus.RECRUITER_CONTACTED,
+    JobStatus.SCREENING, JobStatus.INTERVIEW, JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER,
+    JobStatus.ACCEPTED,
+]
+
+
+def _status_rank(status: str) -> int:
+    return _STATUS_RANK.index(JobStatus(status)) if status in JobStatus.__members__ else 0
+
+
+def _merge_into(db: Session, keep: Job, other: Job) -> None:
+    """Move everything of `other` onto `keep` and delete `other` (no commit, no re-score)."""
+    other_id = other.id
     for link in list(other.source_links):
         other.source_links.remove(link)
         keep.source_links.append(link)
@@ -908,23 +1007,100 @@ def merge_jobs(db: Session, keep_id: int, merge_id: int) -> Job:
         keep.original_jd = other.original_jd
         _apply_parsed(keep, parse_jd(keep.original_jd, keep.title))
     keep.notes = "\n".join(filter(None, [keep.notes, other.notes])) or None
+    for tag in other.added_via or []:
+        if tag not in (keep.added_via or []):
+            keep.added_via = [*(keep.added_via or []), tag]
+    if _status_rank(other.status) > _status_rank(keep.status):
+        keep.status, keep.status_changed_at = other.status, other.status_changed_at
+    for name in ("posting_date", "application_deadline", "recruiter_contact_id",
+                 "career_ops_score", "career_ops_evaluation", "career_ops_report",
+                 "career_ops_status"):
+        if getattr(keep, name) is None and getattr(other, name) is not None:
+            setattr(keep, name, getattr(other, name))
+    _add_locations(keep, other.locations or ([other.location] if other.location else []))
+    if other.posting_date and keep.posting_date and other.posting_date < keep.posting_date:
+        keep.posting_date = other.posting_date  # first seen = when it was really posted
+    other.current_match_id = None
     db.flush()
     for table in Job.metadata.sorted_tables:
         for column in table.columns:
             for fk in column.foreign_keys:
-                if fk.column.table.name == "jobs" and table.name != "job_sources":
+                if fk.column.table.name != "jobs" or table.name == "job_sources":
+                    continue
+                if table.name == "job_matches":  # scores of the old copy; keep is re-scored
+                    db.execute(table.delete().where(column == other_id))
+                else:
                     db.execute(
-                        table.update().where(column == other.id).values({column.name: keep.id})
+                        table.update().where(column == other_id).values({column.name: keep.id})
                     )
     db.delete(other)
+    keep.score_stale = True
     record_activity(
-        db, "job.merged", "job", keep.id, f"Merged job {merge_id}", {"merged_id": merge_id}
+        db, "job.merged", "job", keep.id, f"Merged job {other_id}", {"merged_id": other_id}
     )
-    from app.services.match_service import analyze_job
 
-    analyze_job(db, keep)
+
+def _add_locations(job: Job, places: list[str]) -> None:
+    current = job.locations or ([job.location] if job.location else [])
+    added = [p for p in places if p and not dedup.locations_compatible(current, [p])]
+    if added:
+        job.locations = [*current, *added]
+        more = f" +{len(job.locations) - 3} more" if len(job.locations) > 3 else ""
+        job.location = (" / ".join(job.locations[:3]) + more)[:300]
+
+
+def _keep_first(jobs: list[Job]) -> list[Job]:
+    """The copy to keep first: furthest status, then most sources, then the oldest."""
+    return sorted(jobs, key=lambda j: (-_status_rank(j.status), -len(j.source_links), j.id))
+
+
+def find_duplicate_groups(db: Session) -> list[list[Job]]:
+    """Jobs already saved twice, by the same rules ingest_job uses; the one to keep first."""
+    jobs = list(db.scalars(
+        select(Job).options(selectinload(Job.source_links), selectinload(Job.company))
+        .order_by(Job.company_id, Job.id)
+    ))
+    by_company: dict[int, list[Job]] = {}
+    for job in jobs:
+        by_company.setdefault(job.company_id, []).append(job)
+    groups: list[list[Job]] = []
+    for company_jobs in by_company.values():
+        postings = [_Posting.of(j) for j in company_jobs]
+        parent = list(range(len(company_jobs)))
+
+        def root(i: int, parent: list[int] = parent) -> int:
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for i, job in enumerate(company_jobs):
+            for k in range(i):
+                if root(i) != root(k) and (
+                    _same_posting(company_jobs[k], postings[i])
+                    or _same_posting(job, postings[k])
+                ):
+                    parent[root(i)] = root(k)
+        members: dict[int, list[Job]] = {}
+        for i, job in enumerate(company_jobs):
+            members.setdefault(root(i), []).append(job)
+        groups.extend(_keep_first(g) for g in members.values() if len(g) > 1)
+    return groups
+
+
+def merge_duplicate_groups(db: Session, keep_ids: list[int] | None = None) -> dict[str, Any]:
+    """Merge each duplicate group into its first job (only groups led by `keep_ids`, if given)."""
+    merged: list[dict[str, Any]] = []
+    for group in find_duplicate_groups(db):
+        keep, rest = group[0], group[1:]
+        if keep_ids is not None and keep.id not in keep_ids:
+            continue
+        for other in rest:
+            _merge_into(db, keep, other)
+        merged.append({"kept": keep.id, "merged": [j.id for j in rest]})
     db.commit()
-    return get_job(db, keep_id)
+    return {"groups": len(merged), "jobs_removed": sum(len(m["merged"]) for m in merged),
+            "merged": merged}
 
 
 def job_counts_by(db: Session, column: Any, where: Any = None) -> dict[str, int]:
@@ -1000,6 +1176,21 @@ def check_posting(
                     {"state": result.state, "url": url})
     db.commit()
     return get_job(db, job_id)
+
+
+def status_usage(db: Session) -> dict[str, int]:
+    """How often each job status was set (by hand, in bulk or by Apply), most used first."""
+    from app.models.activity_log import ActivityLog
+
+    to = ActivityLog.data["to"].astext
+    rows = db.execute(
+        select(to, func.count())
+        .where(ActivityLog.entity_type == "job", to.isnot(None))
+        .group_by(to)
+        .order_by(func.count().desc(), to)
+    ).all()
+    valid = {s.value for s in JobStatus}
+    return {status: n for status, n in rows if status in valid}
 
 
 def bulk_update(db: Session, job_ids: list[int], action: str,

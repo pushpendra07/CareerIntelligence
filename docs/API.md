@@ -89,6 +89,11 @@ Conventions:
   Glassdoor and Naukri are never fetched (state UNKNOWN). 422 if the job has no link.
 - `POST /api/v1/jobs/{job_id}/sources`
 - `POST /api/v1/jobs/{job_id}/merge`
+- `GET /api/v1/jobs/status-usage` — how often each job status was set (by hand, in bulk or by Apply), most used first: `{"CLOSED": 86, "NOT_RELEVANT": 76, ...}`; the status pickers show the top 5 as "Most used"
+- `GET /api/v1/jobs/duplicates` — jobs saved more than once, by the import rules: `{groups: [[JobOut…]], extra_jobs}`; the first job of a group is the one kept (furthest status)
+- `POST /api/v1/jobs/agent-import` (`{"jobs": [{title, company, url, location, workplace, experience, salary, posted, description, portal, notes}…], "dry_run"?: bool}`) — jobs an AI assistant found on job portals (Jobs → AI search); each row goes through the normal duplicate checks. Returns `counts` and per-row `result`: `new` · `duplicate` (with `job_id`, `matched_by`) · `repeat` (same as an earlier row) · `deleted` (you deleted it; not re-added) · `invalid`. Max 200 rows
+- `GET /api/v1/extension.zip?app=<UI origin>` — the Job collector Chrome extension (`browser-extension/`) as a zip, with its default API/app addresses set to this app (Settings → Job sources → Chrome extension)
+- `POST /api/v1/jobs/duplicates/merge` (`{"keep_ids"?: [id…]}`) — merge every group (or only those led by `keep_ids`): links, cities, notes, applications, interviews move to the kept job
 - `POST /api/v1/jobs/{job_id}/comments` (`{"body"}`) — add a dated comment; `GET /jobs/{id}` returns `comments`, newest first
 - `DELETE /api/v1/jobs/{job_id}/comments/{comment_id}`
 - `POST /api/v1/jobs/{job_id}/reparse`
@@ -185,9 +190,10 @@ Conventions:
   companies, sources, followups, skills, scans.
 
 ### career-ops
-- `GET /api/v1/career-ops/status`
+- `GET /api/v1/career-ops/status` — includes `automation` (`schedule_hours`, `auto_import`, `next_scan_at`); change it with `PATCH /api/v1/settings/app {"career_ops": {"schedule_hours": 24, "auto_import": true}}`
 - `POST /api/v1/career-ops/import`
 - `POST /api/v1/career-ops/sync`
+- `GET /api/v1/career-ops/portals` — what Career-Ops scans (its `portals.yml`, read-only): companies, titles to keep/skip, locations, max age
 - `GET /api/v1/career-ops/imports`
 - `POST /api/v1/career-ops/jobs/{job_id}/fetch-jd`
 

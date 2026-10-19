@@ -10,9 +10,16 @@
   /* Cards, menus and inputs. White in light mode; a raised dark surface in dark mode. */
   --color-surface: #ffffff;
   --color-page: #f4f5fa;
-  /* The sidebar is dark in both themes. */
-  --color-sidebar: #0f1426;
-  --color-sidebar-hover: #1b2238;
+  /* The sidebar matches the theme: white with a thin border in light, a shade darker than
+     the page in dark (values below and in .dark). Active page = indigo pill. */
+  --color-sidebar: #ffffff;
+  --color-sidebar-hover: #f4f5fa;
+  --color-sidebar-line: #e4e7f0;
+  --color-sidebar-text: #334155;
+  --color-sidebar-muted: #94a3b8;
+  --color-sidebar-strong: #0f172a;
+  --color-sidebar-active: #eef2ff;
+  --color-sidebar-active-text: #4338ca;
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.05);
   --shadow-lift: 0 10px 30px -12px rgb(30 41 82 / 0.22), 0 2px 6px rgb(16 24 40 / 0.06);
 }
@@ -27,8 +34,14 @@
   color-scheme: dark;
   --color-surface: #121a2e;
   --color-page: #0a1020;
-  --color-sidebar: #080d1a;
-  --color-sidebar-hover: #141b2e;
+  --color-sidebar: #0d1426;
+  --color-sidebar-hover: #151d33;
+  --color-sidebar-line: #1c2540;
+  --color-sidebar-text: #c7d0de;
+  --color-sidebar-muted: #6b7a96;
+  --color-sidebar-strong: #f1f4f9;
+  --color-sidebar-active: rgb(99 102 241 / 0.18);
+  --color-sidebar-active-text: #c7d2fe;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-lift: 0 10px 30px -12px rgb(0 0 0 / 0.6);
   --color-slate-50: #0a1020;
@@ -188,6 +201,11 @@
 @utility btn-primary { @apply btn bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white shadow-[0_1px_2px_rgb(16_24_40/0.1),0_4px_12px_-4px_rgb(79_70_229/0.55),inset_0_1px_0_rgb(255_255_255/0.15)] hover:from-[#5b5ff0] hover:to-[#4338ca]; }
 @utility btn-secondary { @apply btn border border-slate-200 bg-surface text-slate-700 shadow-[0_1px_2px_rgb(16_24_40/0.05)] hover:border-slate-300 hover:bg-slate-50; }
 @utility btn-danger { @apply btn bg-[#e11d48] text-white shadow-sm hover:bg-[#be123c]; }
+/* Dark mode tables: the header row and a hovered row are a shade lighter than the card
+   (slate-50 is the page colour in dark mode, which looked like a black band). Opaque, so a
+   sticky header hides the rows scrolling under it. */
+.dark .th { background-color: color-mix(in oklab, white 5%, var(--color-surface)); }
+.dark tr.row-hover:hover { background-color: color-mix(in oklab, white 3%, var(--color-surface)); }
 @utility card { @apply min-w-0 rounded-2xl border border-slate-200/80 bg-surface p-5 shadow-(--shadow-card); }
 @utility link { @apply text-indigo-600 hover:underline; }
 @utility th { @apply bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:rounded-l-lg last:rounded-r-lg; }

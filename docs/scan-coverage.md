@@ -7,11 +7,11 @@ curl -s http://127.0.0.1:8010/api/v1/scanner/status | python3 -m json.tool      
 curl -s http://127.0.0.1:8010/api/v1/career-ops/status | python3 -m json.tool    # Career-Ops
 ```
 
-**40 companies are scanned:** 36 by the built-in Job scanner (10 of them also by Career-Ops)
-plus 4 only by Career-Ops. About 80 more tracked companies are **not** scanned because their
-careers site isn't on a supported job board (see "Not scannable" below).
+**53 companies are in the curated list:** 49 by the built-in Job scanner (10 of them also by Career-Ops)
+plus 4 only by Career-Ops. Across all companies in the app, 190+ boards are auto-scannable.
+Tracked companies without a supported board remain in "Not scannable" below.
 
-## Built-in Job scanner — 36 companies
+## Built-in Job scanner — 49 companies
 
 Scanned when the company has **Job search** ticked and its careers URL is a supported board.
 
@@ -57,6 +57,7 @@ Scanned when the company has **Job search** ticked and its careers URL is a supp
 | Scandiweb | | Pinpoint | https://scandiweb.pinpointhq.com |
 | Adobe | A | Workday | https://adobe.wd5.myworkdayjobs.com/external_experienced |
 | BigCommerce | A | Workday | https://bigcommerce.wd12.myworkdayjobs.com/Commerce |
+| PwC | A | Workday | https://pwc.wd3.myworkdayjobs.com/Global_Experienced_Careers |
 | Decima Digital | B | Lever | https://jobs.lever.co/decima-digital |
 | Perficient | A | SmartRecruiters | https://jobs.smartrecruiters.com/Perficient2 |
 | Third Essential IT Solution | B | SmartRecruiters | https://jobs.smartrecruiters.com/ThirdEssentialITSoluton |
@@ -73,6 +74,27 @@ Scanned when the company has **Job search** ticked and its careers URL is a supp
 | Youwe | A | Workable | https://apply.workable.com/youwe |
 | Human Made | B | Workable | https://apply.workable.com/humanmade |
 | Kanopi Studios | B | Workable | https://apply.workable.com/kanopi |
+| Tryzens | A | Workable | https://apply.workable.com/tryzensglobal |
+| Netguru | B | Workable | https://apply.workable.com/netguru |
+| Landmark Group | A | Oracle | https://efhi.fa.em3.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1 |
+| Apparel Group (6thStreet) | A | Oracle | https://ediu.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1013 |
+| Freshworks | A | SmartRecruiters | https://jobs.smartrecruiters.com/freshworks |
+| Gymshark | B | Greenhouse | https://job-boards.greenhouse.io/gymshark |
+| Razorpay | A | Greenhouse | https://job-boards.greenhouse.io/razorpaysoftwareprivatelimited |
+| KPS AG | B | Teamtailor | https://career.kps.com |
+| Hospitable | | Workable | https://apply.workable.com/hospitable |
+| Loopio | | Ashby | https://jobs.ashbyhq.com/loopio |
+| ScienceLogic | | Ashby | https://jobs.ashbyhq.com/sciencelogic |
+| Epic Creations | | Greenhouse | https://job-boards.greenhouse.io/epickids |
+| Fueled | | Greenhouse | https://job-boards.greenhouse.io/fueledcareers |
+| Entrata | | Lever | https://jobs.lever.co/entrata |
+| Automattic | | Greenhouse | https://job-boards.greenhouse.io/automatticcareers |
+| Sureify | | Greenhouse | https://job-boards.greenhouse.io/sureify |
+| Clearwater Analytics | | Greenhouse | https://job-boards.greenhouse.io/clearwater |
+| Base.com | | Workable | https://apply.workable.com/base-com |
+| Curotec | | Recruitee | https://curotec.recruitee.com |
+| Newfold Digital | | Workday | https://web.wd1.myworkdayjobs.com/ExternalCareerSite |
+| Awesome Motive | | Workable | https://apply.workable.com/awesomemotive |
 
 ## Career-Ops — 14 companies (from its `portals.yml`)
 
@@ -95,7 +117,8 @@ Career-Ops lists 84 companies but scans only the 14 with a readable portal.
 Companies whose careers page is their own website, an unsupported system (SuccessFactors,
 Oracle, iCIMS, Taleo, Zoho, Keka, Darwinbox…), or a Google-search placeholder. Examples from the
 job-search list: Infosys, Cognizant, Capgemini, LTIMindtree, Deloitte, Coforge, Mphasis,
-Nagarro, Persistent Systems, Webkul, Codilar, Ranosys, Krish TechnoLabs, Mageplaza…
+Nagarro, Persistent Systems, Webkul, Codilar, Ranosys, Krish TechnoLabs, Mageplaza,
+rtCamp, Multidots, SetuBridge Technolabs…
 The live list is `not_scannable` in `GET /api/v1/scanner/status`.
 
 For these: run **Find job boards** (may discover a linked board), add jobs from Google Sheets,

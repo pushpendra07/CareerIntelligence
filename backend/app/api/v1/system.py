@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
@@ -8,10 +8,11 @@ from app.ai.features import suggest_interview_questions, summarize_job
 from app.ai.providers import AIUnavailableError, get_provider
 from app.api.deps import DB, AppSettings
 from app.core.errors import AppError, DomainValidationError
+from app.integrations.career_ops import service as career_ops
 from app.matching.config import ENGINE_VERSION
 from app.models.app_settings import AppSettings as AppSettingsRow
 from app.scanner.filters import DEFAULT_SCANNER_SETTINGS, validate_scanner_settings
-from app.services import backup_service, data_io, goals_service
+from app.services import backup_service, data_io, extension_package, goals_service
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
 
@@ -70,6 +71,7 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "scanner": DEFAULT_SCANNER_SETTINGS,
     "goals": goals_service.DEFAULT_GOALS,  # weekly targets on Today (0 = off)
     "backups": backup_service.DEFAULTS,  # automatic backups (Settings -> Backup & import)
+    "career_ops": career_ops.DEFAULT_SETTINGS,  # automatic Scan + import / import on change
 }
 
 
@@ -104,9 +106,23 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         merged["goals"] = goals_service.validate_goals(merged["goals"])
     if "backups" in body:
         merged["backups"] = backup_service.validate_settings(merged["backups"])
+    if "career_ops" in body:
+        merged["career_ops"] = career_ops.validate_settings(merged["career_ops"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}
+
+
+@router.get("/extension.zip")
+def extension_zip(request: Request, app: str | None = None) -> Response:
+    """The Job collector Chrome extension, set up for this app (Settings -> Job sources).
+
+    `app` is the address the UI runs on (defaults to this API's address, as in the Docker install).
+    """
+    api_url = str(request.base_url)
+    data = extension_package.build_zip(api_url, app or api_url)
+    return Response(data, media_type="application/zip", headers={
+        "Content-Disposition": 'attachment; filename="career-intelligence-extension.zip"'})
 
 
 @router.get("/backups")

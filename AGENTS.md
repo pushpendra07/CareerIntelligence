@@ -147,7 +147,7 @@ https://github.com/career-ops-hq/career-ops, git-ignored because it holds person
    Or: `curl -s http://127.0.0.1:8010/api/v1/career-ops/status | python3 -m json.tool`
    — `data_root` must be the Career-Ops folder (not `.`).
 
-### Run it — three ways
+### Run it — four ways
 
 **A. In the app (recommended):** Settings → Job sources → Career-Ops → **Scan + import**.
 Runs in the background (typically **15–20 minutes**; it checks ~12,000 postings; limit 45 min).
@@ -162,6 +162,14 @@ curl -s http://127.0.0.1:8010/api/v1/career-ops/imports | python3 -m json.tool  
 curl -X POST http://127.0.0.1:8010/api/v1/career-ops/import        # import only (seconds)
 ```
 `"running"` in the status is non-null while scanning; `"last_import"` shows the result.
+
+**D. Automatically:** Settings → Career-Ops → *Run automatically*: **Scan + import every N hours**
+(0 = off; needs `CAREER_OPS_SCAN_ENABLED=true` and Node.js) and **Import as soon as Career-Ops finds
+something new** (imports when `pipeline.md`, `scan-history.tsv`, the tracker, `reports/` or `jds/`
+change — e.g. after `npm run scan` in a terminal). Checked every 5 minutes while the app runs
+(`scheduled_tick` in `integrations/career_ops/service.py`, started in `main.py`); stored in app
+settings `career_ops`. *What Career-Ops searches* shows its `portals.yml` (companies, filters)
+read-only (`GET /api/v1/career-ops/portals`) — edit that file in Career-Ops to change it.
 
 **C. In the Career-Ops folder, then import:**
 ```bash
@@ -229,6 +237,25 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
 
 ## Other ways to add data
 
+- **AI search** (Jobs → AI search, `features/jobs/AiSearchPage.tsx`): a prompt built from the Target
+  Profile for Claude (Chrome extension / Desktop) or Gemini to search LinkedIn, Naukri, Indeed, Foundit,
+  Instahyre, Wellfound, Cutshort… in the user's own browser; the assistant pastes a JSON list back in
+  "Jobs from the assistant" → **Check** (dry run: new / already in the app / deleted / invalid) → **Add**.
+  API: `POST /api/v1/jobs/agent-import {"jobs": [...], "dry_run"?}` (`services/agent_import.py`,
+  origin `agent`, Added via **AI search** = `ai_search`). Flexible keys (title/job_title, company,
+  url/link, location, workplace, experience, salary, posted, description/jd, portal, notes);
+  `allow_deleted: true` re-adds a job the user deleted (they asked). Portal buttons
+  (`features/jobs/portals.ts`: search URLs; `PortalLauncher.tsx`: popup) → **Claude** / **Gemini**
+  (opens the portal search, copies a portal prompt) or **Job collector**.
+- **Job collector Chrome extension** (`browser-extension/`, Manifest V3, no AI; install: Load unpacked —
+  see `browser-extension/README.md`): click its icon on any job page → the job is added via
+  `agent-import` (popup shows Added #id · score / Already in your list / deleted → Add anyway).
+  From AI search it also collects a portal's search results (`background.js`) and hands them to
+  the page (`bridge.js` ↔ `features/jobs/collector.ts`, `window.postMessage`), which checks them
+  before the user adds them. Page reader `extract.js` (JobPosting JSON-LD → portal selectors →
+  page); tested in `frontend/src/test/extension-extract.test.ts`. Download for users:
+  Settings → Job sources → Chrome extension (`GET /api/v1/extension.zip?app=`, `services/extension_package.py`
+  writes this app's addresses into `settings.js`; the Docker image copies `browser-extension/`).
 - **Add Job** (button on Jobs / Dashboard): paste a job URL and description → live preview → Save & analyze.
   Use this for LinkedIn / Naukri / Indeed (they can't be scanned).
 - **CSV / JSON upload:** Settings → Backup & import → Import a file (`POST /api/v1/import/{jobs|recruiters}`).
@@ -309,7 +336,10 @@ Check one company: `GET /api/v1/scanner/companies/{id}/board` (`null` = not scan
 To find careers pages / job boards for companies that can't be scanned yet (web research, then
 save via the API), use the ready prompt `docs/prompts/find-company-job-boards.md`. To research
 and update every company's details (verification evidence, India presence, careers URL, tier for
-untiered companies, then scan for jobs), use `docs/prompts/update-company-details.md`.
+untiered companies, then scan for jobs), use `docs/prompts/update-company-details.md`. To find
+companies (any country) that hire people in India — India office, remote from India or
+relocation — for the PHP / Magento / Adobe Commerce / Laravel / WordPress stack and add them
+without duplicates, use `docs/prompts/add-companies-hiring-in-india.md`.
 
 **Adding companies is not the goal — jobs are.** When asked to add companies, follow
 `.agent/workflows/add-company-for-scanning.md`: find and verify the real job board, save it
@@ -361,6 +391,7 @@ frontend/src/
   test/                     Vitest tests + utils.tsx (renderAt, mockApi)
 docs/                       USER_GUIDE.md, ARCHITECTURE.md, API.md, scan-coverage.md, google-sheets.md,
                             career-ops-assessment.md, company-sources.md
+browser-extension/          Job collector Chrome extension (add the job you're viewing; collect a portal search)
 start.sh / stop.sh / dev.sh run scripts
 scripts/setup-career-ops.sh  set up Career-Ops inside the project (career-ops/, git-ignored)
 ```
@@ -369,9 +400,14 @@ scripts/setup-career-ops.sh  set up Career-Ops inside the project (career-ops/, 
 
 **Every job, from any source, goes through `job_service.ingest_job(db, JobInput)`.**
 It validates, finds or creates the company, checks deleted-job tombstones, deduplicates
-(`find_duplicate`: normalized URL → source external ID → company + title + compatible
-location/date → similar JD), attaches a `JobSourceLink`, parses the JD and (optionally) scores.
-Never insert `Job` rows directly.
+(`find_duplicate` / `_same_posting`: normalized URL → source external ID → same posting ID in
+the link → company + title in **any city** (not into a Not relevant/Closed job elsewhere) →
+repost (title words contained, JD ≥ 60%, same level) → similar JD), attaches a `JobSourceLink`,
+parses the JD and (optionally) scores. Ingest holds a transaction advisory lock
+(`INGEST_LOCK_ID`) so concurrent scans/imports can't save the same job twice.
+Never insert `Job` rows directly. Jobs saved twice before the rules caught them:
+`GET /jobs/duplicates`, `POST /jobs/duplicates/merge` (UI: Jobs → "N duplicates",
+`/jobs/duplicates`); the copy kept is the one with the furthest status.
 
 - `JobInput.origin`: `manual` | `import` | `career_ops` | `scan`. Only `manual` may re-add a
   job the user deleted (`DeletedJob` tombstones); other origins raise `DeletedJobError`, which
@@ -408,8 +444,8 @@ Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback
 not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).
 Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).
 Every job has `added_via` (list, in arrival order): `manual` | `sheet` | `scanner` | `career_ops` |
-`file`, set by `ingest_job` from `JobInput.origin` (`manual`, `sheet`, `scan`, `career_ops`,
-`import`); filter with `GET /api/v1/jobs?added_via=<tag>`. New import paths must pass the right origin. Inside a tab the Status
+`file` | `ai_search`, set by `ingest_job` from `JobInput.origin` (`manual`, `sheet`, `scan`, `career_ops`,
+`import`, `agent`); filter with `GET /api/v1/jobs?added_via=<tag>`. New import paths must pass the right origin. Inside a tab the Status
 filter is multi-select (`status=A&status=B`). API: `closed=true|false` separates closed jobs.
 Delete asks for confirmation; jobs with applications need `?force=true`.
 

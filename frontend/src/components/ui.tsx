@@ -97,6 +97,7 @@ export const ADDED_VIA: Record<string, { label: string; cls: string }> = {
   scanner: { label: "Job scanner", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   career_ops: { label: "Career-Ops", cls: "bg-violet-50 text-violet-700 ring-violet-200" },
   file: { label: "File import", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
+  ai_search: { label: "AI search", cls: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200" },
 };
 
 export function AddedViaTags({ values }: { values?: string[] | null }) {

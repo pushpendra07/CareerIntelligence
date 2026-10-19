@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add to Career Intelligence</title>
+<style>
+  :root { --bg: #fff; --text: #0f172a; --muted: #64748b; --line: #e4e7f0; --accent: #4f46e5; --ok: #047857; --warn: #b45309; --bad: #be123c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121a2e; --text: #e1e6ef; --muted: #94a1b8; --line: #222d45; --accent: #818cf8; --ok: #6ee7b7; --warn: #fcd34d; --bad: #fda4af; } }
+  body { margin: 0; width: 340px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  header img { width: 20px; height: 20px; border-radius: 5px; }
+  main { padding: 12px; }
+  .muted { color: var(--muted); } .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  h2 { font-size: 14px; margin: 0 0 2px; } p { margin: 6px 0; }
+  a { color: var(--accent); }
+  label { display: block; margin: 6px 0 2px; font-weight: 600; font-size: 12px; }
+  input, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+  textarea { height: 90px; resize: vertical; }
+  button { margin-top: 8px; padding: 6px 12px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .score { display: inline-block; padding: 0 8px; border-radius: 99px; background: #eef2ff; color: #4338ca; font-weight: 700; }
+  footer { padding: 8px 12px; border-top: 1px solid var(--line); font-size: 11px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><img src="icons/icon-32.png" alt="">Career Intelligence</header>
+<main id="main"><p class="muted">Reading this page…</p></main>
+<footer class="muted">App: <span id="app-url"></span> · <a href="#" id="toggle-settings">change</a>
+  <div id="settings" hidden>
+    <label for="api-url">API address</label><input id="api-url">
+    <label for="app-url-input">App address</label><input id="app-url-input">
+    <button id="save-settings">Save</button>
+  </div>
+</footer>
+<script src="settings.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

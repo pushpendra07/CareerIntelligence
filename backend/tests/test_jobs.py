@@ -221,18 +221,74 @@ def test_dedup_keeps_distinct_openings(client: TestClient) -> None:
         },
     ).json()
     assert b["created"] is True and b["job"]["id"] != a["id"]  # different requisitions
-    other_city = client.post(
+    other_title = client.post(
         "/api/v1/jobs",
         json={
-            "title": "Technical Lead - Adobe Commerce",
+            "title": "Senior Technical Lead - Adobe Commerce",
             "company": "Acme Commerce",
-            "location": "Chennai",
-            "work_model": "ONSITE",
-            "url": "https://acme.example/careers/chennai",
-            "jd": "Onsite in Chennai. PHP.",
+            "url": "https://acme.example/careers/jr-1003",
+            "jd": JD,
         },
     ).json()
-    assert other_city["created"] is True
+    assert other_title["created"] is True  # another level is another job
+
+
+def test_same_job_in_another_city_is_one_job(client: TestClient) -> None:
+    a = add(client, location="Pune", jd="Lead our PHP team.")["job"]
+    other_city = client.post("/api/v1/jobs", json={
+        "title": "Technical Lead - Adobe Commerce", "company": "Acme Commerce",
+        "location": "Chennai", "url": "https://acme.example/careers/chennai", "jd": "PHP.",
+    }).json()
+    assert other_city["created"] is False and other_city["job"]["id"] == a["id"]
+    assert other_city["duplicate_matched_by"] == "company_title"
+    assert other_city["job"]["locations"] == ["Pune", "Chennai"]
+    client.post(f"/api/v1/jobs/{a['id']}/status", json={"status": "NOT_RELEVANT"})
+    # Rejected maybe for its city: the same title somewhere else is shown again.
+    third = client.post("/api/v1/jobs", json={
+        "title": "Technical Lead - Adobe Commerce", "company": "Acme Commerce",
+        "location": "Kolkata", "url": "https://acme.example/careers/kolkata", "jd": "PHP.",
+    }).json()
+    assert third["created"] is True
+
+
+def test_reposted_job_and_same_id_in_url(client: TestClient) -> None:
+    body = ("Chalhoub Group's Capability Hub builds technology for luxury retail. We are "
+            "hiring an engineer to build our ecommerce storefronts on Salesforce Commerce "
+            "Cloud, own integrations with order management, and mentor developers. "
+            "You have 5+ years of experience with SFCC, JavaScript and Node.js. ")
+    applied = add(client, title="Software Engineer - Ecommerce SFCC", company="Chalhoub Group",
+                  location="Bengaluru", jd=body + "Work from our Bengaluru office.",
+                  url="https://careers.chalhoubgroup.com/jobs/8435470-se-ecommerce-sfcc")["job"]
+    client.post(f"/api/v1/jobs/{applied['id']}/status", json={"status": "APPLIED"})
+    repost = client.post("/api/v1/jobs", json={
+        "title": "Software Engineer, Ecommerce", "company": "Chalhoub Group",
+        "location": "Bengaluru", "jd": body + "Hybrid, three days a week in the office.",
+        "url": "https://careers.chalhoubgroup.com/jobs/8550916-software-engineer-ecommerce",
+    }).json()
+    assert repost["created"] is False and repost["job"]["id"] == applied["id"]
+    assert repost["duplicate_matched_by"] == "reposted"
+    senior = client.post("/api/v1/jobs", json={
+        "title": "Senior Software Engineer, Ecommerce", "company": "Chalhoub Group",
+        "location": "Bengaluru", "jd": body,
+        "url": "https://careers.chalhoubgroup.com/jobs/8551280-senior-software-engineer-ecommerce",
+    }).json()
+    assert senior["created"] is True  # a senior role is a different job
+    renamed = client.post("/api/v1/jobs", json={  # same posting ID, reworded link and title
+        "title": "Sr. Engineer (Ecommerce)", "company": "Chalhoub Group", "jd": "x",
+        "url": "https://careers.chalhoubgroup.com/jobs/8551280-sr-engineer",
+    }).json()
+    assert renamed["created"] is False and renamed["duplicate_matched_by"] == "url_id"
+    assert renamed["job"]["id"] == senior["job"]["id"]
+
+
+def test_similar_titles_with_other_posting_ids_stay_apart(client: TestClient) -> None:
+    jd = JD + "\nDigital experience consulting for enterprise clients."
+    a = add(client, title="Enterprise Architect (Digital Experience Strategy)", company="Adobe",
+            url="https://careers.adobe.com/us/en/job/R169932/Enterprise-Architect", jd=jd)["job"]
+    b = add(client, title="Enterprise Architect (Digital Experience Architecture)",
+            company="Adobe", jd=jd,
+            url="https://careers.adobe.com/us/en/job/R169933/Enterprise-Architect")
+    assert b["created"] is True and b["job"]["id"] != a["id"]
 
 
 def test_preview_does_not_save(client: TestClient, db: Session) -> None:
@@ -355,6 +411,59 @@ def test_merge_and_add_source(client: TestClient) -> None:
         f"/api/v1/jobs/{a['id']}/sources", json={"url": "https://indeed.com/viewjob?jk=abc123"}
     ).json()
     assert "INDEED" in clash["sources"]
+
+
+def test_find_and_merge_existing_duplicates(client: TestClient) -> None:
+    a = add(client, location="Pune", jd="Lead our PHP team in Pune.")["job"]
+    b = add(client, title="Magento Lead", location="Pune, Maharashtra",
+            url="https://acme.example/careers/magento-lead", jd="Different text.")["job"]
+    other_role = add(client, title="QA Lead", url="https://acme.example/careers/qa",
+                     jd="Testing.")["job"]
+    assert b["id"] != a["id"] and other_role["id"] != a["id"]
+    # Saved before the dedup rules caught it: the same posting under two IDs.
+    client.patch(f"/api/v1/jobs/{b['id']}", json={"title": "Technical Lead - Adobe Commerce"})
+    assert client.post("/api/v1/applications", json={"job_id": b["id"]}).status_code == 201
+
+    dups = client.get("/api/v1/jobs/duplicates").json()
+    assert dups["extra_jobs"] == 1
+    assert [j["id"] for j in dups["groups"][0]] == [b["id"], a["id"]]  # applied copy first
+
+    r = client.post("/api/v1/jobs/duplicates/merge", json={}).json()
+    assert r == {"groups": 1, "jobs_removed": 1, "merged": [{"kept": b["id"], "merged": [a["id"]]}]}
+    assert client.get(f"/api/v1/jobs/{a['id']}").status_code == 404
+    kept = client.get(f"/api/v1/jobs/{b['id']}").json()
+    assert set(kept["sources"]) == {"LINKEDIN", "COMPANY_CAREERS"}
+    assert kept["status"] == "APPLIED"
+    assert client.get("/api/v1/applications").json()["total"] == 1
+    assert client.get(f"/api/v1/jobs/{other_role['id']}").status_code == 200
+    assert client.get("/api/v1/jobs/duplicates").json()["extra_jobs"] == 0
+    again = client.post("/api/v1/jobs", json={  # the LinkedIn link now belongs to the kept job
+        "title": "Lead", "company": "Acme Commerce", "jd": "x",
+        "url": "https://www.linkedin.com/jobs/view/4012345678",
+    }).json()
+    assert again["created"] is False and again["job"]["id"] == b["id"]
+
+
+def test_dedup_finds_old_job_with_same_title(db: Session) -> None:
+    first = ingest_job(db, JobInput(title="Magento Architect", company_name="Busy Co",
+                                    location="Pune", origin="scan"), analyze=False, commit=False)
+    for n in range(205):  # pushes the first job out of the 200 most recent
+        ingest_job(db, JobInput(title=f"Role {n}", company_name="Busy Co", origin="scan"),
+                   analyze=False, commit=False)
+    again = ingest_job(db, JobInput(title="Magento Architect", company_name="Busy Co",
+                                    location="Pune", origin="scan"), analyze=False, commit=False)
+    assert again.created is False and again.job.id == first.job.id
+
+
+def test_status_usage_counts_status_changes(client: TestClient) -> None:
+    a = add(client)["job"]
+    b = add(client, title="QA Lead", url="https://acme.example/careers/qa", jd="Testing.")["job"]
+    changes = [(a["id"], "NOT_RELEVANT"), (b["id"], "NOT_RELEVANT"), (a["id"], "APPLIED")]
+    for job_id, status in changes:
+        r = client.post(f"/api/v1/jobs/{job_id}/status", json={"status": status})
+        assert r.status_code == 200
+    usage = client.get("/api/v1/jobs/status-usage").json()
+    assert list(usage.items())[:2] == [("NOT_RELEVANT", 2), ("APPLIED", 1)]
 
 
 def test_ingest_service_for_importers(db: Session) -> None:
@@ -583,3 +692,66 @@ def test_edit_location_and_work_model(client: TestClient) -> None:
     assert cleared["work_model"] in ("REMOTE", "HYBRID", "ONSITE", "UNKNOWN")
     blank = client.patch(f"/api/v1/jobs/{job['id']}", json={"location": ""}).json()
     assert blank["location"] is None and blank["locations"] == []
+
+
+def test_agent_import_checks_then_adds_jobs_from_portals(client: TestClient) -> None:
+    jd = "Senior PHP Developer. Magento 2, Laravel, MySQL. 6+ years. Hybrid in Pune."
+    client.post("/api/v1/jobs", json={
+        "title": "Magento Tech Lead", "company": "Acme", "location": "Pune, India",
+        "url": "https://www.naukri.com/job-listings-magento-tech-lead-acme-pune-123456789012",
+        "jd": "Magento tech lead. Magento 2, PHP. 8+ years."})
+    deleted = client.post("/api/v1/jobs", json={
+        "title": "WordPress Lead", "company": "Gone Co", "jd": "WordPress lead.",
+        "url": "https://www.linkedin.com/jobs/view/4100000001/"}).json()["job"]["id"]
+    client.delete(f"/api/v1/jobs/{deleted}")
+    rows = [
+        {"Job Title": "Senior PHP Developer", "Company": "Beta Labs", "Location": "Pune",
+         "Workplace Type": "Hybrid", "Experience": "6+ years", "Salary": "25-30 LPA",
+         "Posted": "3 days ago (2026-10-16)", "Portal": "LinkedIn", "description": jd,
+         "link": "https://www.linkedin.com/jobs/view/4100000099/?trk=x"},
+        {"title": "Magento Tech Lead", "company": "Acme", "location": "Bengaluru",  # same job
+         "url": "https://www.linkedin.com/jobs/view/4100000100/"},
+        {"title": "Senior PHP Developer", "company": "Beta Labs",  # same posting again
+         "url": "https://www.linkedin.com/jobs/view/4100000099/"},
+        {"title": "WordPress Lead", "company": "Gone Co",
+         "url": "https://www.linkedin.com/jobs/view/4100000001/"},
+        {"title": "", "company": "X"},
+    ]
+    check = client.post("/api/v1/jobs/agent-import", json={"jobs": rows, "dry_run": True}).json()
+    assert [r["result"] for r in check["results"]] == [
+        "new", "duplicate", "repeat", "deleted", "invalid"]
+    assert check["counts"]["new"] == 1
+    # a dry run saves nothing
+    assert client.get("/api/v1/jobs", params={"q": "Beta Labs"}).json()["total"] == 0
+
+    done = client.post("/api/v1/jobs/agent-import", json={"jobs": rows}).json()
+    new_id = done["results"][0]["job_id"]
+    job = client.get(f"/api/v1/jobs/{new_id}").json()
+    assert job["added_via"] == ["ai_search"] and job["source"] == "LINKEDIN"
+    assert job["work_model"] == "HYBRID" and job["posting_date"] == "2026-10-16"
+    assert job["salary_text"] == "25-30 LPA" and job["match_score"] is not None
+    assert "AI search · LinkedIn" in job["source_links"][0]["detail"]
+    acme = client.get(f"/api/v1/jobs/{done['results'][1]['job_id']}").json()
+    assert "ai_search" in acme["added_via"] and "Bengaluru" in acme["location"]
+    listed = client.get("/api/v1/jobs", params={"added_via": "ai_search"}).json()
+    assert listed["total"] == 2
+    assert client.post("/api/v1/jobs/agent-import", json={"jobs": []}).status_code == 422
+    assert done["results"][0]["score"] is not None and done["results"][0]["status"] == "NEW"
+    again = client.post("/api/v1/jobs/agent-import",  # the user chose "Add anyway"
+                        json={"jobs": [rows[3]], "allow_deleted": True}).json()
+    assert again["results"][0]["result"] == "new"
+
+
+def test_extension_download_is_set_up_for_this_app(client: TestClient) -> None:
+    import io
+    import zipfile
+
+    r = client.get("/api/v1/extension.zip", params={"app": "http://127.0.0.1:5173/jobs"})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    names = zf.namelist()
+    assert "career-intelligence-extension/manifest.json" in names
+    assert "career-intelligence-extension/icons/icon-48.png" in names
+    settings = zf.read("career-intelligence-extension/settings.js").decode()
+    assert 'apiUrl: "http://testserver", appUrl: "http://127.0.0.1:5173"' in settings
+    assert client.get("/api/v1/extension.zip", params={"app": "javascript:x"}).status_code == 422

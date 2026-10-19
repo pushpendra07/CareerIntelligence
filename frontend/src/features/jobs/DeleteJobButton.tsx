@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, api, errorMessage } from "../../api/client";
+import { Icon } from "../../components/icons";
 
 /**
  * Delete with an inline confirmation (no browser pop-up). If the job has applications,
@@ -33,8 +34,8 @@ export function DeleteJobButton({ jobId, title, onDeleted, compact = false }: {
   const size = compact ? "px-2 py-0.5 text-xs" : "";
   if (step === "idle") {
     return (
-      <button type="button" className={compact ? "rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-700" : `btn-secondary text-rose-700 hover:bg-rose-50 ${size}`} aria-label={`Delete ${title}`} title="Delete this job"
-        onClick={() => setStep("confirm")}>Delete</button>
+      <button type="button" className={compact ? "rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" : `btn-secondary text-rose-700 hover:bg-rose-50 ${size}`} aria-label={`Delete ${title}`} title="Delete this job"
+        onClick={() => setStep("confirm")}>{compact ? <Icon name="trash" className="h-4 w-4" /> : "Delete"}</button>
     );
   }
   const linked = step === "linked";

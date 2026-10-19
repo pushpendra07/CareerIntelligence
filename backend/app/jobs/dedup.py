@@ -3,6 +3,7 @@
 import re
 from datetime import date
 from difflib import SequenceMatcher
+from urllib.parse import urlsplit
 
 from app.core.text import title_key
 
@@ -89,3 +90,38 @@ def locations_compatible(a: list[str], b: list[str]) -> bool:
 
 def dates_compatible(a: date | None, b: date | None) -> bool:
     return a is None or b is None or abs((a - b).days) <= DATE_WINDOW_DAYS
+
+
+_LEVEL_WORDS = {
+    "intern", "trainee", "junior", "jr", "associate", "senior", "sr", "lead", "staff",
+    "principal", "head", "director", "manager", "chief", "vp", "i", "ii", "iii", "iv", "v",
+    "1", "2", "3", "4",
+}
+
+
+def same_level(a: str, b: str) -> bool:
+    """"Senior Engineer" and "Engineer", or "Engineer II" and "Engineer III", are different jobs."""
+    def level(t: str) -> set[str]:
+        return {w for w in re.findall(r"[a-z0-9]+", t.lower()) if w in _LEVEL_WORDS}
+    return level(a) == level(b)
+
+
+def title_words_contained(a: str, b: str) -> bool:
+    """One title is the other with words dropped ("Software Engineer, Ecommerce" in
+    "Software Engineer - Ecommerce SFCC"); a swapped word means a different job."""
+    wa, wb = set(re.findall(r"[a-z0-9]+", a.lower())), set(re.findall(r"[a-z0-9]+", b.lower()))
+    return bool(wa and wb) and (wa <= wb or wb <= wa)
+
+
+_URL_ID_RE = re.compile(r"\d{6,}")
+
+
+def url_ids(url: str | None) -> tuple[str, set[str]]:
+    """(host, posting IDs) of a job link: digit runs of 6+ in its path and query
+    (".../jobs/8551280-senior-..." -> 8551280, "..._ATCI-5814758-S2071747-1" -> both numbers)."""
+    if not url:
+        return "", set()
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    return (parts.hostname or "").removeprefix("www."), set(
+        _URL_ID_RE.findall(f"{parts.path}?{parts.query}")
+    )

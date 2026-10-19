@@ -85,3 +85,6 @@ google-credentials*.json
 # Graphify knowledge graph (generated)
 /graphify-out/
 scratch/
+
+# AI job-hunt prompts with my applied-jobs list (personal)
+*.private.txt

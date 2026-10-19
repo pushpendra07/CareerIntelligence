@@ -22,6 +22,7 @@ const PATHS: Record<string, string> = {
   trophy: "M8 4h8v5a4 4 0 01-8 0V4zm0 2H4v1a4 4 0 004 4m8-5h4v1a4 4 0 01-4 4m-4 2v4m-4 3h8",
   trend: "M3 17l6-6 4 4 8-8m0 0v6m0-6h-6",
   check: "M5 12.5l4.5 4.5L19 7",
+  trash: "M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3",
   search: "M21 21l-4.3-4.3M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z",
 };
 

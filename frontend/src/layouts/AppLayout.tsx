@@ -23,7 +23,7 @@ export const SECTIONS: Section[] = [
   { to: "/", label: "Today", icon: "today", hint: "What to do today, and how your search is going",
     tabs: [{ to: "/", label: "Today" }, { to: "/analytics", label: "Insights" }] },
   { to: "/jobs", label: "Jobs", icon: "jobs", hint: "Review new jobs, browse every job, companies you track",
-    tabs: [{ to: "/jobs/review", label: "Review new" }, { to: "/jobs", label: "All jobs" }, { to: "/companies", label: "Companies" }],
+    tabs: [{ to: "/jobs", label: "All jobs" }, { to: "/companies", label: "Companies" }, { to: "/jobs/ai-search", label: "AI search" }, { to: "/jobs/review", label: "Review new" }],
     badge: (s) => s.new_jobs },
   { to: "/applications/board", label: "Pipeline", icon: "pipeline", hint: "Board of applications by stage, interviews, offers and recruiters",
     tabs: [{ to: "/applications/board", label: "Board" }, { to: "/applications", label: "Applications" }, { to: "/interviews", label: "Interviews" },
@@ -77,16 +77,16 @@ const THEMES: { value: Theme; icon: string; label: string }[] = [
   { value: "system", icon: "monitor", label: "Same as my computer" },
 ];
 
-function ThemeSwitch({ onDark = false }: { onDark?: boolean }) {
+function ThemeSwitch() {
   const [theme, setTheme] = useTheme();
   return (
-    <div role="group" aria-label="Theme" className={`inline-flex rounded-xl p-0.5 ${onDark ? "bg-white/5 ring-1 ring-white/10" : "border border-slate-200 bg-slate-100"}`}>
+    <div role="group" aria-label="Theme" className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
       {THEMES.map((t) => (
         <button key={t.value} type="button" title={t.label} aria-label={t.label} aria-pressed={theme === t.value}
           onClick={() => setTheme(t.value)}
           className={`rounded-lg p-1.5 transition ${theme === t.value
-            ? (onDark ? "bg-white/15 text-white" : "bg-surface text-indigo-600 shadow-sm")
-            : (onDark ? "text-white/50 hover:text-white" : "text-slate-500 hover:text-slate-800")}`}>
+            ? "bg-surface text-indigo-600 shadow-sm"
+            : "text-slate-500 hover:text-slate-800"}`}>
           <Icon name={t.icon} />
         </button>
       ))}
@@ -125,24 +125,26 @@ export function AppLayout() {
   useScheduledReminders(showReminder); // Settings → Reminders: a toast (and notification) when one fires
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => api.get<{ full_name?: string | null; headline?: string | null }>("/profile"),
     staleTime: 300_000, retry: false }).data;
-  // The dark sidebar uses fixed colours (white/…): the dark theme remaps the slate shades.
+  // Sidebar colours are theme tokens (--color-sidebar-*, index.css): light and dark values.
   const item = (s: Section) => {
     const n = summary && s.badge ? s.badge(summary) : undefined;
     const on = s === section;
     return (
       <Link key={s.to} to={s.to} title={s.hint} aria-current={on ? "page" : undefined}
-        className={`group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${on ? "bg-white/10 font-semibold text-white" : "text-white/60 hover:bg-sidebar-hover hover:text-white"}`}>
-        {on && <span aria-hidden className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-[#818cf8] to-[#a78bfa]" />}
-        <Icon name={s.icon} className={`h-[18px] w-[18px] ${on ? "text-[#a5b4fc]" : "text-white/40 group-hover:text-white/80"}`} />
+        className={`group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${on
+          ? "bg-sidebar-active font-semibold text-sidebar-active-text"
+          : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-strong"}`}>
+        {on && <span aria-hidden className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-[#6366f1] to-[#8b5cf6]" />}
+        <Icon name={s.icon} className={`h-[18px] w-[18px] ${on ? "text-sidebar-active-text" : "text-sidebar-muted group-hover:text-sidebar-strong"}`} />
         <span className="flex-1">{s.label}</span>
-        {!!n && <span className={`rounded-full px-2 py-px text-[11px] font-semibold ${s.to === "/followups" ? "bg-[#f59e0b]/20 text-[#fcd34d]" : "bg-[#6366f1]/25 text-[#c7d2fe]"}`}
+        {!!n && <span className={`min-w-6 rounded-full px-2 py-px text-center text-[11px] font-bold tabular-nums ${s.to === "/followups" ? "bg-[#f59e0b] text-[#3b2400]" : "bg-[#6366f1] text-white"}`}
           title={s.to === "/followups" ? "Due today or overdue" : "New jobs to review"}>{n}</span>}
       </Link>
     );
   };
   const group = (label: string, items: Section[]) => (
     <div className="space-y-0.5">
-      <div className="px-3 pb-1.5 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</div>
+      <div className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-muted">{label}</div>
       {items.map(item)}
     </div>
   );
@@ -156,25 +158,25 @@ export function AppLayout() {
     <div className="flex items-center gap-3 px-5 pb-2 pt-5">
       <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#6366f1] via-[#8b5cf6] to-[#d946ef] font-display text-sm font-extrabold text-white shadow-[0_6px_16px_-4px_rgb(139_92_246/0.6)]">CI</span>
       <div>
-        <div className="font-display text-[15px] font-bold tracking-tight text-white">Career Intelligence</div>
-        <div className="text-[11px] text-white/40">Your job search, in one place</div>
+        <div className="font-display text-[15px] font-bold tracking-tight text-sidebar-strong">Career Intelligence</div>
+        <div className="text-[11px] text-sidebar-muted">Your job search, in one place</div>
       </div>
     </div>
   );
   const initials = (profile?.full_name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "Me";
   const footer = (
-    <div className="mt-auto space-y-3 border-t border-white/10 p-4">
+    <div className="mt-auto space-y-3 border-t border-sidebar-line p-4">
       <Link to="/profile" className="flex items-center gap-3 rounded-xl p-1.5 hover:bg-sidebar-hover">
-        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#334155] to-[#1e293b] text-xs font-bold text-white ring-1 ring-white/15">{initials}</span>
+        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-xs font-bold text-white ring-2 ring-indigo-100">{initials}</span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-white">{profile?.full_name || "My profile"}</span>
-          <span className="block truncate text-[11px] text-white/40">{profile?.headline || "CV, target roles, answers"}</span>
+          <span className="block truncate text-sm font-medium text-sidebar-strong">{profile?.full_name || "My profile"}</span>
+          <span className="block truncate text-[11px] text-sidebar-muted">{profile?.headline || "CV, target roles, answers"}</span>
         </span>
       </Link>
-      <div className="flex items-center justify-between px-1.5 text-[11px] text-white/40">Theme <ThemeSwitch onDark /></div>
+      <div className="flex items-center justify-between px-1.5 text-[11px] text-sidebar-muted">Theme <ThemeSwitch /></div>
     </div>
   );
-  const sidebar = "flex flex-col overflow-y-auto bg-sidebar";
+  const sidebar = "flex flex-col overflow-y-auto bg-sidebar border-r border-sidebar-line";
   if (setup.data?.needs_setup) return <Navigate to="/welcome" replace />;
   return (
     <div className="flex min-h-screen">

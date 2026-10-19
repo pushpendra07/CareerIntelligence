@@ -23,7 +23,7 @@ browser). **+ Add job** is always at the top right.
 | Menu | Tabs |
 |---|---|
 | **Today** | Today (your dashboard) · Insights (analytics) |
-| **Jobs** (number = new jobs to review) | Review new · All jobs · Companies |
+| **Jobs** (number = new jobs to review) | All jobs · Companies · AI search · Review new |
 | **Pipeline** | Applications · Interviews · Offers · Recruiters |
 | **Follow-ups** (number = due today or late) | — |
 | **My profile** | Profile · Target roles · CVs · Question bank |
@@ -177,15 +177,20 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
 ## 6. Get jobs into the app
 
 Every way below goes through the same pipeline: duplicates are merged (one job can show
-*LinkedIn ✓ Indeed ✓ Sheet ✓*), the description is parsed and the job is scored.
+*LinkedIn ✓ Indeed ✓ Sheet ✓*), the description is parsed and the job is scored. The same
+company and title in another city, a repost with a new link, or a link with the same posting
+ID is the same job — it is added to the job you already have (and applied to), not added again.
+Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to merge them.
 
 | Way | Where | Best for |
 |---|---|---|
 | **Built-in job scanner** | Settings → Job scanner → **Scan now** (or company page → Scan jobs) | Companies on supported job boards — full descriptions, 1–3 min |
+| **Job collector** (Chrome extension) | Install once: Settings → Job sources → **Chrome extension** → **Download extension (.zip)** → unzip → `chrome://extensions` → Developer mode → **Load unpacked**. On any job page click its icon → the job is added (or "Already in your list: #id") | LinkedIn, Naukri, Indeed, Foundit, Glassdoor, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, company careers pages |
+| **AI search** | Jobs → **AI search** → click a portal → pick the title and **Location** (one multi-select: Remote / Hybrid / Onsite and your cities; remote = anywhere in India, hybrid/onsite = each city) → **Job collector** (automatic, default) or **Claude** / **Gemini** (the portal opens with your search filled in and the prompt copied: open the assistant, paste, Enter) or **Job collector** (the extension reads up to N jobs and brings them back to be checked). Or pick portals → **Copy prompt** → give it to Claude (Chrome extension / Desktop) or Gemini; it searches in your browser and pastes the jobs into *Jobs from the assistant* → **Check** (shows new vs already saved) → **Add N new jobs**. Tagged *AI search* | LinkedIn, Naukri, Indeed, Foundit, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, Glassdoor |
 | **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
 | **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
-| **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now** (set up once with `./scripts/setup-career-ops.sh`) | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
+| **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now**, or automatically (*Run automatically*: every N hours, and import as soon as Career-Ops finds something new) — set up once with `./scripts/setup-career-ops.sh` | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
 
 Job scanner setup (once): Settings → Job scanner → *What to keep*:
 titles to keep (e.g. magento, adobe commerce, php), generic titles that need your stack in the
@@ -424,7 +429,7 @@ Settings has four tabs:
 
 | Tab | What's there |
 |---|---|
-| **Job sources** | An overview of every job source (set up? last run?), then: **Job scanner** — *Search every company* switch, Scan now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import |
+| **Job sources** | An overview of every job source (set up? last run?), then: **Job scanner** — *Search every company* switch, Scan now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import, *Run automatically* (Scan + import every N hours; import when its files change), *What Career-Ops searches* (its companies and filters, read-only) |
 | **Scoring** | What each part of the 0–100 score looks at, their weights (must total 100), the score each recommendation label needs, and (Advanced) company-tier points and deal-breakers. Save re-scores every job; Undo changes discards edits |
 | **Backup & import** | Download a full JSON backup or any list as CSV; import jobs or recruiters from a CSV/JSON file |
 | **About & AI** | Whether optional AI is on and how to turn it on; versions, Google account, Career-Ops path, storage |

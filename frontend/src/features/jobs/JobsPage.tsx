@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
@@ -16,6 +16,28 @@ const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "loca
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
   "CLOSED", "NOT_RELEVANT"];
+/** Shown first until there's a history of status changes (most people use these most). */
+const DEFAULT_MOST_USED = ["APPLIED", "NOT_RELEVANT", "CLOSED", "REJECTED", "INTERVIEW"];
+
+/**
+ * Options for a job-status <select>: the statuses you set most often first ("Most used",
+ * from GET /jobs/status-usage), then every status in pipeline order.
+ */
+export function JobStatusOptions() {
+  const usage = useQuery({
+    queryKey: ["jobs", "status-usage"], staleTime: 300_000, retry: false,
+    queryFn: () => api.get<Record<string, number>>("/jobs/status-usage"),
+  }).data;
+  const used = Object.keys(usage ?? {}).filter((s) => JOB_STATUSES.includes(s));
+  const top = (used.length >= 3 ? used : [...used, ...DEFAULT_MOST_USED.filter((s) => !used.includes(s))]).slice(0, 5);
+  return (
+    <>
+      <optgroup label="Most used">{top.map((s) => <option key={`top-${s}`} value={s}>{humanize(s)}</option>)}</optgroup>
+      <optgroup label="All statuses">{JOB_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}</optgroup>
+    </>
+  );
+}
+
 const RECS = ["HIGHLY_RECOMMENDED", "RECOMMENDED", "CONSIDER", "LOW_PRIORITY", "NOT_RECOMMENDED"];
 const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GREENHOUSE", "LEVER", "WORKDAY",
   "SMARTRECRUITERS", "SUCCESSFACTORS", "ASHBY", "COMPANY_CAREERS", "REFERRAL", "RECRUITER_EMAIL", "WHATSAPP",
@@ -93,8 +115,10 @@ function SortButton({ label, field, first, sort, onSort }: SortProps) {
   );
 }
 
-function SortHeader({ extra, ...props }: SortProps & { extra?: ReactNode }) {
-  const dir = props.sort === props.field ? "ascending" : props.sort === `-${props.field}` ? "descending" : "none";
+function SortHeader({ extra, extraField, ...props }: SortProps & { extra?: ReactNode; extraField?: string }) {
+  // A header with two sort buttons (e.g. Posted · Added) reports whichever one is active.
+  const field = extraField && props.sort.replace(/^-/, "") === extraField ? extraField : props.field;
+  const dir = props.sort === field ? "ascending" : props.sort === `-${field}` ? "descending" : "none";
   return (
     <th className="th" aria-sort={dir}>
       <span className="inline-flex items-center gap-2"><SortButton {...props} />{extra && <span className="text-slate-300">·</span>}{extra}</span>
@@ -220,7 +244,7 @@ function BulkBar({ ids, onDone }: { ids: number[]; onDone: () => void }) {
   const set = (status: string) => run.mutate({ action: "status", status });
   if (!ids.length) return message ? <p className="mb-2 rounded bg-emerald-50 p-2 text-sm text-emerald-800" role="status">{message}</p> : null;
   return (
-    <div className="sticky top-0 z-10 mb-2 flex flex-wrap items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-sm dark:bg-indigo-950" role="region" aria-label="Selected jobs">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-sm dark:bg-indigo-950" role="region" aria-label="Selected jobs">
       <b>{ids.length} selected</b>
       <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("SHORTLISTED")}>★ Shortlist</button>
       <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("NOT_RELEVANT")}>Not relevant</button>
@@ -228,7 +252,7 @@ function BulkBar({ ids, onDone }: { ids: number[]; onDone: () => void }) {
       <select className="input w-auto py-1 text-xs" aria-label="Set status of selected jobs" value="" disabled={run.isPending}
         onChange={(e) => e.target.value && set(e.target.value)}>
         <option value="">Set status…</option>
-        {JOB_STATUSES.map((st) => <option key={st} value={st}>{humanize(st)}</option>)}
+        <JobStatusOptions />
       </select>
       {confirm ? (
         <span className="flex items-center gap-1 text-xs">
@@ -295,6 +319,16 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   // Ticked jobs; cleared when the page, filters or rows-per-page change.
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const phone = usePhone();
+  const stickyTop = useHeaderHeight(!phone);
+  const sticky = stickyTop !== undefined;
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const toolbarHeight = useElementHeight(toolbarRef, sticky);
+  const headerBottom = (stickyTop ?? 0) + toolbarHeight; // where the column headers stick
+  // Column headers stick to the page only when the table fits its card (no inner scroll box);
+  // otherwise the table scrolls sideways inside the card, as on small windows.
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const fits = useTableFits(tableWrapRef, sticky && !!data?.items.length);
+  const stickyHead = sticky && fits;
   const listKey = JSON.stringify([listQuery, page, size]);
   useEffect(() => setSelected(new Set()), [listKey]);
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -354,10 +388,17 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
-        <Link className="btn-primary sm:hidden" to="/jobs/new">Add Job</Link>
+        <div className="flex items-center gap-2">
+          <DuplicatesLink />
+          <Link className="btn-primary sm:hidden" to="/jobs/new">Add Job</Link>
+        </div>
       </div>
       <StatusTabs active={tab.key} query={query} />
-      <Card>
+      {/* Like Magento's admin grid: search, sort, paging and bulk actions stay under the top bar
+          while the list scrolls; the filter panel below scrolls away (not on phones). */}
+      <div ref={toolbarRef} data-testid="jobs-toolbar" style={sticky ? { top: stickyTop } : undefined}
+        className={sticky ? "sticky z-20 -mx-2 bg-page/85 px-2 py-1 backdrop-blur-md" : ""}>
+      <section className="card space-y-2 p-3!">
         <div className="flex flex-wrap items-center gap-2">
           <input className="input min-w-56 flex-1" placeholder="Search title, company, location or job ID (#123)" aria-label="Search jobs"
             key={params.get("q") ?? ""} defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
@@ -368,7 +409,12 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+        {data && data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "job" : "jobs"} />}
+        {data && data.items.length > 0 && <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />}
+      </section>
+      </div>
+      <Card>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Chips label="Score" options={SCORE_CHIPS} value={params.get("min_score") ?? ""} onChange={(v) => set("min_score", v)} />
           <Chips label="Work" options={WORK_CHIPS} value={params.get("work_model") ?? ""} onChange={(v) => set("work_model", v)} />
           <Chips label="Posted" options={POSTED_CHIPS} value={params.get("posted_within") ?? ""} onChange={(v) => set("posted_within", v)} />
@@ -411,15 +457,14 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       {(isLoading || !restored) && <Spinner />}
       {error && <ErrorBox error={error} />}
       {data && (
-        <Card className="scroll-mt-16" id="jobs-list">
-          {data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "job" : "jobs"} />}
-          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (
-            <div className="overflow-x-auto">
-              <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />
+        <section id="jobs-list" className="card" style={{ scrollMarginTop: sticky ? headerBottom + 8 : 64 }}>
+          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (<>
+            {/* Wide screens: no inner scroll box, so the column headers can stick to the page. */}
+            <div ref={tableWrapRef} className={stickyHead ? "" : "overflow-x-auto"}>
               {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} /> : <>
               <p className="mb-2 text-xs text-slate-500"><b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead><tr>
+              <table className="min-w-full divide-y divide-slate-100 [&_td]:px-2 [&_th]:px-2">
+                <thead className={stickyHead ? "sticky z-10" : ""} style={stickyHead ? { top: headerBottom } : undefined}><tr>
                   <th className="th w-8">
                     <input type="checkbox" aria-label="Select all jobs on this page"
                       checked={data.items.length > 0 && data.items.every((j) => selected.has(j.id))}
@@ -429,22 +474,22 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   <SortHeader label="ID" field="id" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Score" field="match_score" first="desc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
-                    extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
+                    extraField="company" extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
                   <SortHeader label="Location" field="location" first="asc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy} />
                   <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
-                  <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy} />
-                  <SortHeader label="Added" field="created_at" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy}
+                    extraField="created_at" extra={<SortButton label="Added" field="created_at" first="desc" sort={sort} onSort={sortBy} />} />
                   <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
                   <th className="th">Next step</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
-                    <tr key={j.id} className={selected.has(j.id) ? "bg-indigo-50/60" : "hover:bg-slate-50"}>
+                    <tr key={j.id} className={selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}>
                       <td className="td w-8"><input type="checkbox" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
-                      <td className="td max-w-md">
+                      <td className="td max-w-md [overflow-wrap:anywhere]">
                         <Link to={`/jobs/${j.id}`} className="font-medium text-slate-800 hover:text-indigo-700">{j.title}</Link>
                         <div className="text-xs text-slate-500">
                           {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
@@ -452,11 +497,13 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                         </div>
                         <div className="mt-0.5"><AddedViaTags values={j.added_via} /></div>
                       </td>
-                      <td className="td text-xs">{j.location ?? "—"}{j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}</td>
+                      <td className="td max-w-40 text-xs [overflow-wrap:anywhere]">{j.location ?? "—"}{j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}</td>
                       <td className="td text-xs">{experienceRange(j.experience_min, j.experience_max)}</td>
                       <td className="td text-xs">{j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</td>
-                      <td className="td text-xs" title="Date the job was posted on the job site">{formatDate(j.posting_date)}</td>
-                      <td className="td text-xs" title="Date the job was added to this app">{formatDate(j.created_at)}</td>
+                      <td className="td whitespace-nowrap text-xs">
+                        <div title="Date the job was posted on the job site">{formatDate(j.posting_date)}</div>
+                        <div className="text-slate-500" title="Date the job was added to this app">added {formatDate(j.created_at)}</div>
+                      </td>
                       <td className="td"><JobStatusBadge value={j.status} /></td>
                       <td className="td whitespace-nowrap">
                         <span className="inline-flex items-center gap-2"><NextStep job={j} /><DeleteJobButton jobId={j.id} title={j.title} compact /></span>
@@ -467,11 +514,74 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
               </table>
               </>}
             </div>
-          )}
+          </>)}
           <Pagination page={page} size={size} total={data.total} onPage={setPage} scrollTo="jobs-list"
             onSize={(n) => { setSize(n); setPage(1); }} noun={data.total === 1 ? "job" : "jobs"} />
-        </Card>
+        </section>
       )}
     </div>
   );
+}
+
+/** "3 duplicates" next to the title when jobs were saved more than once; opens the merge page. */
+function DuplicatesLink() {
+  const dups = useQuery({
+    queryKey: ["jobs", "duplicates"],
+    queryFn: () => api.get<{ extra_jobs: number }>("/jobs/duplicates"),
+    retry: false,
+  });
+  const n = dups.data?.extra_jobs ?? 0;
+  if (!n) return null;
+  return (
+    <Link className="btn-secondary px-2.5 py-1 text-xs" to="/jobs/duplicates" title="The same job saved more than once — review and merge">
+      {n} duplicate{n === 1 ? "" : "s"}
+    </Link>
+  );
+}
+
+/** Height of the app's sticky top bar, so content can stick right under it; undefined when off. */
+function useHeaderHeight(enabled: boolean): number | undefined {
+  const [height, setHeight] = useState<number>();
+  useLayoutEffect(() => {
+    const header = document.querySelector("header");
+    if (!enabled || !header || typeof ResizeObserver === "undefined") { setHeight(undefined); return; }
+    const update = () => setHeight(Math.round(header.getBoundingClientRect().height));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [enabled]);
+  return height;
+}
+
+/** Current height of an element (follows resizes); 0 when off or not measurable. */
+function useElementHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): number {
+  const [height, setHeight] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!enabled || !el || typeof ResizeObserver === "undefined") { setHeight(0); return; }
+    const update = () => setHeight(Math.round(el.getBoundingClientRect().height));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, enabled]);
+  return height;
+}
+
+/** Whether the table inside `ref` is no wider than its container (follows resizes). */
+function useTableFits(ref: RefObject<HTMLElement | null>, enabled: boolean): boolean {
+  const [fits, setFits] = useState(true);
+  useLayoutEffect(() => {
+    const wrap = ref.current;
+    const table = wrap?.querySelector("table");
+    if (!enabled || !wrap || !table || typeof ResizeObserver === "undefined") return;
+    const update = () => setFits(table.scrollWidth <= wrap.clientWidth + 1);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(wrap);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [ref, enabled]);
+  return fits;
 }

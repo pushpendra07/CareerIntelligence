@@ -48,11 +48,16 @@ Manual entry, Career-Ops import and CSV/JSON import all call `job_service.ingest
 2. **Deduplicate**, first match wins:
    - same normalized URL
    - same source and posting ID
-   - same company, title and compatible location, posted within 60 days
-   - similar title and near-identical JD
+   - the same posting ID (6+ digits) in a link, on any site
+   - same company and title in any city, posted within 60 days (the city is added to the
+     job's locations); not into a Not relevant/Closed job in another city
+   - a repost: one title is the other with words dropped, same level (Senior, II…), JD ≥ 60%
+   - similar title and near-identical JD, unless the employer's site gives them different IDs
 
-   It never merges two different requisition IDs, or two different IDs from the same
-   aggregator. A duplicate adds a `job_sources` row, so one job lists every place it was seen.
+   It never merges two different requisition IDs, two different IDs from the same aggregator,
+   or different levels ("Senior Engineer" vs "Engineer"). Ingest takes a transaction advisory
+   lock so concurrent sources take turns. Older duplicates: `GET /jobs/duplicates` and
+   `POST /jobs/duplicates/merge` (keeps the copy with the furthest status). A duplicate adds a `job_sources` row, so one job lists every place it was seen.
 3. **Parse the JD** (`jobs/jd_parser.py`). This is deterministic and works per section and
    per sentence:
    - required vs preferred skills

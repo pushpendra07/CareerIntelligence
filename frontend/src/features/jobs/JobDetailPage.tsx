@@ -15,7 +15,7 @@ import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
 import { ContactLinks } from "../../components/ContactLinks";
-import { APPLIED_STATUSES, JOB_STATUSES, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
+import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
   EXACT_MATCH: "green", PARTIAL_MATCH: "blue", RELATED: "amber", MISSING: "red", NICE_TO_HAVE: "gray",
@@ -226,7 +226,7 @@ export function JobDetailPage() {
           <span className="text-slate-500">Status</span>
           <JobStatusBadge value={j.status} />
           <select className="input w-auto py-1 text-xs" aria-label="Job status" value={j.status} onChange={(e) => status.mutate(e.target.value)}>
-            {JOB_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
+            <JobStatusOptions />
           </select>
           {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
         </div>

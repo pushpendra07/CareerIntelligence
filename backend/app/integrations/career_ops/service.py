@@ -81,6 +81,20 @@ def _hash(path: Path) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
+def watched_hashes(root: Path) -> dict[str, str | None]:
+    """Fingerprint of every file the import reads; a change means there is something new."""
+    files = [root / "data" / "pipeline.md", root / "data" / "scan-history.tsv",
+             readers.resolve_tracker(root)]
+    out = {str(p.relative_to(root)): _hash(p) for p in files}
+    for folder in ("reports", "jds"):
+        entries = sorted(
+            f"{p.name}:{p.stat().st_size}:{p.stat().st_mtime_ns}"
+            for p in (root / folder).glob("*.md")
+        ) if (root / folder).is_dir() else []
+        out[folder] = hashlib.sha256("\n".join(entries).encode()).hexdigest()
+    return out
+
+
 def _key(url: str | None, company: str | None, title: str | None) -> str:
     if url:
         return normalize_url(url)
@@ -243,10 +257,7 @@ def import_from_career_ops(
             run.errors = [*run.errors, {"stage": "scan", "error": str(exc)}]
             logger.warning("career-ops scan failed", extra={"error": str(exc)})
 
-    run.file_hashes = {
-        name: _hash(root / name)
-        for name in ("data/pipeline.md", "data/scan-history.tsv", "data/applications.md")
-    }
+    run.file_hashes = watched_hashes(root)
     records, skipped = collect(root)
     stats: dict[str, int] = {
         "records": len(records),
@@ -420,6 +431,14 @@ def status(db: Session, settings: Settings) -> dict[str, Any]:
             "errors": last.errors,
         }
     )
+    cfg = automation_settings(db)
+    due = next_scan_at(db, cfg)
+    info["automation"] = {
+        **cfg,
+        "scan_ready": settings.career_ops_scan_enabled and info["node_available"],
+        "next_scan_at": due if info["node_available"] and settings.career_ops_scan_enabled
+        else None,
+    }
     info["imported_jobs"] = len(
         list(db.scalars(select(Job.id).where(Job.source == JobSource.CAREER_OPS.value)))
     )
@@ -469,3 +488,103 @@ def start_sync(db: Session, settings: Settings) -> CareerOpsImport:
     threading.Thread(target=_sync_in_background, args=(run.id, settings),
                      name=f"career-ops-sync-{run.id}", daemon=True).start()
     return run
+
+
+# --- automatic runs (Settings -> Career-Ops) -------------------------------------------------
+
+DEFAULT_SETTINGS: dict[str, Any] = {
+    "schedule_hours": 0,  # 0 = off; e.g. 24 = Scan + import once a day while the app runs
+    "auto_import": False,  # import whenever Career-Ops' files change (e.g. a terminal scan)
+}
+CHECK_EVERY_SECONDS = 300
+
+
+def validate_settings(cfg: dict[str, Any]) -> dict[str, Any]:
+    out = {**DEFAULT_SETTINGS, **cfg}
+    try:
+        hours = int(out["schedule_hours"] or 0)
+    except (TypeError, ValueError) as exc:
+        raise DomainValidationError("career_ops.schedule_hours must be a number") from exc
+    if not 0 <= hours <= 168:
+        raise DomainValidationError("career_ops.schedule_hours must be between 0 and 168")
+    return {"schedule_hours": hours, "auto_import": bool(out["auto_import"])}
+
+
+def automation_settings(db: Session) -> dict[str, Any]:
+    from app.models.app_settings import AppSettings
+
+    row = db.get(AppSettings, 1)
+    return {**DEFAULT_SETTINGS, **((row.data if row else {}).get("career_ops") or {})}
+
+
+def next_scan_at(db: Session, cfg: dict[str, Any]) -> datetime | None:
+    """When the next scheduled Scan + import is due (None when the schedule is off)."""
+    hours = int(cfg.get("schedule_hours") or 0)
+    if hours <= 0:
+        return None
+    last = db.scalar(select(CareerOpsImport.started_at)
+                     .where(CareerOpsImport.scan_triggered.is_(True))
+                     .order_by(CareerOpsImport.id.desc()).limit(1))
+    return last + timedelta(hours=hours) if last else datetime.now(UTC)
+
+
+def scheduled_tick(db: Session, settings: Settings) -> str | None:
+    """One scheduler check: start a due Scan + import, or import changed files.
+
+    Returns what was started ("scan" or "import"), or None.
+    """
+    if settings.career_ops_path is None or running_import(db):
+        return None
+    cfg = automation_settings(db)
+    due = next_scan_at(db, cfg)
+    if (due is not None and due <= datetime.now(UTC) and settings.career_ops_scan_enabled
+            and runner.node_binary()):
+        start_sync(db, settings)
+        return "scan"
+    if not cfg["auto_import"]:
+        return None
+    try:
+        root = data_root(settings)
+    except DomainValidationError:
+        return None
+    last = db.scalar(select(CareerOpsImport.file_hashes)
+                     .where(CareerOpsImport.status != "RUNNING")
+                     .order_by(CareerOpsImport.id.desc()).limit(1))
+    if last == watched_hashes(root):
+        return None
+    import_from_career_ops(db, settings)
+    return "import"
+
+
+def _scheduler_loop(stop: threading.Event, settings: Settings) -> None:
+    from app.db.session import get_sessionmaker
+
+    while not stop.wait(CHECK_EVERY_SECONDS):
+        try:
+            with get_sessionmaker()() as db:
+                if started := scheduled_tick(db, settings):
+                    logger.info("career-ops automatic run", extra={"kind": started})
+        except ConflictError:
+            pass
+        except Exception:
+            logger.exception("career-ops automatic run failed")
+
+
+def start_scheduler(settings: Settings) -> threading.Event:
+    stop = threading.Event()
+    threading.Thread(target=_scheduler_loop, args=(stop, settings), name="career-ops-scheduler",
+                     daemon=True).start()
+    return stop
+
+
+def portals(settings: Settings) -> dict[str, Any]:
+    """Career-Ops' scan setup (portals.yml), read-only: companies and filters."""
+    root = data_root(settings)
+    candidates = [root / "portals.yml"]
+    if settings.career_ops_path:
+        candidates.append(settings.career_ops_path / "portals.yml")
+    for path in candidates:
+        if (found := readers.read_portals(path)) is not None:
+            return {"path": str(path), **found}
+    return {"path": None, "companies": [], "title_keep": [], "title_skip": [], "locations": [],
+            "max_posting_age_days": None}

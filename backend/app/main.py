@@ -28,13 +28,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Scores and JD parses are also kept current in the background (services/freshness.py).
         stops = []
         if settings.environment != "test":
+            from app.integrations.career_ops.service import start_scheduler as start_career_ops
             from app.scanner.runner import start_scheduler
             from app.services.backup_service import start_scheduler as start_backups
             from app.services.freshness import start_refresher
             from app.services.reminder_service import start_scheduler as start_reminders
 
             stops = [start_scheduler(), start_refresher(), start_backups(settings),
-                     start_reminders()]
+                     start_reminders(), start_career_ops(settings)]
         yield
         for stop in stops:
             stop.set()

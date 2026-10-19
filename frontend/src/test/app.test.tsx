@@ -122,7 +122,7 @@ describe("jobs list", () => {
     // Technology is a "more" filter: the panel opens by itself when it's in use.
     expect(screen.getByLabelText("Technology")).toHaveValue("PHP");
     expect(screen.getByRole("button", { name: "Fewer filters" })).toHaveAttribute("aria-expanded", "true");
-    const call = api.fn.mock.calls[0][0] as string;
+    const call = api.fn.mock.calls.map((c) => String(c[0])).find((u) => u.includes("/jobs?")) ?? "";
     expect(call).toContain("technology=PHP");
     expect(call).toContain("min_score=70");
   });

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { locate } from "../layouts/AppLayout";
@@ -36,9 +36,39 @@ describe("settings", () => {
     expect(await screen.findByText("1 saved · private sheets connected")).toBeInTheDocument();
     expect(await screen.findByText("Not set up (optional)")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add Job by hand/ })).toHaveAttribute("href", "/jobs/new");
+    expect(screen.getByRole("link", { name: "Download extension (.zip)" })).toHaveAttribute("href", expect.stringContaining("/api/v1/extension.zip?app="));
+    expect(screen.getByText("Not installed in this browser.")).toBeInTheDocument();
     // Removed: the one-off sheet import (Google Sheets card does it) and notification options that did nothing.
     expect(screen.queryByText(/Import from Google Sheet/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Daily digest/)).not.toBeInTheDocument();
+  });
+
+  it("career-ops: runs automatically and shows what it searches", async () => {
+    const api = mockApi({
+      "GET /scanner/status": { supported_boards: [], job_search_enabled: 0, scannable: 0, by_provider: {}, not_scannable: [], running: null, last_run: null,
+        settings: { title_include: [], title_broad: [], jd_keywords: [], title_exclude: [], locations: [], location_exclude: [],
+          keep_unknown_location: true, max_age_days: 45, max_new_per_company: 50, schedule_hours: 0, search_all_companies: false } },
+      "GET /sheets": [], "GET /sheets/access": { service_account: null, key_file: null, error: null },
+      "GET /career-ops/status": { configured: true, scan_enabled: true, node_available: true, code_root: "/x/career-ops", counts: {},
+        automation: { schedule_hours: 0, auto_import: false, scan_ready: true, next_scan_at: null } },
+      "PATCH /settings/app": {},
+      "GET /career-ops/portals": { path: "/x/career-ops/portals.yml", max_posting_age_days: 60, title_keep: ["Magento"], title_skip: ["Intern"],
+        locations: ["Pune"], companies: [{ name: "Acme Commerce", careers_url: "https://job-boards.greenhouse.io/acme", enabled: true, notes: null },
+          { name: "Old Co", careers_url: null, enabled: false, notes: null }] },
+    });
+    renderAt(<SettingsPage />);
+    const hours = await screen.findByLabelText("Scan + import every (hours, 0 = off)");
+    await userEvent.clear(hours);
+    await userEvent.type(hours, "24");
+    await userEvent.click(screen.getByLabelText(/Import as soon as Career-Ops finds something new/));
+    const card = hours.closest("div.rounded-lg") as HTMLElement;
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
+    await vi.waitFor(() => expect(api.calls.find((c) => c.method === "PATCH")?.body).toEqual({ career_ops: { schedule_hours: 24, auto_import: true } }));
+
+    await userEvent.click(screen.getByText("What Career-Ops searches"));
+    expect(await screen.findByText("Acme Commerce")).toBeInTheDocument();
+    expect(screen.getByText("1 on · 1 off")).toBeInTheDocument();
+    expect(screen.getByText("Old Co").parentElement).toHaveTextContent("(off)");
   });
 
   it("scoring: explains each part, saves only real changes, can undo", async () => {

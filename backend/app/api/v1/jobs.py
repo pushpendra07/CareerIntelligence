@@ -28,7 +28,13 @@ from app.schemas.job import (
     SourceIn,
     StatusIn,
 )
-from app.services import description_service, freshness, job_service, match_service
+from app.services import (
+    agent_import,
+    description_service,
+    freshness,
+    job_service,
+    match_service,
+)
 from app.services import email_draft as email_draft_service
 from app.services.job_service import JobFilters, JobInput
 
@@ -146,7 +152,8 @@ def job_filters(
     salary_min: Decimal | None = None,
     status: Annotated[list[str] | None, Query()] = None,
     closed: bool | None = None,
-    added_via: Literal["manual", "sheet", "scanner", "career_ops", "file"] | None = None,
+    added_via: Literal["manual", "sheet", "scanner", "career_ops", "file", "ai_search"]
+    | None = None,
     stale: bool | None = None,
     has_application: bool | None = None,
     sort: Literal[
@@ -206,6 +213,48 @@ def fetch_descriptions(db: DB, body: FetchDescriptionsIn) -> dict[str, Any]:
 def bulk_jobs(db: DB, body: BulkJobsIn) -> dict[str, Any]:
     """Set the status of, or delete, up to 500 jobs. Deleting skips jobs with applications."""
     return job_service.bulk_update(db, body.job_ids, body.action, body.status)
+
+
+class AgentImportIn(BaseModel):
+    jobs: list[Any]
+    dry_run: bool = False
+    allow_deleted: bool = False  # add a job the user deleted before (they asked for it)
+
+
+@router.post("/jobs/agent-import")
+def agent_import_jobs(db: DB, body: AgentImportIn) -> dict[str, Any]:
+    """Jobs an AI assistant found on job portals (LinkedIn, Naukri…), deduplicated.
+
+    `dry_run=true` only reports which are new / already in the app / deleted / invalid.
+    """
+    return agent_import.import_jobs(db, body.jobs, dry_run=body.dry_run,
+                                    allow_deleted=body.allow_deleted)
+
+
+class MergeDuplicatesIn(BaseModel):
+    keep_ids: list[int] | None = None  # merge only the groups led by these jobs; None = all
+
+
+@router.get("/jobs/duplicates")
+def job_duplicates(db: DB) -> dict[str, Any]:
+    """Jobs saved more than once (same rules as import). The first job of a group is kept."""
+    groups = job_service.find_duplicate_groups(db)
+    return {
+        "groups": [[_out(j).model_dump(mode="json") for j in g] for g in groups],
+        "extra_jobs": sum(len(g) - 1 for g in groups),
+    }
+
+
+@router.post("/jobs/duplicates/merge")
+def merge_duplicates(db: DB, body: MergeDuplicatesIn) -> dict[str, Any]:
+    """Merge each duplicate group into its first job: sources, notes, applications move over."""
+    return job_service.merge_duplicate_groups(db, body.keep_ids)
+
+
+@router.get("/jobs/status-usage")
+def job_status_usage(db: DB) -> dict[str, int]:
+    """How often each status was chosen, most used first — orders the status pickers."""
+    return job_service.status_usage(db)
 
 
 @router.get("/jobs/status-counts")

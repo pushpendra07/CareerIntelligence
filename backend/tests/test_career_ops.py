@@ -263,3 +263,65 @@ def test_career_ops_location(database_url: str) -> None:
         _env_file=None, environment="test", database_url=database_url
     )
     assert off.career_ops_path is None  # tests never pick up a real install
+
+
+def test_automatic_scan_and_import_on_change(
+    co_root: Path, client: TestClient, settings: Settings, db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.core.config import get_settings
+
+    enabled = settings.model_copy(update={"career_ops_path": co_root,
+                                          "career_ops_scan_enabled": True})
+    client.app.dependency_overrides[get_settings] = lambda: enabled  # type: ignore[attr-defined]
+    before = snapshot(co_root)
+    assert service.scheduled_tick(db, enabled) is None  # both off by default
+
+    r = client.patch("/api/v1/settings/app", json={"career_ops": {"auto_import": True}})
+    assert r.json()["career_ops"] == {"schedule_hours": 0, "auto_import": True}
+    assert service.scheduled_tick(db, enabled) == "import"  # never imported yet
+    assert service.scheduled_tick(db, enabled) is None  # files unchanged
+    (co_root / "data" / "pipeline.md").write_text(
+        (co_root / "data" / "pipeline.md").read_text().replace(
+            "## Processed", "- [ ] https://jobs.lever.co/delta/abc | Delta | Magento Lead\n\n"
+            "## Processed"))
+    assert service.scheduled_tick(db, enabled) == "import"  # a terminal scan added a job
+    before = snapshot(co_root)
+
+    started: list[str] = []
+    monkeypatch.setattr(runner, "node_binary", lambda: "/usr/bin/node")
+    monkeypatch.setattr(service, "start_sync", lambda db, s: started.append("scan"))
+    assert client.patch("/api/v1/settings/app",
+                        json={"career_ops": {"schedule_hours": 200}}).status_code == 422
+    client.patch("/api/v1/settings/app", json={"career_ops": {"schedule_hours": 24}})
+    assert service.scheduled_tick(db, enabled) == "scan"  # no scan has run yet: due now
+    scanned = service.new_run(db, enabled, scan=True)  # what the started scan leaves behind
+    scanned.status, scanned.file_hashes = "COMPLETED", service.watched_hashes(co_root)
+    db.commit()
+    assert service.scheduled_tick(db, enabled) is None and started == ["scan"]  # next in 24h
+    auto = client.get("/api/v1/career-ops/status").json()["automation"]
+    assert auto["schedule_hours"] == 24 and auto["next_scan_at"]
+    assert snapshot(co_root) == before  # the app never writes Career-Ops' files
+
+
+def test_portals_are_read_only(co_root: Path, client: TestClient, settings: Settings) -> None:
+    from app.core.config import get_settings
+
+    (co_root / "portals.yml").write_text(
+        "max_posting_age_days: 60\n"
+        "title_filter:\n  positive: [Magento, Adobe Commerce]\n  negative: [Intern]\n"
+        "location_filter:\n  allow: [Remote, Pune]\n"
+        "tracked_companies:\n"
+        "  - name: Acme Commerce\n    careers_url: https://job-boards.greenhouse.io/acme\n"
+        "    enabled: true\n"
+        "  - name: Old Co\n    careers_url: https://old.example/careers\n    enabled: false\n"
+    )
+    configured = settings.model_copy(update={"career_ops_path": co_root})
+    client.app.dependency_overrides[get_settings] = lambda: configured  # type: ignore[attr-defined]
+    before = snapshot(co_root)
+    p = client.get("/api/v1/career-ops/portals").json()
+    assert p["title_keep"] == ["Magento", "Adobe Commerce"] and p["locations"] == ["Remote", "Pune"]
+    assert [(c["name"], c["enabled"]) for c in p["companies"]] == [
+        ("Acme Commerce", True), ("Old Co", False)]
+    assert p["max_posting_age_days"] == 60
+    assert snapshot(co_root) == before

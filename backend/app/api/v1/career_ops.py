@@ -49,6 +49,12 @@ def sync(db: DB, settings: AppSettings, wait: bool = False) -> dict[str, Any]:
     return _run_out(service.start_sync(db, settings))
 
 
+@router.get("/portals")
+def portals(settings: AppSettings) -> dict[str, Any]:
+    """Companies and filters Career-Ops scans (its portals.yml, read-only)."""
+    return service.portals(settings)
+
+
 @router.get("/imports")
 def imports(db: DB) -> list[dict[str, Any]]:
     rows = db.scalars(select(CareerOpsImport).order_by(CareerOpsImport.id.desc()).limit(50))

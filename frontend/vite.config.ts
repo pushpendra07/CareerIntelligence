@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => {
   const target = env.VITE_API_TARGET || "http://127.0.0.1:8000";
   return {
     plugins: [react(), tailwindcss()],
-    server: { port: 5173, proxy: { "/api": target } },
+    // ../browser-extension: its page reader is tested here (src/test/extension-extract.test.ts).
+    server: { port: 5173, proxy: { "/api": target }, fs: { allow: [".", "../browser-extension"] } },
     preview: { port: 4173, proxy: { "/api": target } },
     test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], css: false, globals: true,
       include: ["src/**/*.test.{ts,tsx}"] }, // e2e/ is Playwright (npm run e2e)

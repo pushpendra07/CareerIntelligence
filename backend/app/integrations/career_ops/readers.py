@@ -459,3 +459,41 @@ def read_version(code_root: Path | None) -> str | None:
     if code_root and (code_root / "VERSION").is_file():
         return (code_root / "VERSION").read_text(encoding="utf-8").split("#")[0].strip()
     return None
+
+
+def _words(values: Any) -> list[str]:
+    return [str(v) for v in values if clean(str(v))] if isinstance(values, list) else []
+
+
+def read_portals(path: Path) -> dict[str, Any] | None:
+    """What Career-Ops' scanner searches (portals.yml): companies, title and location filters."""
+    if not path.is_file():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    titles = data.get("title_filter")
+    titles = titles if isinstance(titles, dict) else {}
+    places = data.get("location_filter")
+    places = places if isinstance(places, dict) else {}
+    companies = [
+        {
+            "name": clean(str(c.get("name") or "")),
+            "careers_url": clean(str(c.get("careers_url") or "")) or None,
+            "enabled": c.get("enabled") is not False,
+            "notes": clean(str(c.get("notes") or "")) or None,
+        }
+        for c in data.get("tracked_companies") or []
+        if isinstance(c, dict) and clean(str(c.get("name") or ""))
+    ]
+    age = data.get("max_posting_age_days")
+    return {
+        "max_posting_age_days": age if isinstance(age, int) else None,
+        "title_keep": _words(titles.get("positive")),
+        "title_skip": _words(titles.get("negative")),
+        "locations": _words(places.get("allow")),
+        "companies": companies,
+    }
