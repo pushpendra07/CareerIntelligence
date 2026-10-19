@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { BackButton, Badge, Card, Chips, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
+import { BackButton, Badge, Card, Chips, CopyLinkButton, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
 import type { Application, CV, FollowUp, Interview, JobDetail, Page } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
 import { FollowUpRow, QuickFollowUp, inDays } from "../followups/FollowUpParts";
@@ -110,15 +110,15 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
 /** The one thing to do next, depending on where the job is in your search. */
 function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: () => void; setStatus: (s: string) => void; busy: boolean }) {
   const url = postingUrl(job);
-  const posting = url && <a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a>;
+  const posting = url && <><a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a><CopyLinkButton url={url} /></>;
   let text: string;
   let actions: ReactNode;
   if (NEW_STATUSES.includes(job.status) || job.status === "REVIEWING") {
     text = "Is this worth applying to?";
     actions = <>
+      {posting}
       <button className="btn-primary" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
       <button className="btn-secondary" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
-      {posting}
     </>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     text = job.recommended_cv ? `Ready to apply — send your “${job.recommended_cv.name}” CV.` : "Ready to apply.";

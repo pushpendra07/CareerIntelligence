@@ -74,7 +74,7 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `CAREER_OPS_PATH` | `career-ops/` in the project, if present | Career-Ops checkout (read-only for this app); leave empty for the in-project copy |
 | `CAREER_OPS_DATA_PATH` | — | Only if Career-Ops keeps its data outside the checkout; leave empty otherwise |
 | `CAREER_OPS_SCAN_ENABLED` | `false` | `true` allows **Scan + import** to run Career-Ops' `scan.mjs` |
-| `AI_PROVIDER` | `none` | Optional AI: `none`, `openai`, `anthropic`, `gemini`, `ollama` |
+| `AI_PROVIDER` | `none` | Optional AI: `none`, `anthropic`, `gemini`, `openai`, `omniroute` (OpenAI-compatible gateway, default `http://localhost:20128/v1`), `ollama`. Powers the Assistant chat in free-form mode |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | — | Only when an AI provider is set (costs tokens) |
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
 | `BACKUP_PATH` | `backups` | Automatic backup zips (database dump, data.json, CVs; git-ignored). Restore: `scripts/restore-backup.sh` |
@@ -247,6 +247,14 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   `allow_deleted: true` re-adds a job the user deleted (they asked). Portal buttons
   (`features/jobs/portals.ts`: search URLs; `PortalLauncher.tsx`: popup) → **Claude** / **Gemini**
   (opens the portal search, copies a portal prompt) or **Job collector**.
+- **Assistant chat** (corner button / ⌘J on every page, `features/chat/Chat.tsx`; `POST /api/v1/chat`,
+  `GET /api/v1/chat/status`; backend `app/chat/`): answers from the user's data through read-only
+  tools (`chat/tools.py`: search_jobs, get_job, pipeline_summary, applications, interviews,
+  follow-ups, offers, companies, recruiters, profile, search everything). With an AI provider it
+  is a tool-calling loop (`chat/llm.py`: Anthropic, Gemini, OpenAI-compatible incl. OmniRoute);
+  without one (or if the AI call fails) it uses rule-based commands (`chat/commands.py`).
+  Changes are only **proposed** (`propose_*` tools → `actions` with an API path + body); the UI
+  calls that API when the user clicks Confirm. History is kept in the browser (`chat.v1`).
 - **Job collector Chrome extension** (`browser-extension/`, Manifest V3, no AI; install: Load unpacked —
   see `browser-extension/README.md`): click its icon on any job page → the job is added via
   `agent-import` (popup shows Added #id · score / Already in your list / deleted → Add anyway).

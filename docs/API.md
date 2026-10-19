@@ -223,6 +223,8 @@ Conventions:
 
 ### system
 - `GET /api/v1/ai/status`
+- `GET /api/v1/chat/status` — `{mode: "ai"|"commands", provider, model}`
+- `POST /api/v1/chat` (`{"messages": [{"role": "user"|"assistant", "content"}…]}`, last 16 used) — the Assistant: `{reply (Markdown), cards: [{type: jobs|list|counts…}], actions: [{id, kind, label, method, path, body, open_url?}], mode, note?}`. Actions are changes the user confirms; the UI then calls `path` with `body`. Nothing is changed by this endpoint
 - `POST /api/v1/ai/jobs/{job_id}/interview-questions`
 - `POST /api/v1/ai/jobs/{job_id}/summary`
 - `GET /api/v1/settings/app`

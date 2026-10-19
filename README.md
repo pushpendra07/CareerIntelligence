@@ -13,12 +13,14 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-178_backend_·_36_frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-264_backend_·_150_frontend-brightgreen)
 
 [Features](#-features) ·
 [Quick start](#-run-locally) ·
 [How matching works](#-how-the-0100-match-score-works) ·
+[Assistant](#-assistant-chat) ·
 [Job scanner](#-built-in-job-scanner) ·
+[LinkedIn & Naukri](#-linkedin-naukri--other-portals-ai-search--job-collector) ·
 [Career-Ops](#-career-ops-integration-optional) ·
 [Configuration](#%EF%B8%8F-configuration) ·
 [Development](#-development) ·
@@ -37,19 +39,25 @@ threads and notes. Career Intelligence brings it into one local web app:
 ```
 CV ─▶ Professional Profile ─▶ Target Profile
                                    │
-  Built-in job scanner · Manual "paste URL + JD" · CSV / JSON / Google Sheets · Career-Ops
+  Built-in job scanner · Career-Ops · Google Sheets · CSV / JSON · Add Job (URL + JD)
+  Job collector Chrome extension · AI search (Claude / Gemini on LinkedIn, Naukri…)
                                    │
            Normalize ─▶ Deduplicate ─▶ Parse JD ─▶ 0–100 Match Score
                                    │
      Shortlist ─▶ Apply ─▶ Recruiter ─▶ Interviews ─▶ Offer ─▶ Analytics
+                                   │
+            Assistant chat: ask anything, apply, check status (you confirm changes)
 ```
 
 - **Runs entirely on your machine.** No cloud service or account is needed, and your data stays local.
 - **Explainable.** Every score breaks down into nine components, each with plain-language reasons.
 - **Deterministic.** The same job, profile and scoring version always produce the same score.
 - **AI is optional.** Parsing, scoring and interview prep work without any API key.
-- **Finds jobs itself.** A built-in scanner searches the Greenhouse, Lever, Ashby, Workday… boards of companies you track.
-- **Optionally works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it.
+- **Finds jobs itself.** A built-in scanner searches the Greenhouse, Lever, Ashby, Workday… boards of companies you track, on a schedule.
+- **One click from any job page.** The Job collector Chrome extension adds the job you are looking at (LinkedIn, Naukri, Indeed, careers pages).
+- **Never the same job twice.** Same link, same posting ID, same company + title in another city, or a repost are recognised and merged.
+- **Ask it anything.** The Assistant chat finds jobs, checks statuses and applies for you; every change waits for your Confirm.
+- **Optionally works with [Career-Ops](https://github.com/career-ops-hq/career-ops)** without changing it, automatically every N hours.
 
 ---
 
@@ -87,7 +95,9 @@ CV ─▶ Professional Profile ─▶ Target Profile
 
 ### 💼 Jobs
 - **Review new jobs**: new jobs one at a time, best match first, with why it fits, what's
-  missing and the description; Shortlist / Not relevant / Skip with one key (S / N / K).
+  missing and the description; Open posting / Shortlist / Not relevant / Skip with one key
+  (O / S / N / K). Jobs lists, the job page and Today show **Open posting ↗** and **Copy link**
+  (to share the job's portal link) before Shortlist.
 - **Built-in job scanner**: one click (or every N hours) searches the job boards of companies
   marked *Job search* and adds relevant jobs, with full descriptions, already scored.
 - **Add Job**: paste a URL and a JD and save. A **live preview** shows the detected source, skills,
@@ -97,7 +107,13 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - JD parsing: required vs preferred skills, years per skill, experience range, salary
   (LPA, lakhs, k, monthly), work model, locations, certifications, qualifications.
 - **Deduplication** across every source. One job can show
-  *Career-Ops ✓ LinkedIn ✓ Naukri ✓ Manual*. Search-results pages are never used as a job's identity.
+  *Career-Ops ✓ LinkedIn ✓ Naukri ✓ Manual*. A job is the same when it has the same link, the same
+  posting ID in its link, the same company + title in **any city**, or is a repost (same level, JD
+  60%+ alike). Concurrent scans can't save it twice. **Jobs → N duplicates** merges older copies,
+  keeping the one you got furthest with. Search-results pages are never used as a job's identity.
+- **Admin-grid list** (like Magento's product grid): the search, filters, paging and bulk actions
+  stay on top while you scroll, and so does the table header.
+- **Status picker** lists your **most used statuses** first.
 - Filters (score, recommendation, tier, technology, location, work model, source, date,
   experience, salary, applied, and **any combination of statuses**) and sorting.
 - Color-coded status labels and **status tabs** with counts: All open · New · Pending · Applied ·
@@ -149,9 +165,36 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Reports**: ten reports (overview, jobs, applications, interviews, offers, companies,
   sources, follow-ups, skills, scans) for any date range — trend, stacked and donut charts,
   change vs the previous period, sortable detail tables, CSV download and print to PDF.
-- **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills.
+- **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills
+  (⌘K command palette).
+- **Notifications & reminders**: a bell with what needs you, scheduled reminders, macOS notifications.
 - **Backup & import** (CSV/JSON, including a full JSON backup of everything) and **Google Sheets** import.
 - **Audit log** of every important action.
+
+</td></tr>
+<tr><td valign="top">
+
+### 💬 Assistant chat
+- Round button at the bottom right of every page, or **⌘J**.
+- Ask about anything in the app: *best new jobs this week*, *remote magento jobs in pune 80+*,
+  *status of Accenture*, *#512*, *upcoming interviews*, *follow-ups due*, *how am I doing*.
+- Tell it what to do: *apply 512*, *mark 77 not relevant*, *note 512 called HR*. Each change is
+  shown as a card with **Confirm**; nothing changes until you click it.
+- Works **without AI** (built-in commands, free). With **Claude, Gemini, OpenAI or OmniRoute**
+  it understands any question in your own words, using read-only tools on your data.
+- On/off and AI on/off in **Settings → About & AI**.
+
+</td><td valign="top">
+
+### 🧩 LinkedIn, Naukri & other portals
+- **Job collector Chrome extension** (download from Settings): click it on any job page and the
+  job is added — or you're told it's *Already in your list: #512*.
+- **Jobs → AI search**: one button per portal (LinkedIn, Naukri, Indeed, Foundit, Glassdoor,
+  Instahyre, Wellfound, Cutshort, Hirist, iimjobs). Pick the title and **Location** (Remote /
+  Hybrid / Onsite and your cities), then **Job collector** (fully automatic) or **Claude / Gemini**
+  (the portal opens with your search and the prompt is copied).
+- Jobs found are **checked for duplicates first**; you click **Add** for the new ones. They are
+  tagged *AI search*.
 
 </td></tr>
 </table>
@@ -238,10 +281,12 @@ Career Intelligence is running
    scored as "unknown" until you do).
 3. **Settings → Job scanner → Scan now** to search the job boards of companies marked
    *Job search* (and **Find job boards** to discover boards for companies that only have a careers page).
-4. **Add Job** → paste a job URL and description → **Save & analyze** (for LinkedIn, Naukri, etc.).
-5. *(Optional)* **Settings → Career-Ops → Import now** to pull in jobs that
+4. **Settings → Job sources → Chrome extension → Download**, install it (Load unpacked), then click
+   it on any LinkedIn / Naukri / careers-page job to add it. Or use **Add Job** (paste URL + description).
+5. *(Optional)* **Jobs → AI search** to search portals with the Job collector, Claude or Gemini.
+6. *(Optional)* **Settings → Career-Ops → Import now** (or *Run automatically*) to pull in jobs that
    [Career-Ops](https://github.com/career-ops-hq/career-ops) has found.
-6. **Dashboard** → work through **Today's Priorities**.
+7. **Today** → work through **Today's Priorities**, or ask the **Assistant** (⌘J) *“what should I apply to today?”*
 
 <details>
 <summary><b>Optional: bulk-import companies from your own research files</b></summary>
@@ -389,7 +434,8 @@ Technical Lead – Adobe Commerce                         93 / 100  HIGHLY RECOM
 | Board | What it returns |
 |---|---|
 | Greenhouse · Lever · Ashby · Pinpoint · Recruitee · Workable · Teamtailor | All open jobs **with full descriptions** in one call |
-| SmartRecruiters · Workday | Job list, then one call per relevant job for its description |
+| SmartRecruiters · Workday · SAP SuccessFactors · Oracle Cloud | Job list, then one call per relevant job for its description |
+| Company careers pages with schema.org `JobPosting` data | The postings on the page |
 
 How a scan works:
 
@@ -406,6 +452,72 @@ How a scan works:
 
 A company page also has **Scan jobs** for that one company. Scans can run automatically every N hours
 while the app is running (**Settings → Job scanner → What to keep → Scan automatically every**).
+
+---
+
+## 💬 Assistant chat
+
+The chat at the bottom right of every page (**⌘J**) answers from your own data and can act for you.
+
+| Ask | You get |
+|---|---|
+| *best new jobs this week* · *remote magento jobs in pune 80+* · *laravel jobs last 3 days* | Matching jobs as cards (score, status, link) |
+| *#512* · *tell me about job 512* | Status, score and why, missing skills, salary, latest activity, link |
+| *status of Accenture* · *where did I apply in the last 30 days?* | Its jobs and your applications |
+| *upcoming interviews* · *follow-ups due* · *offers* · *how am I doing* | The lists and your pipeline in numbers |
+| *apply 512* · *mark 77 not relevant* · *note 512 called HR* · *done follow-up 9* | A card with **Confirm**: records the application (+ follow-up, + apply link), changes the status, adds the note |
+
+- **Two modes.** Without AI it understands the commands above (free, instant, private). With an AI
+  provider it understands any question and can combine lookups (*“which Pune jobs did I apply to last
+  week and has anyone replied?”*). If the AI call fails it falls back to commands and says why.
+- **Safe by design.** The AI only gets **read-only tools** (search jobs, job details, pipeline,
+  applications, interviews, follow-ups, offers, companies, recruiters, profile). Changes are only
+  *proposed*; the app makes them when you click **Confirm**. “Apply” records it in the app and opens
+  the posting — it never submits forms on other websites.
+- **Providers:** Claude (Anthropic), Gemini, OpenAI, **OmniRoute** (OpenAI-compatible gateway,
+  `http://localhost:20128/v1`) and Ollama — see [Configuration](#%EF%B8%8F-configuration).
+- **Settings → About & AI → Assistant:** *Show the Assistant* (on/off) and *Use AI in the Assistant*
+  (off = commands only, no tokens). The conversation is kept in your browser; **Clear** empties it.
+
+API: `POST /api/v1/chat`, `GET /api/v1/chat/status`. Code: `backend/app/chat/` (tools, commands, provider loop).
+
+---
+
+## 🧩 LinkedIn, Naukri & other portals: AI search & Job collector
+
+These portals have no public jobs API and can't be scanned, so the app works with them **in your own
+browser, with your own login**.
+
+### Job collector Chrome extension (no AI, no tokens)
+
+1. **Settings → Job sources → Chrome extension → Download extension (.zip)** — it is pre-set to your
+   app's address. Unzip it.
+2. Chrome → `chrome://extensions` → **Developer mode** → **Load unpacked** → choose the unzipped
+   `career-intelligence-extension` folder → pin it.
+3. On any job posting (LinkedIn, Naukri, Indeed, Glassdoor, Foundit, Instahyre, Wellfound, Cutshort,
+   Hirist, iimjobs or a company careers page) **click the extension**:
+   **Added #123 · score 78**, **Already in your list: #512** (the new link is added to it), or
+   **You deleted this job before → Add it anyway**.
+
+It reads the page (schema.org `JobPosting` data, then each portal's layout, then the page itself),
+never clicks Apply or messages anyone, and sends data only to your own app. Source:
+[`browser-extension/`](browser-extension/README.md). After an update, click ↻ on the extension in
+`chrome://extensions` and reload the app tab.
+
+### Jobs → AI search
+
+- **Portal buttons** open a popup: **Job title**, **Location** (one multi-select: Remote — anywhere in
+  India — Hybrid, Onsite and your cities; each choice becomes a search) and who searches:
+  - **Job collector** — *automatic*: opens each search, reads every job and brings them back.
+  - **Claude** / **Gemini** — the portal opens with your search filled in (LinkedIn, Naukri, Indeed,
+    Foundit, Glassdoor) and a prompt built from your Target Profile is copied; open the assistant's
+    side panel, paste, Enter. (Chrome doesn't let a page start another extension, so this needs one paste.)
+- **One prompt for several portals** to copy into any AI assistant.
+- **Jobs from the assistant**: the JSON list it returns → **Check** (new / already in the app /
+  deleted / invalid, nothing saved) → **Add N new jobs**. API: `POST /api/v1/jobs/agent-import`.
+
+> LinkedIn and some other portals don't allow automated collection in their terms. Adding the job you
+> are looking at is the safest use; the collector goes at a reading pace and stops at 50 jobs.
 
 ---
 
@@ -433,6 +545,10 @@ unmodified. Career Intelligence connects through a **read-only file adapter**:
 - **Settings → Career-Ops → Scan + import** (opt-in: `CAREER_OPS_SCAN_ENABLED=true`) runs `node scan.mjs --json`
   in the background (allowed up to 45 minutes; it checks 10,000+ postings), then imports. **Import now**
   only reads the files and takes seconds.
+- **Run automatically:** *Scan + import every N hours* and *Import as soon as Career-Ops finds something
+  new* (e.g. after `npm run scan` in a terminal), checked every 5 minutes while the app runs.
+- **What Career-Ops searches:** its `portals.yml` companies, titles, locations and posting age, shown
+  read-only (edit the file in Career-Ops to change them).
 - The full analysis of why this design was chosen is in [docs/career-ops-assessment.md](docs/career-ops-assessment.md).
 
 ---
@@ -448,8 +564,8 @@ Never commit it.
 | `CAREER_OPS_PATH` | `career-ops/` in the project | Career-Ops checkout (read-only); leave empty to use the in-project copy |
 | `CAREER_OPS_DATA_PATH` | — | Separate Career-Ops data root, if you use one |
 | `CAREER_OPS_SCAN_ENABLED` | `false` | Allow **Scan + import** to run Career-Ops' scanner |
-| `AI_PROVIDER` | `none` | `none`, `anthropic`, `openai`, `gemini` or `ollama` |
-| `AI_MODEL` / `AI_API_KEY` / `AI_BASE_URL` | — | Optional AI settings (e.g. a local Ollama at `http://localhost:11434/v1`) |
+| `AI_PROVIDER` | `none` | `none`, `anthropic`, `gemini`, `openai`, `omniroute` or `ollama` |
+| `AI_MODEL` / `AI_API_KEY` / `AI_BASE_URL` | — | Optional AI settings. OmniRoute defaults to `http://localhost:20128/v1` (key only if it requires one); Ollama to `http://localhost:11434/v1` |
 | `STORAGE_PATH` | `storage` | Where original CV files are stored |
 | `BACKUP_PATH` | `backups` | Automatic backups (Settings → Backup & import); restore with `scripts/restore-backup.sh` |
 | `APP_PASSWORD` | — | Optional login password (empty = no login) |
@@ -457,8 +573,16 @@ Never commit it.
 | `CORS_ORIGINS` | `localhost:5173` | Allowed browser origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Structured logging |
 
-AI is used only for optional extras (suggested interview questions and JD summaries). Results are
-returned as suggestions and never affect scoring.
+AI is used only for optional extras: the **Assistant** in free-form mode, suggested interview
+questions and JD summaries. It never affects scoring, and it never changes data without your Confirm.
+
+```bash
+# backend/.env — pick one, then: ./stop.sh --keep-db && ./start.sh
+AI_PROVIDER=anthropic   AI_API_KEY=sk-ant-…                      # Claude (AI_MODEL optional)
+AI_PROVIDER=gemini      AI_API_KEY=…        AI_MODEL=<gemini model>
+AI_PROVIDER=openai      AI_API_KEY=sk-…     AI_MODEL=<openai model>
+AI_PROVIDER=omniroute   AI_MODEL=<model or combo>                 # local OmniRoute gateway
+```
 
 ---
 
@@ -500,7 +624,8 @@ returned as suggestions and never affect scoring.
 │   │   ├── skills/            # skills & domains taxonomy
 │   │   ├── companies/         # verification model, URL checker, importers
 │   │   ├── scanner/           # built-in job scanner: board connectors, filters, runs
-│   │   ├── integrations/      # Career-Ops adapter, Google Sheets
+│   │   ├── chat/              # Assistant: read-only tools, built-in commands, AI tool loop
+│   │   ├── integrations/      # Career-Ops adapter (+ schedule), Google Sheets
 │   │   ├── interviews/        # interview-prep builder
 │   │   ├── ai/                # optional AI providers
 │   │   ├── storage/           # write-once file storage (S3-ready interface)
@@ -510,11 +635,12 @@ returned as suggestions and never affect scoring.
 │   └── scripts/devdb.py       # bundled dev PostgreSQL
 ├── frontend/
 │   └── src/
-│       ├── features/          # dashboard, jobs, companies, cvs, profile, applications,
-│       │                      # interviews, questions, offers, followups, analytics, settings
+│       ├── features/          # dashboard, jobs (incl. AI search, duplicates), chat, companies,
+│       │                      # cvs, profile, applications, interviews, offers, followups, settings
 │       ├── components/        # shared UI (cards, badges, charts, list input…)
 │       ├── api/  types/  utils/  router/  layouts/  test/
-├── docs/                      # architecture, API reference, analyses
+├── browser-extension/         # Job collector Chrome extension (Manifest V3, no build step)
+├── docs/                      # architecture, API reference, user guide, prompts
 ├── start.sh  stop.sh  dev.sh  # local run scripts
 └── docker-compose.yml         # optional containers
 ```
@@ -527,7 +653,7 @@ returned as suggestions and never affect scoring.
 ```bash
 # Backend: tests run against a real PostgreSQL (bundled, or TEST_DATABASE_URL)
 cd backend
-uv run pytest                                   # 127 tests
+uv run pytest                                   # 264 tests
 uv run ruff check . && uv run ruff format --check .
 uv run mypy app                                 # strict type checking
 uv run alembic check                            # models and migrations in sync
@@ -535,7 +661,7 @@ uv run alembic revision --autogenerate -m "describe change"
 
 # Frontend
 cd frontend
-npm test                                        # Vitest + Testing Library
+npm test                                        # Vitest + Testing Library (150 tests)
 npx tsc -b                                      # type check
 npm run build                                   # production build
 ```
@@ -543,7 +669,9 @@ npm run build                                   # production build
 The test suite covers:
 - the matching engine: determinism, every component, blockers and configurable weights
 - the parsers: real-world JD and CV formats
-- deduplication
+- deduplication (links, posting IDs, same job in other cities, reposts) and merging duplicates
+- the Assistant: commands, every AI provider's tool loop (with a fake provider), never writing on its own
+- AI search imports, the Job collector's page reader and the extension download
 - company verification and invalid-URL handling
 - the job scanner: board detection, every connector, filters and the scan pipeline (no network)
 - the Career-Ops import (and that its files stay byte-identical)
@@ -634,6 +762,9 @@ Any other agent: tell it *"Read AGENTS.md first."*
   never return keys.
 - **Untrusted text.** Job text sent to AI is fenced as untrusted data, and AI output is validated
   and only offered as suggestions.
+- **Assistant.** The AI gets read-only tools only; every change is a proposal you confirm.
+- **Chrome extension.** Reads only the page you click it on (or the portal search you start from the
+  app), only accepts requests from the app's own pages, and sends data only to your app.
 - **Exports.** CSV exports neutralize spreadsheet formula injection.
 - **Git.** `.gitignore` keeps `.env` files, uploaded CVs, databases, exports and logs out of the repository.
 
@@ -644,7 +775,8 @@ Any other agent: tell it *"Read AGENTS.md first."*
 | Document | Contents |
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, data model, matching engine, verification, security, performance |
-| [docs/API.md](docs/API.md) | All 96 REST endpoints (interactive docs at `/docs` when running) |
+| [docs/API.md](docs/API.md) | All REST endpoints (interactive docs at `/docs` when running) |
+| [browser-extension/README.md](browser-extension/README.md) | Job collector Chrome extension: install, use, how it reads pages |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Start from scratch: every page of the app step by step |
 | [AGENTS.md](AGENTS.md) | Guide for AI coding agents (Antigravity, Claude Code, …): flow, rules, workflows in `.agent/` |
 | [docs/scan-coverage.md](docs/scan-coverage.md) | Companies searched for jobs and their job boards |
@@ -658,8 +790,11 @@ Any other agent: tell it *"Read AGENTS.md first."*
 
 - **Scanned PDFs.** CVs need extractable text; there is no OCR.
 - **Email notifications.** Not implemented yet. Reminders appear in Today's Priorities and Follow-ups.
-- **LinkedIn / Naukri / Indeed.** They are not scanned automatically: they have no public jobs API
-  and forbid scraping. Use **Add Job** (paste URL + JD) for those.
+- **LinkedIn / Naukri / Indeed.** They are not scanned on a schedule: they have no public jobs API
+  and forbid scraping. Use the **Job collector** extension (one click on a job page), **AI search**,
+  or **Add Job** (paste URL + JD).
+- **Claude / Gemini in Chrome** can't be started by the app (Chrome blocks it), so AI search with
+  them needs one paste; the Job collector runs fully on its own.
 - **Custom career sites.** Companies whose careers page is their own system (no Greenhouse, Lever,
   Workday… board) cannot be scanned; some sites also block automated requests.
 - **Private Google Sheets.** In-app sheet import needs a sheet shared as *Anyone with the link → Viewer*.

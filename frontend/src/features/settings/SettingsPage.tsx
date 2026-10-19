@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Card, ErrorBox, Field, KeyValue, Spinner, PageIntro } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
+import type { ChatStatus } from "../chat/Chat";
 import { collectorOutdated, collectorVersion, extensionDownloadUrl } from "../jobs/collector";
 import { ScannerSettings } from "../scanner/ScannerSettings";
 import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
@@ -287,8 +288,17 @@ function AboutSettings() {
     <div className="space-y-4">
       <Card title="Optional AI">
         <p className="text-sm">{ai.data?.enabled ? <>On — using <b>{ai.data.provider}</b>.</> : <>Off. Everything in the app works without AI; scoring, email drafts and job checks are built in.</>}</p>
-        <p className="mt-1 text-xs text-slate-500">To turn it on, set AI_PROVIDER (anthropic, openai, gemini or ollama), AI_MODEL and AI_API_KEY in <code>backend/.env</code> and restart the app. It costs tokens with your provider.</p>
+        <p className="mt-1 text-sm">With AI on, the <b>Assistant</b> (chat button at the bottom right, ⌘J) answers anything about your data in your own words; without it, it understands built-in commands.</p>
+        <div className="mt-2 text-xs text-slate-500">
+          <p>To turn it on, add to <code>backend/.env</code> and restart (<code>./stop.sh --keep-db && ./start.sh</code>). It costs tokens with your provider:</p>
+          <pre className="mt-1 overflow-x-auto rounded bg-slate-100 p-2 text-[11px] leading-relaxed dark:bg-white/5">{`# Claude:     AI_PROVIDER=anthropic   AI_API_KEY=sk-ant-…   (AI_MODEL optional)
+# Gemini:     AI_PROVIDER=gemini      AI_API_KEY=…          AI_MODEL=<a Gemini model>
+# OpenAI:     AI_PROVIDER=openai      AI_API_KEY=sk-…       AI_MODEL=<an OpenAI model>
+# OmniRoute:  AI_PROVIDER=omniroute   AI_MODEL=<model or combo in OmniRoute>
+#             AI_API_KEY=<only if OmniRoute requires one>   AI_BASE_URL=http://localhost:20128/v1 (default)`}</pre>
+        </div>
       </Card>
+      <AssistantSettings />
       <Card title="About this app">
         {!d ? <Spinner /> : (
           <KeyValue items={[
@@ -300,6 +310,41 @@ function AboutSettings() {
         )}
       </Card>
     </div>
+  );
+}
+
+/** Turn the Assistant chat on/off, and whether it may use AI (tokens) or only built-in commands. */
+function AssistantSettings() {
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["chat", "status"], queryFn: () => api.get<ChatStatus>("/chat/status") });
+  const save = useMutation({
+    mutationFn: (patch: { enabled?: boolean; use_ai?: boolean }) => api.patch("/settings/app", { assistant: patch }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat"] }),
+    meta: { success: "Assistant settings saved", toastError: true },
+  });
+  const s = status.data;
+  if (!s) return <Card title="Assistant"><Spinner /></Card>;
+  const enabled = s.enabled !== false;
+  return (
+    <Card title="Assistant">
+      <p className="mb-3 text-sm text-slate-600">The chat at the bottom right of every page (⌘J): finds jobs, checks statuses, applies and more —
+        changes always wait for your Confirm.</p>
+      <div className="space-y-3 text-sm">
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={enabled} disabled={save.isPending} onChange={(e) => save.mutate({ enabled: e.target.checked })} />
+          <span><b>Show the Assistant</b><span className="block text-xs text-slate-500">Off hides the chat button and ⌘J.</span></span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={s.use_ai !== false} disabled={!enabled || !s.ai_configured || save.isPending}
+            onChange={(e) => save.mutate({ use_ai: e.target.checked })} />
+          <span><b>Use AI in the Assistant</b>
+            <span className="block text-xs text-slate-500">{!s.ai_configured
+              ? "No AI provider is set up (see Optional AI above), so it uses built-in commands."
+              : s.mode === "ai" ? `On — answers in your own words with ${s.provider}${s.model ? ` (${s.model})` : ""}; costs tokens.`
+                : "Off — built-in commands only (free). Your AI key stays set for the other AI features."}</span></span>
+        </label>
+      </div>
+    </Card>
   );
 }
 

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # uses backend/secrets/google-service-account.json when that file exists.
     google_service_account_file: Path | None = None
 
-    ai_provider: Literal["none", "openai", "anthropic", "gemini", "ollama"] = "none"
+    ai_provider: Literal["none", "openai", "anthropic", "gemini", "ollama", "omniroute"] = "none"
     ai_api_key: SecretStr | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None  # OpenAI-compatible endpoint (e.g. http://localhost:11434/v1)

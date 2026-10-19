@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, ErrorBox, PageIntro, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
+import { Badge, Card, CopyLinkButton, ErrorBox, PageIntro, ScoreBadge, Spinner, StatusBadge } from "../../components/ui";
 import type { JobDetail, Page, Job } from "../../types/api";
 import { humanize } from "../../utils/format";
 import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
@@ -130,6 +130,12 @@ export function ReviewPage() {
           {setStatus.error && <p className="text-sm text-rose-600">{errorMessage(setStatus.error)}</p>}
           {!current ? <Spinner /> : <ReviewCard job={current} />}
           <div className="sticky bottom-0 -mx-2 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50/95 px-2 py-3 backdrop-blur">
+            {postingLink && (
+              <a className="btn-secondary" href={postingLink} target="_blank" rel="noopener noreferrer">
+                Open posting ↗ <kbd className="kbd">O</kbd>
+              </a>
+            )}
+            {postingLink && <CopyLinkButton url={postingLink} />}
             <button className="btn-primary" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
               ★ Shortlist <kbd className="kbd">S</kbd>
             </button>
@@ -140,11 +146,6 @@ export function ReviewPage() {
               Skip for now <kbd className="kbd">K</kbd>
             </button>
             <span className="flex-1" />
-            {postingLink && (
-              <a className="btn-secondary" href={postingLink} target="_blank" rel="noopener noreferrer">
-                Open posting ↗ <kbd className="kbd">O</kbd>
-              </a>
-            )}
             {current && <Link className="btn-secondary" to={`/jobs/${current.id}`}>All details</Link>}
           </div>
         </>

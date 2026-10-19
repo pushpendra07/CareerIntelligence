@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
+import { Badge, Card, CopyLinkButton, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { StatusMultiSelect } from "./StatusMultiSelect";
@@ -177,6 +177,11 @@ function NextStep({ job }: { job: Job }) {
   if (NEW_STATUSES.includes(job.status)) {
     return (
       <span className="inline-flex gap-1">
+        {job.source_url && (
+          <a className="btn-secondary px-2 py-1 text-xs" href={job.source_url} target="_blank" rel="noopener noreferrer"
+            aria-label={`Open posting: ${job.title}`} title="Open the job posting">↗</a>
+        )}
+        {job.source_url && <CopyLinkButton url={job.source_url} compact />}
         <button className="btn-secondary px-2 py-1 text-xs" disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
           title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>★ Shortlist</button>
         <button className="btn-secondary px-2 py-1 text-xs" disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}

@@ -473,6 +473,15 @@ Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI
 
 ## 15. Keyboard, phone and install
 
+- **Assistant:** the round chat button at the bottom right of every page, or `⌘ J` / `Ctrl J`. Ask
+  about anything in the app — “best new jobs this week”, “remote magento jobs in pune 80+”,
+  “status of Accenture”, “#512”, “upcoming interviews”, “follow-ups due”, “how am I doing” — or
+  tell it what to do: “apply 512”, “mark 77 not relevant”, “note 512 called the recruiter”.
+  Changes appear as a card with **Confirm**; nothing changes until you click it. Without AI it
+  understands these commands; with an AI key (Settings → About & AI: Claude, Gemini, OpenAI or
+  OmniRoute) you can ask anything in your own words. The conversation stays in this browser
+  (**Clear** empties it).
+
 - **Command palette:** `⌘ K` (Mac) or `Ctrl K` (or **Commands** in the top bar). Type to go to any
   page, run an action (add a job, scan job boards, back up now, import a file) or open a job or
   company by name. `↑`/`↓` to choose, `Enter` to open, `Esc` to close.

@@ -341,3 +341,20 @@ export function KeyValue({ items }: { items: [string, ReactNode][] }) {
     </dl>
   );
 }
+
+/** Copies a job's portal link to share it anywhere; says "Copied" for a moment. */
+export function CopyLinkButton({ url, compact = false, className }: { url: string; compact?: boolean; className?: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = () => {
+    const done = (s: "copied" | "failed") => { setState(s); window.setTimeout(() => setState("idle"), 1500); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => done("copied"), () => done("failed"));
+    else done("failed");
+  };
+  const label = state === "copied" ? "Copied ✓" : state === "failed" ? "Copy failed" : compact ? "" : "Copy link";
+  return (
+    <button type="button" className={className ?? (compact ? "btn-secondary px-2 py-1 text-xs" : "btn-secondary")} onClick={copy}
+      aria-label="Copy job link" title={state === "failed" ? url : "Copy the job posting link to share it"}>
+      {state === "idle" && <Icon name="link" className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />}{label}
+    </button>
+  );
+}

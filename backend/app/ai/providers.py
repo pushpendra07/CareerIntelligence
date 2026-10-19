@@ -20,6 +20,7 @@ DEFAULT_MODELS = {"anthropic": "claude-sonnet-5-5"}
 DEFAULT_BASE_URLS = {
     "openai": "https://api.openai.com/v1",
     "ollama": "http://localhost:11434/v1",
+    "omniroute": "http://localhost:20128/v1",  # OmniRoute AI gateway (OpenAI-compatible)
     "anthropic": "https://api.anthropic.com",
     "gemini": "https://generativelanguage.googleapis.com/v1beta",
 }
@@ -60,7 +61,7 @@ def _post_json(
 
 
 class OpenAICompatible:
-    """OpenAI, Ollama, LM Studio, vLLM and any /v1/chat/completions endpoint."""
+    """OpenAI, OmniRoute, Ollama, LM Studio, vLLM and any /v1/chat/completions endpoint."""
 
     def __init__(
         self, name: str, base_url: str, model: str, api_key: str | None, timeout: int
@@ -150,7 +151,7 @@ def get_provider(settings: Settings) -> AIProvider:
     if not model:
         raise AIUnavailableError(f"Set AI_MODEL for provider '{name}'")
     base = settings.ai_base_url or DEFAULT_BASE_URLS[name]
-    if name in ("openai", "ollama"):
+    if name in ("openai", "ollama", "omniroute"):  # OmniRoute's key is optional (local use)
         if name == "openai" and not key:
             raise AIUnavailableError("Set AI_API_KEY for OpenAI")
         return OpenAICompatible(name, base, model, key, settings.ai_timeout_seconds)

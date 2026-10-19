@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, ScoreBadge, Spinner } from "../../components/ui";
+import { Badge, Card, CopyLinkButton, ScoreBadge, Spinner } from "../../components/ui";
 import type { FollowUp, Interview, Job, Page } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
 
@@ -84,6 +84,12 @@ export function BestMatches() {
                 </div>
               </div>
               <div className="flex shrink-0 gap-1">
+                {j.source_url && (
+                  <a className="rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" href={j.source_url} target="_blank" rel="noopener noreferrer"
+                    title="Open the job posting">Open posting ↗</a>
+                )}
+                {j.source_url && <CopyLinkButton url={j.source_url} compact
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" />}
                 <button type="button" className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
                   disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: j.id, status: "SHORTLISTED" })} title="Move to Pending → Shortlisted">
                   ★ Shortlist

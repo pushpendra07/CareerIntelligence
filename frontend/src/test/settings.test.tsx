@@ -95,4 +95,17 @@ describe("settings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Import" }));
     expect(await screen.findByText("Imported: 3 new, 1 already in the app.")).toBeInTheDocument();
   });
+
+  it("about & AI: turns the Assistant and its AI on or off", async () => {
+    const api = mockApi({
+      "GET /settings/system": {}, "GET /ai/status": { enabled: true, provider: "anthropic" }, "GET /sheets/access": { service_account: null },
+      "GET /chat/status": { enabled: true, use_ai: true, ai_configured: true, mode: "ai", provider: "anthropic", model: "claude" },
+      "PATCH /settings/app": {},
+    });
+    renderAt(<SettingsPage view="about" />);
+    await userEvent.click(await screen.findByLabelText(/Use AI in the Assistant/));
+    await vi.waitFor(() => expect(api.calls.find((c) => c.method === "PATCH")?.body).toEqual({ assistant: { use_ai: false } }));
+    await userEvent.click(screen.getByLabelText(/Show the Assistant/));
+    await vi.waitFor(() => expect(api.calls.filter((c) => c.method === "PATCH").at(-1)?.body).toEqual({ assistant: { enabled: false } }));
+  });
 });

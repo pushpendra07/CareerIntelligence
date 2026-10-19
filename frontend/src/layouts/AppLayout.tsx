@@ -8,6 +8,7 @@ import { NotificationBell, useBrowserReminders, useScheduledReminders, type Remi
 import { toast } from "../components/Toaster";
 import { LogoutButton } from "../components/AuthGate";
 import { CommandPalette } from "../components/CommandPalette";
+import { ChatLauncher } from "../features/chat/Chat";
 import { Toaster } from "../components/Toaster";
 import { prefs } from "../utils/storage";
 import { useTheme, type Theme } from "../utils/theme";
@@ -205,6 +206,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <CommandPalette pages={PAGES} />
+        <ChatLauncher />
         <Toaster />
       </div>
     </div>

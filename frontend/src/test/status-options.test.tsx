@@ -22,3 +22,17 @@ describe("job status picker", () => {
     await vi.waitFor(() => expect(groupLabels("Most used")).toEqual(["Applied", "Not Relevant", "Closed", "Rejected", "Interview"]));
   });
 });
+
+describe("copy job link", () => {
+  it("copies the posting link and says so", async () => {
+    const { render, screen } = await import("@testing-library/react");
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const { CopyLinkButton } = await import("../components/ui");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<CopyLinkButton url="https://www.linkedin.com/jobs/view/4100000099/" />);
+    await userEvent.click(screen.getByRole("button", { name: "Copy job link" }));
+    expect(writeText).toHaveBeenCalledWith("https://www.linkedin.com/jobs/view/4100000099/");
+    expect(await screen.findByText("Copied ✓")).toBeInTheDocument();
+  });
+});
