@@ -23,6 +23,7 @@ def test_password_protects_the_api(client: TestClient, settings: Settings) -> No
     assert ok.status_code == 200 and auth.COOKIE in ok.cookies
     cookie = ok.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=lax" in cookie
+    assert "secure" not in cookie  # plain http://127.0.0.1 would never send it back
     assert client.get("/api/v1/jobs").status_code == 200
     assert client.get("/api/v1/auth/status").json()["authenticated"] is True
 
@@ -32,6 +33,9 @@ def test_password_protects_the_api(client: TestClient, settings: Settings) -> No
     client.post("/api/v1/auth/login", json={"password": "new one"})
     client.post("/api/v1/auth/logout")
     assert client.get("/api/v1/jobs").status_code == 401
+
+    over_https = client.post("https://testserver/api/v1/auth/login", json={"password": "new one"})
+    assert "secure" in over_https.headers["set-cookie"].lower()
 
 
 def test_tokens_expire_and_cannot_be_forged(settings: Settings) -> None:

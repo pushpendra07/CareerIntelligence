@@ -1,4 +1,5 @@
-"""safe_request: broken responses become OSError; redirect targets with spaces still work."""
+"""safe_request: broken responses become OSError; redirect targets with spaces still work;
+connections go to the checked addresses."""
 
 import http.client
 import urllib.error
@@ -41,7 +42,7 @@ class FakeOpener:
 @pytest.fixture
 def opener(monkeypatch: pytest.MonkeyPatch) -> Any:
     holder: dict[str, FakeOpener] = {}
-    monkeypatch.setattr(guard, "_check_host", lambda url: None)
+    monkeypatch.setattr(guard, "_check_host", lambda url: ["93.184.216.34"])
     monkeypatch.setattr(guard.urllib.request, "build_opener", lambda *a: holder["o"])
     return holder
 
@@ -63,3 +64,48 @@ def test_redirect_to_a_url_with_spaces_is_followed(opener: Any) -> None:
     res = guard.safe_get("https://a.example/")
     assert res.status == 200
     assert res.url == "https://a.example/?sst=Bot%20check%20(support)&x=1"
+
+
+def fake_dns(*addrs: str) -> Any:
+    return lambda host, port, *a, **k: [(2, 1, 6, "", (ip, port)) for ip in addrs]
+
+
+def test_check_host_returns_the_checked_addresses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(guard.socket, "getaddrinfo", fake_dns("93.184.216.34", "93.184.216.34"))
+    assert guard._check_host("https://a.example/") == ["93.184.216.34"]
+    monkeypatch.setattr(guard.socket, "getaddrinfo", fake_dns("93.184.216.34", "10.0.0.5"))
+    with pytest.raises(guard.BlockedURLError):
+        guard._check_host("https://a.example/")
+
+
+class FakeSocket:
+    def setsockopt(self, *_: object) -> None:
+        return None
+
+
+def test_connection_goes_to_the_checked_address_not_a_new_lookup(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    # A second DNS answer (rebinding to 127.0.0.1) is never asked for: no lookup at connect.
+    monkeypatch.setattr(guard.socket, "getaddrinfo", fake_dns("127.0.0.1"))
+    tried: list[tuple[str, int]] = []
+
+    def connect(address: tuple[str, int], *_: object) -> FakeSocket:
+        tried.append(address)
+        if address[0] == "93.184.216.34":
+            raise OSError("unreachable")
+        return FakeSocket()
+
+    monkeypatch.setattr(guard.socket, "create_connection", connect)
+    for cls in (guard._PinnedHTTPConnection, guard._PinnedHTTPSConnection):
+        tried.clear()
+        conn = cls("a.example", 8443, addrs=["93.184.216.34", "93.184.216.35"])
+        conn._create_connection(("a.example", 8443))
+        assert tried == [("93.184.216.34", 8443), ("93.184.216.35", 8443)]
+        assert conn.host == "a.example"  # TLS name check and Host header keep the name
+
+
+def test_no_checked_address_fails_without_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(guard.socket, "create_connection", lambda *a: pytest.fail("connected"))
+    conn = guard._PinnedHTTPConnection("a.example", 80, addrs=[])
+    with pytest.raises(OSError, match="No address"):
+        conn._create_connection(("a.example", 80))

@@ -462,6 +462,17 @@ def running_import(db: Session) -> CareerOpsImport | None:
     return run
 
 
+def close_interrupted(db: Session) -> int:
+    """At startup: imports still RUNNING belong to a previous process (they run in a thread of
+    this one), so close them as FAILED instead of letting them block a new sync for an hour."""
+    runs = list(db.scalars(select(CareerOpsImport).where(CareerOpsImport.status == "RUNNING")))
+    for run in runs:
+        run.status, run.finished_at = "FAILED", datetime.now(UTC)
+        run.errors = [*run.errors, {"stage": "run", "error": "Interrupted (the app stopped)"}]
+    db.commit()
+    return len(runs)
+
+
 def _sync_in_background(run_id: int, settings: Settings) -> None:
     from app.db.session import get_sessionmaker
 
@@ -571,6 +582,11 @@ def _scheduler_loop(stop: threading.Event, settings: Settings) -> None:
 
 
 def start_scheduler(settings: Settings) -> threading.Event:
+    from app.db.session import get_sessionmaker
+
+    with get_sessionmaker()() as db:
+        if closed := close_interrupted(db):
+            logger.info("closed interrupted career-ops imports", extra={"count": closed})
     stop = threading.Event()
     threading.Thread(target=_scheduler_loop, args=(stop, settings), name="career-ops-scheduler",
                      daemon=True).start()

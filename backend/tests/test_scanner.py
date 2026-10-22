@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.html_text import html_to_text
@@ -338,3 +338,25 @@ def test_rate_limited_requests_are_retried_after_a_pause() -> None:
     answers[:] = [429, 429]
     gave_up = service.polite(http, pauses=(1.0,), sleep=pauses.append)("GET", "https://x.test/")
     assert gave_up.status == 429  # still limited after every retry: reported as before
+
+
+def test_runs_left_running_by_a_restart_are_closed_at_startup(db: Session) -> None:
+    from app.core.errors import ConflictError
+    from app.scanner import runner
+
+    stuck = ScanRun(kind="SCAN", trigger="manual", stats={"companies": 3}, companies=[])
+    done = ScanRun(kind="SCAN", trigger="manual", stats={}, companies=[], status="COMPLETED")
+    db.add_all([stuck, done])
+    db.commit()
+    with pytest.raises(ConflictError):  # a fresh RUNNING run blocks a new one
+        runner.start_background(db, "SCAN")
+    # The start lock is released even when the start is refused.
+    held = db.execute(text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                           "AND objid = :k"), {"k": runner.START_LOCK_ID}).scalar()
+    assert held == 0
+
+    assert runner.close_interrupted(db) == 1
+    assert stuck.status == "FAILED" and stuck.finished_at is not None
+    assert stuck.stats == {"companies": 3, "error": runner.INTERRUPTED}
+    assert done.status == "COMPLETED"
+    assert runner.running_run(db) is None

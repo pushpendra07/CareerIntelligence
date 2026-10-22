@@ -24,7 +24,7 @@ def status(request: Request, settings: AppSettings) -> dict[str, Any]:
 
 
 @router.post("/auth/login")
-def login(body: LoginIn, settings: AppSettings) -> Response:
+def login(body: LoginIn, request: Request, settings: AppSettings) -> Response:
     if not auth.required(settings):
         return JSONResponse({"authenticated": True})
     if not auth.password_ok(settings, body.password):
@@ -33,8 +33,9 @@ def login(body: LoginIn, settings: AppSettings) -> Response:
             {"error": {"code": "unauthorized", "message": "Wrong password", "details": None}},
             status_code=401)
     res = JSONResponse({"authenticated": True})
+    # Secure when the app is reached over HTTPS; plain http://127.0.0.1 needs it off.
     res.set_cookie(auth.COOKIE, auth.make_token(settings), max_age=auth.MAX_AGE, httponly=True,
-                   samesite="lax", path="/")
+                   samesite="lax", path="/", secure=request.url.scheme == "https")
     return res
 
 

@@ -194,7 +194,7 @@ merged, never duplicated; jobs the user deleted are skipped.
 | "scan.mjs not found" / not configured | Run `./scripts/setup-career-ops.sh`, or fix `CAREER_OPS_PATH` |
 | "scan.mjs timed out after 2700s" | A portal hung; run `npm run scan` in the Career-Ops folder to see which, then Import now |
 | "already running" (409) | Wait for the current scan; it appears under `running` in the status |
-| Run stuck as RUNNING after a restart | Auto-closed as FAILED after 1 hour; start a new one |
+| Run stuck as RUNNING after a restart | Closed as FAILED when the app starts again (scans and imports run in the app's own threads); start a new one |
 
 ## Job board search — built-in scanner (no Career-Ops needed)
 
@@ -486,7 +486,8 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
 - Backend: routers stay thin; logic in `services/` or the feature package. Raise
   `NotFoundError`, `ConflictError`, `DomainValidationError` (`core/errors.py`), never bare
   HTTPException. Errors are returned as `{"error": {"code", "message", "details"}}`.
-- Outbound HTTP only via `core.http.safe_get` / `safe_request` (SSRF guard on every redirect).
+- Outbound HTTP only via `core.http.safe_get` / `safe_request` (SSRF guard on every redirect; the
+  connection goes to the checked addresses, never a second DNS lookup).
 - New table → model in `app/models/`, export in `models/__init__.py`, hand-written Alembic
   migration in `backend/alembic/versions/` (`down_revision` = current head). See
   `.agent/workflows/add-migration.md`.

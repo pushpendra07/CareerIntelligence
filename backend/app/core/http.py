@@ -1,7 +1,8 @@
 """A small, guarded HTTP GET for verification checks (stdlib only).
 
 Guards: http(s) only, no private/loopback/link-local targets (re-checked on every redirect),
-bounded redirects, timeout and response size.
+bounded redirects, timeout and response size. The connection goes to the addresses that were
+checked, not to a fresh DNS lookup, so a host can't pass the check and then resolve elsewhere.
 """
 
 import http.client
@@ -11,8 +12,10 @@ import socket
 import ssl
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from functools import partial
+from typing import Any, Protocol
 from urllib.parse import quote, urljoin, urlsplit
 
 USER_AGENT = "CareerIntelligence/0.1 (personal job-search verification; +local)"
@@ -44,7 +47,8 @@ class FetchError(OSError):
 _URL_SAFE = ":/?#[]@!$&'()*+,;=%~"
 
 
-def _check_host(url: str) -> None:
+def _check_host(url: str) -> list[str]:
+    """The host's addresses, all public, or BlockedURLError."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise BlockedURLError(f"Unsupported URL: {url}")
@@ -52,10 +56,62 @@ def _check_host(url: str) -> None:
         infos = socket.getaddrinfo(parts.hostname, parts.port or 443)
     except socket.gaierror as exc:
         raise BlockedURLError(f"Cannot resolve {parts.hostname}") from exc
+    addrs: list[str] = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
             raise BlockedURLError(f"Refusing non-public address for {parts.hostname}")
+        if str(ip) not in addrs:
+            addrs.append(str(ip))
+    return addrs
+
+
+def _connect_to(addrs: list[str]) -> Callable[..., socket.socket]:
+    """http.client's socket opener, limited to the checked addresses (tried in order)."""
+
+    def create(address: tuple[str, int], *args: Any) -> socket.socket:
+        error = OSError(f"No address for {address[0]}")
+        for ip in addrs:
+            try:
+                return socket.create_connection((ip, address[1]), *args)
+            except OSError as exc:
+                error = exc
+        raise error
+
+    return create
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args: Any, addrs: list[str], **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _connect_to(addrs)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """Connects to a checked address; TLS (SNI, certificate) still uses the host name."""
+
+    def __init__(self, *args: Any, addrs: list[str], **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _connect_to(addrs)
+
+
+class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, addrs: list[str]) -> None:
+        super().__init__()
+        self.addrs = addrs
+
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(partial(_PinnedHTTPConnection, addrs=self.addrs), req)
+
+
+class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, addrs: list[str]) -> None:
+        super().__init__(context=ssl.create_default_context())
+        self.addrs = addrs
+
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(partial(_PinnedHTTPSConnection, addrs=self.addrs), req,
+                            context=self._context)  # type: ignore[attr-defined]
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -74,9 +130,6 @@ def safe_request(
     max_bytes: int = MAX_BYTES,
 ) -> FetchResult:
     """GET/POST with the SSRF guard re-applied on every redirect hop."""
-    opener = urllib.request.build_opener(
-        _NoRedirect, urllib.request.HTTPSHandler(context=ssl.create_default_context())
-    )
     data = json.dumps(json_body).encode() if json_body is not None else None
     hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html;q=0.9, */*;q=0.5"}
     if data is not None:
@@ -84,7 +137,12 @@ def safe_request(
     hdrs.update(headers or {})
     current = url
     for _ in range(max_redirects + 1):
-        _check_host(current)
+        addrs = _check_host(current)
+        # No proxy: the request must go to the address that was checked.
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _NoRedirect,
+            _PinnedHTTPHandler(addrs), _PinnedHTTPSHandler(addrs),
+        )
         request = urllib.request.Request(  # noqa: S310 - scheme checked in _check_host
             current, data=data, headers=hdrs, method=method
         )

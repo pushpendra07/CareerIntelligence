@@ -325,3 +325,13 @@ def test_portals_are_read_only(co_root: Path, client: TestClient, settings: Sett
         ("Acme Commerce", True), ("Old Co", False)]
     assert p["max_posting_age_days"] == 60
     assert snapshot(co_root) == before
+
+
+def test_imports_left_running_by_a_restart_are_closed_at_startup(
+        db: Session, settings: Settings, co_root: Path) -> None:
+    busy = service.new_run(db, settings.model_copy(update={"career_ops_path": co_root}), scan=True)
+    db.commit()
+    assert service.running_import(db) is not None
+    assert service.close_interrupted(db) == 1
+    assert busy.status == "FAILED" and busy.errors[-1]["error"] == "Interrupted (the app stopped)"
+    assert service.running_import(db) is None

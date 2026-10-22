@@ -758,7 +758,7 @@ Any other agent: tell it *"Read AGENTS.md first."*
 - **Inputs.** All input is validated with Pydantic and all SQL goes through bound parameters.
   Only `http(s)` URLs are accepted, and the React UI escapes everything it renders.
 - **Outbound requests.** Verification fetches go through an SSRF guard (public IPs only, re-checked
-  on every redirect).
+  on every redirect, and the connection goes to the address that was checked).
 - **Secrets.** They come only from the environment. Logs redact secret-like keys, and API responses
   never return keys.
 - **Untrusted text.** Job text sent to AI is fenced as untrusted data, and AI output is validated
