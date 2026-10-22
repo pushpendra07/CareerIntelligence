@@ -20,7 +20,8 @@ from app.skills.catalog import find_skills, normalize_skill
 
 # Jobs you're still pursuing (rejected/withdrawn/closed/not relevant don't count).
 ACTIVE = [s.value for s in JobStatus if s not in (
-    JobStatus.CLOSED, JobStatus.NOT_RELEVANT, JobStatus.REJECTED, JobStatus.WITHDRAWN)]
+    JobStatus.CLOSED, JobStatus.NOT_RELEVANT, JobStatus.IGNORED, JobStatus.DUPLICATE,
+    JobStatus.REJECTED, JobStatus.WITHDRAWN)]
 LIMIT = 25
 
 

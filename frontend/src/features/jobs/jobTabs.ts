@@ -2,10 +2,10 @@
 
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
-  "CLOSED", "NOT_RELEVANT"];
+  "CLOSED", "NOT_RELEVANT", "IGNORED", "DUPLICATE"];
 
 /** Finished jobs: their own tabs, never in "All open". */
-export const FINISHED_STATUSES = ["REJECTED", "WITHDRAWN", "NOT_RELEVANT", "CLOSED"];
+export const FINISHED_STATUSES = ["REJECTED", "WITHDRAWN", "NOT_RELEVANT", "IGNORED", "DUPLICATE", "CLOSED"];
 /** Jobs still in play: what "All open" lists, the sum of the To review and In progress tabs. */
 export const OPEN_STATUSES = JOB_STATUSES.filter((s) => !FINISHED_STATUSES.includes(s));
 export const NEW_STATUSES = ["NEW", "DISCOVERED"];
@@ -21,7 +21,7 @@ export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
   { key: "interview", label: "Interview", statuses: ["INTERVIEW", "AWAITING_FEEDBACK"] },
   { key: "selected", label: "Selected", statuses: ["OFFER", "ACCEPTED"] },
   { key: "rejected", label: "Rejected", statuses: ["REJECTED"] },
-  { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT"] },
+  { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT", "IGNORED", "DUPLICATE"] },
   { key: "closed", label: "Closed", statuses: ["CLOSED"] },
 ];
 /** Tabs for finished jobs, shown apart from the active ones. */

@@ -210,7 +210,8 @@ def _job_count() -> Any:
 
 
 # Jobs you're still pursuing: everything except closed / not relevant / rejected / withdrawn.
-INACTIVE_JOB_STATUSES = ("CLOSED", "NOT_RELEVANT", "REJECTED", "WITHDRAWN")
+INACTIVE_JOB_STATUSES = ("CLOSED", "NOT_RELEVANT", "IGNORED", "DUPLICATE", "REJECTED",
+                         "WITHDRAWN")
 
 
 def job_counts(db: Session, company_ids: list[int]) -> dict[int, tuple[int, int]]:

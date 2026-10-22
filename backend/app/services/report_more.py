@@ -338,7 +338,9 @@ def _market(db: Session, r: Range) -> dict[str, Any]:
 
 OUTCOMES = {"SHORTLISTED": "Shortlisted", "READY_TO_APPLY": "Shortlisted",
             "REVIEWING": "Shortlisted", "ON_HOLD": "Shortlisted", "APPLIED": "Applied",
-            "NOT_RELEVANT": "Not relevant", "CLOSED": "Closed"}
+            "NOT_RELEVANT": "Not relevant", "CLOSED": "Closed", "IGNORED": "Ignored",
+            "DUPLICATE": "Duplicate"}
+DISMISSED = ("Not relevant", "Closed", "Ignored", "Duplicate")
 BACKLOG_BANDS = [(0, "Today"), (3, "1–3 days"), (7, "4–7 days"), (14, "8–14 days"),
                  (30, "15–30 days")]
 
@@ -362,7 +364,8 @@ def _activity(db: Session, r: Range) -> dict[str, Any]:
         Job.id.in_({d[0] for d in now + before if d[0]}))).all())
 
     def stats(ds: list[Any]) -> dict[str, Any]:
-        out = {"Shortlisted": 0, "Applied": 0, "Not relevant": 0, "Closed": 0}
+        out = {"Shortlisted": 0, "Applied": 0, "Not relevant": 0, "Closed": 0, "Ignored": 0,
+               "Duplicate": 0}
         first: dict[int, datetime] = {}
         for jid, at, to in ds:
             if (o := OUTCOMES.get(to)) is not None:
@@ -401,7 +404,8 @@ def _activity(db: Session, r: Range) -> dict[str, Any]:
     per_period = {d["period"]: d for d in data}
     table_rows = [{"label": d["label"], "found": d["Found"], "reviewed": d["Reviewed"],
                    **{k: per_period.get(d["period"], {}).get(k, 0)
-                      for k in ("Shortlisted", "Applied", "Not relevant", "Closed")}}
+                      for k in ("Shortlisted", "Applied", "Not relevant", "Closed", "Ignored",
+                                "Duplicate")}}
                   for d in flow]
     note = (f"Decisions are recorded from {since.date():%d %b %Y}."
             if since and since.date() > r.start else None)
@@ -427,8 +431,8 @@ def _activity(db: Session, r: Range) -> dict[str, Any]:
             kpi("Jobs reviewed", "reviewed", s["reviewed"], was("reviewed")),
             kpi("Shortlisted", "shortlisted", s["Shortlisted"], was("Shortlisted")),
             kpi("Applied", "applied", s["Applied"], was("Applied")),
-            kpi("Dismissed", "dismissed", s["Not relevant"] + s["Closed"],
-                p["Not relevant"] + p["Closed"] if known else None, better="none"),
+            kpi("Dismissed", "dismissed", sum(s[k] for k in DISMISSED),
+                sum(p[k] for k in DISMISSED) if known else None, better="none"),
             kpi("Waiting for review (now)", "backlog", len(backlog_rows), better="down"),
             kpi("Days to decide (median)", "days", s["days"], was("days"), " days",
                 better="down", sample=(s["reviewed"], p["reviewed"])),
@@ -446,7 +450,8 @@ def _activity(db: Session, r: Range) -> dict[str, Any]:
             ("label", "Period", "text"), ("found", "Found", "number"),
             ("reviewed", "Reviewed", "number"), ("Shortlisted", "Shortlisted", "number"),
             ("Applied", "Applied", "number"), ("Not relevant", "Not relevant", "number"),
-            ("Closed", "Closed", "number"),
+            ("Closed", "Closed", "number"), ("Ignored", "Ignored", "number"),
+            ("Duplicate", "Duplicate", "number"),
         ], table_rows),
         "jobs": table("Waiting for review (oldest first)", [
             ("title", "Job", "job"), ("company", "Company", "company"),

@@ -441,6 +441,11 @@ def ancestors(name: str) -> list[str]:
     return chain
 
 
+def descendants(name: str) -> list[str]:
+    """The more specific forms of a skill: "Magento" -> Magento 2, Adobe Commerce, ..."""
+    return [s.name for s in SKILLS if name in ancestors(s.name)]
+
+
 def related(name: str) -> set[str]:
     skill = SKILLS_BY_NAME.get(name)
     if not skill:

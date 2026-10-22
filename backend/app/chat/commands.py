@@ -20,6 +20,9 @@ Add an AI key (Claude, Gemini, OpenAI or OmniRoute) to ask anything in your own 
 STATUS_WORDS = {
     "not relevant": "NOT_RELEVANT",
     "irrelevant": "NOT_RELEVANT",
+    "ignore": "IGNORED",
+    "ignored": "IGNORED",
+    "duplicate": "DUPLICATE",
     "ready to apply": "READY_TO_APPLY",
     "on hold": "ON_HOLD",
     "recruiter contacted": "RECRUITER_CONTACTED",

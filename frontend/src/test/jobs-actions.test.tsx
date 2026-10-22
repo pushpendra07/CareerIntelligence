@@ -50,7 +50,7 @@ describe("status multi-select", () => {
     expect(cleared).toContain("NEW");
     expect(cleared).not.toContain("NOT_RELEVANT"); // finished: its own tab
     expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any open status");
-  });
+  }, 15_000); // clicks through every status
 });
 
 describe("delete job", () => {
@@ -279,7 +279,7 @@ describe("ticked jobs", () => {
     await userEvent.click(screen.getByRole("button", { name: /More filters/ }));
     expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
     const calls = listUrls(api.fn).length;
-    for (const name of ["Location", "Technology", "Experience fits"]) {
+    for (const name of ["Location", "Skills", "Experience fits"]) {
       await userEvent.click(screen.getByLabelText(name));
       await userEvent.click(document.body); // blank area
     }
@@ -291,7 +291,7 @@ describe("ticked jobs", () => {
     await userEvent.click(document.body);
     expect(listUrls(api.fn).at(-1)!.searchParams.get("location")).toBe("Pune"); // a real change still filters
 
-    await userEvent.type(screen.getByLabelText("Technology"), "GraphQL{Enter}");
+    await userEvent.type(screen.getByLabelText("Skills"), "GraphQL{Enter}");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("technology")).toBe("GraphQL"); // Enter applies it
   });
 });

@@ -124,6 +124,8 @@ export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; on
     actions = <>
       {closed}
       <button className="btn-rose" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
+      <button className="btn-slate" disabled={busy} onClick={() => setStatus("IGNORED")} title="Not now — hides it from the open lists">Ignore</button>
+      <button className="btn-slate" disabled={busy} onClick={() => setStatus("DUPLICATE")} title="The same posting as another job — hides this copy">Duplicate</button>
       <button className="btn-emerald" disabled={busy} onClick={() => setStatus("APPLIED")}
         title="Already applied — records the application">✓ Applied</button>
       {posting}
@@ -179,7 +181,7 @@ export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; on
 }
 
 /** Statuses that end the decision: the page goes back to the list after setting one. */
-const DISMISSED = ["CLOSED", "NOT_RELEVANT"];
+const DISMISSED = ["CLOSED", "NOT_RELEVANT", "IGNORED", "DUPLICATE"];
 
 const SECTIONS: [string, string][] = [["fit", "Fit"], ["description", "Description"], ["email", "Email to HR"], ["contact", "Contact"], ["follow-ups", "Follow-ups"], ["comments", "Comments"]];
 
@@ -193,6 +195,8 @@ function QuickActions({ job, setStatus, busy }: { job: JobDetail; setStatus: (s:
     <span className="inline-flex items-center gap-1" data-testid="quick-actions">
       {open && <button className={`btn-slate ${b}`} disabled={busy} onClick={() => setStatus("CLOSED")} title="The posting is no longer open">Closed</button>}
       {deciding && <button className={`btn-rose ${b}`} disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>}
+      {deciding && <button className={`btn-slate ${b}`} disabled={busy} onClick={() => setStatus("IGNORED")}>Ignore</button>}
+      {deciding && <button className={`btn-slate ${b}`} disabled={busy} onClick={() => setStatus("DUPLICATE")}>Duplicate</button>}
       {open && <button className={`btn-emerald ${b}`} disabled={busy} onClick={() => setStatus("APPLIED")} title="Already applied — records the application">✓ Applied</button>}
       {url && <a className={`btn-sky ${b}`} href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a>}
       {deciding && <button className={`btn-amber ${b}`} disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>}

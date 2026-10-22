@@ -1,3 +1,4 @@
+import { useLocation } from "react-router-dom";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +16,11 @@ function listRequest(fn: { mock: { calls: unknown[][] } }, last = false): URL {
   const urls = fn.mock.calls.map((c) => new URL(String(c[0]), "http://x"))
     .filter((u) => u.pathname.endsWith("/jobs") && u.searchParams.get("size") !== "1");
   return last ? urls[urls.length - 1] : urls[0];
+}
+
+function Where() {
+  const { search } = useLocation();
+  return <p data-testid="where">{search}</p>;
 }
 
 const SUMMARY = { total_jobs: 410, closed_jobs: 6, new_jobs: 410, jobs_scored: 416, jobs_90_plus: 1, jobs_80_plus: 39, stale_scores: 0,
@@ -125,6 +131,26 @@ describe("job status tabs", () => {
     await userEvent.click(within(chips).getByRole("button", { name: /^Screening\s*1$/ }));
     expect(listRequest(api.fn, true).searchParams.getAll("status")).toEqual(["SCREENING"]);
     expect(within(chips).getByRole("button", { name: /^Screening/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("searching or filtering stays in the tab you're on", async () => {
+    const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 }, "GET /jobs/status-counts": {} });
+    renderAt(<><JobsPage /><Where /></>, { path: "/jobs", route: "/jobs" }); // plain /jobs = New
+    expect(await screen.findByRole("heading", { name: "New jobs" })).toBeInTheDocument();
+    const search = screen.getByLabelText("Search jobs");
+    await userEvent.type(search, "magento{Enter}");
+    expect(await screen.findByRole("heading", { name: "New jobs" })).toBeInTheDocument(); // not All open
+    const last = listRequest(api.fn, true);
+    expect(last.searchParams.get("q")).toBe("magento");
+    expect(last.searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
+    expect(screen.getByTestId("where")).toHaveTextContent("tab=new");
+
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=pending" });
+    await userEvent.click((await screen.findAllByRole("button", { name: /More filters/ })).at(-1)!);
+    await userEvent.type(screen.getAllByLabelText("Skills").at(-1)!, "PHP{Enter}");
+    const pending = listRequest(api.fn, true);
+    expect(pending.searchParams.get("technology")).toBe("PHP");
+    expect(pending.searchParams.getAll("status")).toEqual(["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"]);
   });
 
   it("opens on New: jobs that just arrived, newest first", async () => {

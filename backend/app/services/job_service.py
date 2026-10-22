@@ -4,12 +4,13 @@ Manual entry, Career-Ops import and any future source all go through `ingest_job
 """
 
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, String, case, cast, func, or_, select, text
+from sqlalchemy import Select, String, and_, case, cast, func, or_, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, selectinload
 
@@ -325,7 +326,8 @@ def _same_posting(job: Job, new: _Posting) -> str | None:
     One company + one title is one job to apply to, whichever city it is posted in.
     """
     if (
-        job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT)
+        job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT, JobStatus.IGNORED,
+                       JobStatus.DUPLICATE)
         and job.posting_date
         and new.posting_date
         and (new.posting_date - job.posting_date).days > 60
@@ -347,7 +349,8 @@ def _same_posting(job: Job, new: _Posting) -> str | None:
     locs_ok = dedup.locations_compatible(
         job.locations or ([job.location] if job.location else []), new.locations
     )
-    if not locs_ok and job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT):
+    if not locs_ok and job.status in (JobStatus.CLOSED, JobStatus.NOT_RELEVANT, JobStatus.IGNORED,
+                       JobStatus.DUPLICATE):
         return None  # maybe rejected for its city: a posting elsewhere stays visible
     if job.normalized_title == title_key(new.title) and dedup.dates_compatible(
         job.posting_date, new.posting_date
@@ -644,7 +647,9 @@ class JobFilters:
     company_id: int | None = None
     tier: str | None = None
     role: str | None = None
-    technology: str | None = None
+    technology: str | None = None  # one or more skills, comma separated
+    skills_mode: str = "any"  # any: a job with any of the skills; all: with every one
+    skills_exact: bool = False  # only the skill itself, not its more specific forms
     location: str | None = None
     work_model: str | None = None
     source: str | None = None
@@ -667,7 +672,7 @@ STATUS_ORDER = case(
         JobStatus.RECRUITER_CONTACTED, JobStatus.SCREENING, JobStatus.INTERVIEW,
         JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER,
         JobStatus.ACCEPTED, JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.NOT_RELEVANT,
-        JobStatus.CLOSED,
+        JobStatus.IGNORED, JobStatus.DUPLICATE, JobStatus.CLOSED,
     ])},
     value=Job.status,
     else_=99,
@@ -696,6 +701,21 @@ SORTS: dict[str, Any] = {
     "-id": (Job.id.desc(),),
     "-created_at": (Job.created_at.desc(), Job.id.desc()),
 }
+
+
+def has_skill(skill: str, exact: bool = False) -> Any:
+    """Jobs listing `skill` (required or nice-to-have). Not exact: also its more specific forms
+    ("Magento" finds "Magento 2") and the name in any capitalisation ("php" finds "PHP")."""
+    from app.skills.catalog import descendants
+
+    forms = [skill] if exact else [skill, *descendants(skill)]
+    conds = [col.contains(cast([name], JSONB))
+             for name in forms for col in (Job.required_skills, Job.preferred_skills)]
+    if not exact:
+        quoted = f'%"{skill}"%'  # a skill outside the catalog, written another way
+        conds += [cast(Job.required_skills, String).ilike(quoted),
+                  cast(Job.preferred_skills, String).ilike(quoted)]
+    return or_(*conds)
 
 
 def filtered_jobs(f: JobFilters) -> Select[Any]:
@@ -735,13 +755,11 @@ def filtered_jobs(f: JobFilters) -> Select[Any]:
     if f.role:
         stmt = stmt.where(Job.title.ilike(f"%{f.role.strip()}%"))
     if f.technology:
-        skill = normalize_skill(f.technology) or f.technology
-        stmt = stmt.where(
-            or_(
-                Job.required_skills.contains(cast([skill], JSONB)),
-                Job.preferred_skills.contains(cast([skill], JSONB)),
-            )
-        )
+        skills = list(dict.fromkeys(normalize_skill(p) or p.strip()
+                                    for p in re.split(r"[,|;]", f.technology) if p.strip()))
+        conds = [has_skill(s, exact=f.skills_exact) for s in skills]
+        if conds:
+            stmt = stmt.where(and_(*conds) if f.skills_mode == "all" else or_(*conds))
     if f.location:
         like = f"%{f.location.strip()}%"
         stmt = stmt.where(or_(Job.location.ilike(like), cast(Job.locations, String).ilike(like)))
@@ -980,7 +998,8 @@ APPLICATION_FOLLOWS = {
     JobStatus.WITHDRAWN, JobStatus.CLOSED,
 }
 # The search for this job is over: its open follow-ups are no longer needed.
-JOB_FINISHED = {JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.CLOSED, JobStatus.NOT_RELEVANT}
+JOB_FINISHED = {JobStatus.REJECTED, JobStatus.WITHDRAWN, JobStatus.CLOSED, JobStatus.NOT_RELEVANT,
+                JobStatus.IGNORED, JobStatus.DUPLICATE}
 
 
 def _sync_application(db: Session, job: Job, status: JobStatus, note: str | None) -> None:
@@ -1077,7 +1096,8 @@ def merge_jobs(db: Session, keep_id: int, merge_id: int) -> Job:
 # Which status says more about the user's progress; a merge keeps the furthest one.
 _STATUS_RANK = [
     JobStatus.DISCOVERED, JobStatus.NEW, JobStatus.CLOSED, JobStatus.NOT_RELEVANT,
-    JobStatus.ON_HOLD, JobStatus.REVIEWING, JobStatus.SHORTLISTED, JobStatus.READY_TO_APPLY,
+    JobStatus.IGNORED, JobStatus.DUPLICATE, JobStatus.ON_HOLD, JobStatus.REVIEWING,
+    JobStatus.SHORTLISTED, JobStatus.READY_TO_APPLY,
     JobStatus.WITHDRAWN, JobStatus.REJECTED, JobStatus.APPLIED, JobStatus.RECRUITER_CONTACTED,
     JobStatus.SCREENING, JobStatus.INTERVIEW, JobStatus.AWAITING_FEEDBACK, JobStatus.OFFER,
     JobStatus.ACCEPTED,

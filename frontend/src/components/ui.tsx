@@ -46,7 +46,7 @@ const STATUS_TONE: Record<string, keyof typeof TONES> = {
   VERIFIED: "green", PARTIALLY_VERIFIED: "blue", RESEARCHED: "indigo", DISCOVERED: "gray",
   NEEDS_REVIEW: "amber", STALE: "amber", INVALID: "red", REJECTED: "red",
   APPLIED: "indigo", SHORTLISTED: "blue", READY_TO_APPLY: "blue", INTERVIEW: "green",
-  AWAITING_FEEDBACK: "amber", SCREENING: "blue", OFFER: "green", ACCEPTED: "green", NOT_RELEVANT: "gray", CLOSED: "gray",
+  AWAITING_FEEDBACK: "amber", SCREENING: "blue", OFFER: "green", ACCEPTED: "green", NOT_RELEVANT: "gray", IGNORED: "gray", DUPLICATE: "gray", CLOSED: "gray",
   WITHDRAWN: "gray", RECEIVED: "blue", NEGOTIATING: "amber", DECLINED: "gray", EXPIRED: "gray",
   SCHEDULED: "blue", RESCHEDULED: "amber", COMPLETED: "green", CANCELLED: "gray",
   PASSED: "green", FAILED: "red", PENDING: "gray", HIRING: "green",
@@ -77,6 +77,8 @@ export const JOB_STATUS_STYLE: Record<string, { badge: string; dot: string }> = 
   ON_HOLD: { badge: "bg-yellow-50 text-yellow-800 ring-yellow-300", dot: "bg-yellow-500" },
   CLOSED: { badge: "bg-zinc-200 text-zinc-700 ring-zinc-300", dot: "bg-zinc-600" },
   NOT_RELEVANT: { badge: "bg-neutral-100 text-neutral-500 ring-neutral-200", dot: "bg-neutral-300" },
+  IGNORED: { badge: "bg-slate-100 text-slate-500 ring-slate-200", dot: "bg-slate-300" },
+  DUPLICATE: { badge: "bg-violet-50 text-violet-600 ring-violet-200", dot: "bg-violet-300" },
 };
 
 export function JobStatusBadge({ value }: { value: string | null | undefined }) {
@@ -98,6 +100,7 @@ export const JOB_STATUS_NEXT: Record<string, string> = {
   INTERVIEW: "prepare for the interview", AWAITING_FEEDBACK: "waiting for feedback", OFFER: "decide on the offer",
   ACCEPTED: "offer accepted", REJECTED: "ended", WITHDRAWN: "you withdrew",
   NOT_RELEVANT: "hidden from open lists", CLOSED: "posting no longer open",
+  IGNORED: "ignored for now", DUPLICATE: "same as another job",
 };
 
 /** The current status, unmistakably: the status pill, then what it means and how long it's been so. */

@@ -478,7 +478,7 @@ New (sorted `-created_at`); with filters in the link it opens All open. Closed /
 a job page returns to the last list (`lastJobListUrl` in `JobNav.tsx`). Tab → statuses:
 new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
 Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback · selected = Offer+Accepted · rejected ·
-not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `jobTabs.ts`; grouped by
+not-pursuing = Withdrawn+Not relevant+Ignored+Duplicate · closed (defined in `JOB_TABS`, `jobTabs.ts`; grouped by
 stage in `JOB_TAB_GROUPS`). All open = every unfinished job = the sum of the to-review and
 in-progress tabs; the dashboard's `total_jobs` uses the same set (`JOB_FINISHED`).
 Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).

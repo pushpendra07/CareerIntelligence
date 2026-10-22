@@ -288,6 +288,9 @@ STATUS_MAP = {
     "closed": JobStatus.CLOSED,
     "expired": JobStatus.CLOSED,
     "not relevant": JobStatus.NOT_RELEVANT,
+    "ignore": JobStatus.IGNORED,
+    "ignored": JobStatus.IGNORED,
+    "duplicate": JobStatus.DUPLICATE,
 }
 
 

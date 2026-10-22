@@ -80,6 +80,9 @@ Conventions:
   job's contact person (at least one of name/email/phone/LinkedIn; empty clears a field). Someone
   already saved with the same email, LinkedIn or phone is linked instead of added twice.
 - `DELETE /api/v1/jobs/{job_id}/contact` — unlink it (the contact stays in Recruiters)
+- Jobs filter `technology`: one or more skills, comma separated; `skills_mode=any|all` (default
+  any), `skills_exact=true` (only the skill itself, not its more specific forms). Same on
+  `GET /api/v1/jobs/status-counts`.
 - `POST /api/v1/jobs/preview`
 - `POST /api/v1/jobs` — optional `company_id`: link the job to that company (picked from the
   suggestions) instead of matching `company` by name

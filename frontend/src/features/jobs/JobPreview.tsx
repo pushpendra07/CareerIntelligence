@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { AddedViaTags, Badge, ErrorBox, JobStatusBadge, Spinner, StatusBadge } from "../../components/ui";
@@ -19,7 +19,8 @@ export function JobPreview({ id, ids, onOpen, onClose, top = 0 }: {
   const job = useQuery({ queryKey: ["job", String(id)], queryFn: () => api.get<JobDetail>(`/jobs/${id}`) });
   const status = useMutation({
     mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }),
-    onSuccess: () => qc.invalidateQueries(),
+    // Done with this job: close the panel and go back to the list (it may have left this tab).
+    onSuccess: () => { qc.invalidateQueries(); onClose(); },
     meta: { success: "Status updated", toastError: true },
   });
   const at = ids.indexOf(id);
@@ -36,10 +37,22 @@ export function JobPreview({ id, ids, onOpen, onClose, top = 0 }: {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [prev, next, onOpen, onClose]);
+  // A click outside the panel closes it. A job row is left to its own click (which shows that
+  // job here, or closes the panel when it's the same job).
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (!el || panel.current?.contains(el) || el.closest("[data-job-row]")) return;
+      onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [onClose]);
   const j = job.data;
   const b = "btn-secondary px-2 py-1 text-xs";
   return (
-    <aside role="dialog" aria-label="Job preview" style={{ top }}
+    <aside ref={panel} role="dialog" aria-label="Job preview" style={{ top }}
       className="fixed bottom-0 right-0 z-30 flex w-full max-w-xl flex-col border-l border-slate-200 bg-surface shadow-2xl">
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2">
         <button className={b} disabled={!prev} onClick={() => prev && onOpen(prev)} aria-label="Previous job in the list" title="Previous (↑)">↑</button>

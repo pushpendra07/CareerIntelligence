@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompaniesPage } from "../features/companies/CompaniesPage";
@@ -7,7 +7,7 @@ import { CompanyDuplicatesPage } from "../features/companies/CompanyDuplicatesPa
 import { JobDetailPage } from "../features/jobs/JobDetailPage";
 import { rememberJobList } from "../features/jobs/JobNav";
 import { Highlighted } from "../features/jobs/JobParts";
-import { JobsPage } from "../features/jobs/JobsPage";
+import { JobStatusOptions, JobsPage } from "../features/jobs/JobsPage";
 import { mockApi, renderAt } from "./utils";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -42,8 +42,9 @@ describe("jobs list", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     const closed = await screen.findByRole("button", { name: "Closed: Magento Lead" });
     const row = closed.parentElement!;
-    expect(within(row).getAllByRole("button").slice(0, 4).map((b) => b.getAttribute("aria-label")))
-      .toEqual(["Closed: Magento Lead", "Not relevant: Magento Lead", "Applied: Magento Lead", "Shortlist Magento Lead"]);
+    expect(within(row).getAllByRole("button").slice(0, 6).map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Closed: Magento Lead", "Not relevant: Magento Lead", "Ignore: Magento Lead", "Duplicate: Magento Lead",
+        "Applied: Magento Lead", "Shortlist Magento Lead"]);
     await userEvent.click(screen.getByRole("button", { name: "Applied: Magento Lead" }));
     await userEvent.click(closed);
     await userEvent.click(screen.getByRole("button", { name: "Not relevant: Magento Lead" }));
@@ -93,6 +94,69 @@ describe("jobs list", () => {
     expect(await within(panel).findByRole("heading", { name: /PHP Architect/ })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Job preview" })).not.toBeInTheDocument();
+  });
+});
+
+describe("ignore and duplicate", () => {
+  it("are quick buttons in the list and always under Most used", async () => {
+    const api = mockApi({ "GET /jobs": listOf([ROW]), "POST /jobs/7/status": { ok: true },
+      "GET /jobs/status-usage": { APPLIED: 9, NOT_RELEVANT: 5, CLOSED: 3 } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click(await screen.findByRole("button", { name: "Ignore: Magento Lead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Duplicate: Magento Lead" }));
+    await waitFor(() => expect(api.calls.filter((c) => c.path === "/jobs/7/status").map((c) => c.body))
+      .toEqual([{ status: "IGNORED" }, { status: "DUPLICATE" }]));
+    renderAt(<select aria-label="Status"><JobStatusOptions /></select>);
+    const most = await screen.findByRole("group", { name: "Most used" });
+    await waitFor(() => expect(within(most).getAllByRole("option").map((o) => o.textContent))
+      .toEqual(["Applied", "Not Relevant", "Closed", "Ignored", "Duplicate"]));
+  });
+
+  it("are quick buttons on the job page and its preview", async () => {
+    const api = mockApi({ "GET /jobs": listOf([ROW]), "GET /jobs/7": DETAIL, "POST /jobs/7/status": { ok: true } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click((await screen.findAllByText("Remote (India / US / Global Delivery)"))[0]);
+    const panel = await screen.findByRole("dialog", { name: "Job preview" });
+    await userEvent.click(await within(panel).findByRole("button", { name: "Duplicate" }));
+    await waitFor(() => expect(api.calls.find((c) => c.path === "/jobs/7/status")?.body).toEqual({ status: "DUPLICATE" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Job preview" })).not.toBeInTheDocument());
+  });
+});
+
+describe("job preview", () => {
+  it("closes after a status change made in it", async () => {
+    const api = mockApi({ "GET /jobs": listOf([ROW, ROW2]), "GET /jobs/7": DETAIL, "POST /jobs/7/status": { ok: true } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click((await screen.findAllByText("Remote (India / US / Global Delivery)"))[0]);
+    const panel = await screen.findByRole("dialog", { name: "Job preview" });
+    await userEvent.click(await within(panel).findByRole("button", { name: "Not relevant" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Job preview" })).not.toBeInTheDocument());
+    expect(api.calls.find((c) => c.path === "/jobs/7/status")?.body).toEqual({ status: "NOT_RELEVANT" });
+  });
+
+  it("closes on a click outside it; another row switches it to that job", async () => {
+    mockApi({ "GET /jobs": listOf([ROW, ROW2]), "GET /jobs/7": DETAIL, "GET /jobs/8": { ...DETAIL, id: 8, title: "PHP Architect" } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    const cells = await screen.findAllByText("Remote (India / US / Global Delivery)");
+    await userEvent.click(cells[0]);
+    const panel = await screen.findByRole("dialog", { name: "Job preview" });
+    await userEvent.click(within(panel).getByText("Is this worth applying to?", {}, )); // inside: stays
+    expect(screen.getByRole("dialog", { name: "Job preview" })).toBeInTheDocument();
+    await userEvent.click(cells[1]); // another row: shows that job
+    expect(await within(screen.getByRole("dialog", { name: "Job preview" })).findByRole("heading", { name: /PHP Architect/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("heading", { name: /jobs$/, level: 1 })); // outside: closes
+    expect(screen.queryByRole("dialog", { name: "Job preview" })).not.toBeInTheDocument();
+  });
+
+  it("stays open when the change fails, showing why", async () => {
+    mockApi({ "GET /jobs": listOf([ROW]), "GET /jobs/7": DETAIL,
+      "POST /jobs/7/status": () => { throw Object.assign(new Error("Server error"), { status: 500 }); } });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    await userEvent.click((await screen.findAllByText("Remote (India / US / Global Delivery)"))[0]);
+    const panel = await screen.findByRole("dialog", { name: "Job preview" });
+    await userEvent.click(await within(panel).findByRole("button", { name: "Not relevant" }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole("dialog", { name: "Job preview" })).toBeInTheDocument();
   });
 });
 

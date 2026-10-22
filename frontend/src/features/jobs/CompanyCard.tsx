@@ -8,7 +8,7 @@ import { ExtraLinkList } from "../companies/ExtraLinks";
 type Naukri = { rating?: number; reviews?: number };
 
 /** Jobs already decided against are not "other jobs" worth a look. */
-const DONE = ["NOT_RELEVANT", "REJECTED", "WITHDRAWN", "CLOSED"];
+const DONE = ["NOT_RELEVANT", "IGNORED", "DUPLICATE", "REJECTED", "WITHDRAWN", "CLOSED"];
 
 /** The company behind a job: key facts, its links and its other jobs in the app. */
 export function CompanyCard({ companyId, jobId }: { companyId: number; jobId: number }) {

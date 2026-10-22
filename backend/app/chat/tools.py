@@ -27,7 +27,7 @@ TAB_STATUSES = {
     "interview": ["INTERVIEW", "AWAITING_FEEDBACK"],
     "selected": ["OFFER", "ACCEPTED"],
     "rejected": ["REJECTED"],
-    "not-pursuing": ["WITHDRAWN", "NOT_RELEVANT"],
+    "not-pursuing": ["WITHDRAWN", "NOT_RELEVANT", "IGNORED", "DUPLICATE"],
     "closed": ["CLOSED"],
 }
 

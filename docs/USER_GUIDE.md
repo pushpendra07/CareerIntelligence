@@ -260,9 +260,18 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   **Rejected · Not pursuing · Closed**. **All open** is every job still in play, so its count is
   New + Pending + Applied + Interview + Selected (the same number as *Jobs* on Today).
   The page opens on **New** — jobs that just arrived, newest first (*Recently added*). Setting a
-  status moves the job to its tab (Shortlist → Pending, Applied → Applied, Not relevant → Not
-  pursuing, Closed → Closed). Links from Today and Insights that carry filters open **All open**.
-  Each job shows its skills; click one to list only jobs with that skill (click again to clear).
+  status moves the job to its tab (Shortlist → Pending, Applied → Applied, Not relevant, Ignore or
+  Duplicate → Not pursuing, Closed → Closed). **Ignore** puts a job aside for now without judging
+  the fit; **Duplicate** hides a second copy of a posting you already have. Both are quick buttons
+  next to *Not relevant* in the list, the preview and the job page, and always under *Most used*
+  in the status menu. Search and filters apply **inside the tab you're on** (searching on
+  New searches new jobs only); switch tabs to search elsewhere. Links from Today and Insights that
+  carry filters open **All open**.
+  Each job shows its skills; click one to add it to the **Skills** filter (click again to take
+  it out). Under *More filters* → **Skills**, add several skills (Enter after each) and choose
+  **Any of these** or **All of these**; tick **Exact skill only** to leave out more specific forms
+  (Magento without Magento 2). Without it, a skill also finds its specific forms and any spelling
+  ("php" finds PHP).
   A tab with several statuses shows a chip per status with its count (Pending: *Reviewing ·
   Shortlisted · Ready to apply · On hold*; Applied: *Applied · Recruiter contacted · Screening*);
   click one to see only that status, **All** for the whole tab.
@@ -275,7 +284,8 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - **In the list:** each row has **Closed** and **Not relevant** first, then the next step
   (**★ Shortlist** / **Apply**, **✓ Applied**); open posting, copy link and delete are under **⋯**. **Click a row**
   to preview the job on the right — score, why it fits, description and the same buttons — and
-  move through the rows with ↑ / ↓; Esc closes it.
+  move through the rows with ↑ / ↓. Esc, a click outside it, or changing the job's status from
+  it closes it (a click on another row shows that job instead).
 - **On a job page:** the bar under the top stays while you scroll, with **Back to jobs**, the
   job, its score, the main buttons and **← n/N →** to move through the list you came from (keys
   **J** / **K**). Links under *Next step* jump to Fit, Description, Email, Follow-ups and Comments.

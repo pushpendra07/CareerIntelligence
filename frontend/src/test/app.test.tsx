@@ -120,8 +120,8 @@ describe("jobs list", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?technology=PHP&min_score=70" });
     expect(await screen.findByText("Adobe Commerce Technical Lead")).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByText("updating")).toBeInTheDocument();
-    // Technology is a "more" filter: the panel opens by itself when it's in use.
-    expect(screen.getByLabelText("Technology")).toHaveValue("PHP");
+    // Skills is a "more" filter: the panel opens by itself when it's in use.
+    expect(within(screen.getByRole("group", { name: "Skills filter" })).getByText("PHP")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fewer filters" })).toHaveAttribute("aria-expanded", "true");
     const call = api.fn.mock.calls.map((c) => String(c[0])).find((u) => u.includes("/jobs?")) ?? "";
     expect(call).toContain("technology=PHP");

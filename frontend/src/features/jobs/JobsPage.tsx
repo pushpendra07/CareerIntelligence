@@ -11,14 +11,50 @@ import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, formatShortDate, humanize, salaryRange } from "../../utils/format";
 import { prefs } from "../../utils/storage";
 import { usePhone } from "../../utils/media";
+import { ListInput } from "../../components/ListInput";
 import { ARCHIVE_TABS, JOB_STATUSES, JOB_TABS, JOB_TAB_GROUPS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses, tabHref } from "./jobTabs";
 export { JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses } from "./jobTabs";
 
-const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
+const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "skills_mode", "skills_exact", "location", "work_model",
   "source", "status", "posted_after", "posted_within", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
+
+/** The skills in the `technology` filter ("C#, PHP" → ["C#", "PHP"]). */
+export const skillList = (v: string | null | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+/** Several skills: jobs with any or all of them; "exact" leaves out more specific forms
+ * (Magento without Magento 2). Changes go to the address like every filter. */
+function SkillsFilter({ params, onChange }: { params: URLSearchParams; onChange: (changes: Record<string, string>) => void }) {
+  const skills = skillList(params.get("technology"));
+  const mode = params.get("skills_mode") === "all" ? "all" : "any";
+  const exact = params.get("skills_exact") === "true";
+  return (
+    <div role="group" aria-label="Skills filter" className="col-span-2 space-y-1.5 md:col-span-4 lg:col-span-5">
+      <ListInput value={skills} label="Skills" placeholder="Skills, e.g. PHP, Magento 2 — Enter after each"
+        onChange={(v) => onChange(v.length ? { technology: v.join(", ") } : { technology: "", skills_mode: "", skills_exact: "" })} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        {skills.length > 1 && (
+          <span role="radiogroup" aria-label="Match" className="inline-flex overflow-hidden rounded-lg border border-slate-200">
+            {(["any", "all"] as const).map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => onChange({ skills_mode: m === "all" ? "all" : "" })}
+                className={`px-2.5 py-1 text-xs ${mode === m ? "bg-indigo-600 text-white" : "bg-surface text-slate-600 hover:bg-slate-50"}`}>
+                {m === "any" ? "Any of these" : "All of these"}
+              </button>
+            ))}
+          </span>
+        )}
+        <label className="inline-flex items-center gap-1.5 text-slate-600" title="Only the skill as written, not its more specific forms (Magento without Magento 2)">
+          <input type="checkbox" checked={exact} disabled={!skills.length} onChange={(e) => onChange({ skills_exact: e.target.checked ? "true" : "" })} />
+          Exact skill only
+        </label>
+      </div>
+    </div>
+  );
+}
 
 /** Shown first until there's a history of status changes (most people use these most). */
 const DEFAULT_MOST_USED = ["APPLIED", "NOT_RELEVANT", "CLOSED", "REJECTED", "INTERVIEW"];
+/** Always under "Most used": quick ways to put a job aside. */
+const ALWAYS_LISTED = ["IGNORED", "DUPLICATE"];
 
 /**
  * Options for a job-status <select>: the statuses you set most often first ("Most used",
@@ -30,7 +66,8 @@ export function JobStatusOptions() {
     queryFn: () => api.get<Record<string, number>>("/jobs/status-usage"),
   }).data;
   const used = Object.keys(usage ?? {}).filter((s) => JOB_STATUSES.includes(s));
-  const top = (used.length >= 3 ? used : [...used, ...DEFAULT_MOST_USED.filter((s) => !used.includes(s))]).slice(0, 5);
+  const top = [...(used.length >= 3 ? used : [...used, ...DEFAULT_MOST_USED.filter((s) => !used.includes(s))]).slice(0, 5),
+    ...ALWAYS_LISTED].filter((s, i, all) => all.indexOf(s) === i);
   return (
     <>
       <optgroup label="Most used">{top.map((s) => <option key={`top-${s}`} value={s}>{humanize(s)}</option>)}</optgroup>
@@ -222,6 +259,10 @@ function NextStep({ job }: { job: Job }) {
       title="The posting is no longer open" onClick={() => status.mutate("CLOSED")}>Mark closed</button>
     <button className={b} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
       title="Not a fit — hides it from the open lists" onClick={() => status.mutate("NOT_RELEVANT")}>Not relevant</button>
+    <button className={b} disabled={status.isPending} aria-label={`Ignore: ${job.title}`}
+      title="Not now — hides it from the open lists (Not pursuing tab)" onClick={() => status.mutate("IGNORED")}>Ignore</button>
+    <button className={b} disabled={status.isPending} aria-label={`Duplicate: ${job.title}`}
+      title="The same posting as another job — hides this copy (Not pursuing tab)" onClick={() => status.mutate("DUPLICATE")}>Duplicate</button>
   </>;
   let main: ReactNode = null;
   if (NEW_STATUSES.includes(job.status)) {
@@ -249,14 +290,14 @@ function NextStep({ job }: { job: Job }) {
 }
 
 /** The job's skills under its title: required first, then preferred (lighter), the rest as "+N".
- * With onPick, each skill is a button that filters the list by it (again: clears the filter). */
-export function JobSkills({ job, max = 6, active, onPick }: { job: Pick<Job, "required_skills" | "preferred_skills">;
-  max?: number; active?: string | null; onPick?: (skill: string) => void }) {
+ * With onPick, each skill is a button that adds it to the skills filter (again: takes it out). */
+export function JobSkills({ job, max = 6, active = [], onPick }: { job: Pick<Job, "required_skills" | "preferred_skills">;
+  max?: number; active?: string[]; onPick?: (skill: string) => void }) {
   const all = [...(job.required_skills ?? []).map((s) => ({ s, req: true })),
     ...(job.preferred_skills ?? []).filter((s) => !job.required_skills?.includes(s)).map((s) => ({ s, req: false }))];
   if (!all.length) return null;
   const rest = all.slice(max);
-  const isActive = (s: string) => !!active && s.toLowerCase() === active.toLowerCase();
+  const isActive = (s: string) => active.some((a) => a.toLowerCase() === s.toLowerCase());
   const look = (s: string, req: boolean) => `rounded-md px-1.5 py-px text-[11px] leading-4 ${isActive(s)
     ? "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300"
     : req ? "bg-slate-100 text-slate-700" : "border border-dashed border-slate-200 text-slate-500"}`;
@@ -265,8 +306,8 @@ export function JobSkills({ job, max = 6, active, onPick }: { job: Pick<Job, "re
       {all.slice(0, max).map(({ s, req }) => (
         <li key={s}>
           {onPick
-            ? <button type="button" aria-pressed={isActive(s)} onClick={() => onPick(isActive(s) ? "" : s)}
-                title={`${req ? "Required" : "Preferred"} · ${isActive(s) ? "click to show all jobs" : `show only jobs with ${s}`}`}
+            ? <button type="button" aria-pressed={isActive(s)} onClick={() => onPick(s)}
+                title={`${req ? "Required" : "Preferred"} · ${isActive(s) ? "click to take it out of the skills filter" : `add ${s} to the skills filter`}`}
                 className={`${look(s, req)} transition hover:bg-indigo-50 hover:text-indigo-700`}>{s}</button>
             : <span title={req ? "Required" : "Preferred"} className={`inline-block ${look(s, req)}`}>{s}</span>}
         </li>
@@ -277,8 +318,8 @@ export function JobSkills({ job, max = 6, active, onPick }: { job: Pick<Job, "re
 }
 
 /** Phones: one card per job instead of an 11-column table. */
-function JobCards({ jobs, selected, toggle, skill, onSkill }: { jobs: Job[]; selected: Set<number>; toggle: (id: number) => void;
-  skill: string | null; onSkill: (skill: string) => void }) {
+function JobCards({ jobs, selected, toggle, skills, onSkill }: { jobs: Job[]; selected: Set<number>; toggle: (id: number) => void;
+  skills: string[]; onSkill: (skill: string) => void }) {
   return (
     <ul className="divide-y divide-slate-100">
       {jobs.map((j) => (
@@ -293,7 +334,7 @@ function JobCards({ jobs, selected, toggle, skill, onSkill }: { jobs: Job[]; sel
               {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
               {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
             </div>
-            <JobSkills job={j} max={4} active={skill} onPick={onSkill} />
+            <JobSkills job={j} max={4} active={skills} onPick={onSkill} />
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600">
               <span>{j.location ?? "Location unknown"}{j.work_model !== "UNKNOWN" && ` · ${humanize(j.work_model)}`}</span>
               {(j.experience_min != null || j.experience_max != null) && <span>{experienceRange(j.experience_min, j.experience_max)}</span>}
@@ -452,6 +493,9 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   /** Apply a change made by the user, and remember it for next time. */
   const update = (next: URLSearchParams) => {
     next.delete("page");
+    // Search and filters work inside the tab you're on: without this, plain /jobs (New) would
+    // turn into All open as soon as a filter appears in the address.
+    if (view !== "closed" && !next.has("tab")) next.set("tab", tabKey);
     setParams(next);
     const keep = new URLSearchParams(next);
     for (const k of NOT_REMEMBERED) keep.delete(k);
@@ -464,6 +508,18 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     const next = new URLSearchParams(params);
     if (value.trim()) next.set(key, value.trim()); else next.delete(key);
     update(next);
+  };
+  const setMany = (changes: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(changes)) { if (v.trim()) next.set(k, v.trim()); else next.delete(k); }
+    update(next);
+  };
+  /** A skill clicked on a job: added to the skills filter, or taken out if it's already there. */
+  const toggleSkill = (skill: string) => {
+    const skills = skillList(params.get("technology"));
+    const has = skills.some((s) => s.toLowerCase() === skill.toLowerCase());
+    const next = has ? skills.filter((s) => s.toLowerCase() !== skill.toLowerCase()) : [...skills, skill];
+    setMany(next.length ? { technology: next.join(", ") } : { technology: "", skills_mode: "", skills_exact: "" });
   };
   const setStatuses = (values: string[]) => {
     const next = new URLSearchParams(params);
@@ -528,7 +584,9 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           update(next);
         }} />
         <ActiveFilters params={params} tab={tab} onRemove={(key, value) => {
-          if (key === "status") setStatuses(picked.filter((x) => x !== value)); else set(key, "");
+          if (key === "status") setStatuses(picked.filter((x) => x !== value));
+          else if (key === "technology") setMany({ technology: "", skills_mode: "", skills_exact: "" });
+          else set(key, "");
         }} />
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Chips label="Score" options={SCORE_CHIPS} value={params.get("min_score") ?? ""} onChange={(v) => set("min_score", v)} />
@@ -549,13 +607,11 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
         </div>
         {showMore && (
           <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 md:grid-cols-4 lg:grid-cols-5">
+            <SkillsFilter params={params} onChange={setMany} />
             <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 75)" aria-label="Min score"
               key={params.get("min_score") ?? ""} defaultValue={params.get("min_score") ?? ""} onBlur={(e) => e.target.value !== (params.get("min_score") ?? "") && set("min_score", e.target.value)} />
             {select("recommendation", RECS, "Any recommendation")}
             {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Any company tier")}
-            <input className="input" placeholder="Skill (e.g. magento2, GraphQL)" aria-label="Technology" key={`tech-${params.get("technology") ?? ""}`}
-              defaultValue={params.get("technology") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("technology", e.currentTarget.value)}
-              onBlur={(e) => set("technology", e.target.value)} />
             <input className="input" placeholder="Location (e.g. Bengaluru)" aria-label="Location" defaultValue={params.get("location") ?? ""}
               onBlur={(e) => set("location", e.target.value)} />
             {select("source", SOURCES, "Any source")}
@@ -578,7 +634,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (<>
             {/* Wide screens: no inner scroll box, so the column headers can stick to the page. */}
             <div ref={tableWrapRef} className={stickyHead ? "" : "overflow-x-auto"}>
-              {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} skill={params.get("technology")} onSkill={(v) => set("technology", v)} /> : <>
+              {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} skills={skillList(params.get("technology"))} onSkill={toggleSkill} /> : <>
               <p className="mb-2 text-xs text-slate-500"><b>Click a row</b> to preview it here (↑ ↓ move, Esc closes) · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100 [&_td]:px-2 [&_th]:px-2">
                 <thead className={stickyHead ? "sticky z-10" : ""} style={stickyHead ? { top: headerBottom } : undefined}><tr>
@@ -602,7 +658,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
-                    <tr key={j.id} onClick={(e) => openPreview(e, j.id)}
+                    <tr key={j.id} data-job-row onClick={(e) => openPreview(e, j.id)}
                       className={`cursor-pointer ${preview === j.id ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300" : selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}`}>
                       <td className="td w-8"><input type="checkbox" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
@@ -614,7 +670,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                           {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
                           <AddedViaTags values={j.added_via} />
                         </div>
-                        <JobSkills job={j} active={params.get("technology")} onPick={(v) => set("technology", v)} />
+                        <JobSkills job={j} active={skillList(params.get("technology"))} onPick={toggleSkill} />
                       </td>
                       <td className="td max-w-32 text-xs" title={[j.location, j.work_model !== "UNKNOWN" ? humanize(j.work_model) : ""].filter(Boolean).join(" · ")}>
                         <div className="truncate">{j.location ?? "—"}</div>
@@ -691,7 +747,13 @@ function ActiveFilters({ params, tab, onRemove }: {
       case "has_application": return v === "true" ? "Already applied" : "Not applied yet";
       case "added_via": return `Added via ${ADDED_VIA[v]?.label ?? v}`;
       case "company_id": return `Company #${v}`;
-      case "technology": case "location": return `${humanize(k)}: ${v}`;
+      case "technology": {
+        const many = skillList(v).length > 1;
+        const how = [many ? (params.get("skills_mode") === "all" ? "all of" : "any of") : null,
+          params.get("skills_exact") === "true" ? "exact" : null].filter(Boolean).join(", ");
+        return `Skills${how ? ` (${how})` : ""}: ${skillList(v).join(", ")}`;
+      }
+      case "location": return `${humanize(k)}: ${v}`;
       case "recommendation": case "tier": case "work_model": case "source": return humanize(v);
       default: return null;
     }

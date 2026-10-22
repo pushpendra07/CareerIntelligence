@@ -42,6 +42,8 @@ class JobStatus(StrEnum):
     ON_HOLD = "ON_HOLD"
     CLOSED = "CLOSED"
     NOT_RELEVANT = "NOT_RELEVANT"
+    IGNORED = "IGNORED"  # not now: hidden from the open lists without judging the fit
+    DUPLICATE = "DUPLICATE"  # the same posting as another job you keep
 
 
 class WorkModel(StrEnum):

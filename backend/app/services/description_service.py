@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 KIND = "DESCRIBE"
 DEFAULT_LIMIT = 40
 FINISHED = [JobStatus.CLOSED.value, JobStatus.REJECTED.value, JobStatus.NOT_RELEVANT.value,
-            JobStatus.WITHDRAWN.value]
+            JobStatus.IGNORED.value, JobStatus.DUPLICATE.value, JobStatus.WITHDRAWN.value]
 
 
 def _url(job: Job) -> str | None:

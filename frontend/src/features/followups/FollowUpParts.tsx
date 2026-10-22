@@ -27,7 +27,7 @@ export function dueLabel(due: string): string {
 const SNOOZES: [number, string][] = [[1, "+1 day"], [3, "+3 days"], [7, "+1 week"]];
 
 /** Job statuses where a follow-up no longer makes sense. */
-const FINISHED = ["REJECTED", "CLOSED", "NOT_RELEVANT", "WITHDRAWN", "ACCEPTED"];
+const FINISHED = ["REJECTED", "CLOSED", "NOT_RELEVANT", "IGNORED", "DUPLICATE", "WITHDRAWN", "ACCEPTED"];
 
 /** One reminder with its context and one-click actions: Done, or push it out. */
 export function FollowUpRow({ f, showJob = true }: { f: FollowUp; showJob?: boolean }) {
