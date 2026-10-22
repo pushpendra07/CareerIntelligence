@@ -68,11 +68,97 @@ def company(db: Session, name: str, careers_url: str, enabled: bool = True) -> i
     ("https://acme.recruitee.com/o/dev", "RECRUITEE", "acme"),
     ("https://scandiweb.pinpointhq.com", "PINPOINT", "scandiweb"),
     ("https://onemagnify.wd5.myworkdayjobs.com/en-US/OneMagnify_Careers", "WORKDAY", "onemagnify"),
+    ("https://wd3.myworkdaysite.com/en-US/recruiting/havas/GroupCareers", "WORKDAY", "havas"),
+    ("https://silkcommerce.bamboohr.com/jobs", "BAMBOOHR", "silkcommerce"),
+    ("https://bacancy.keka.com/careers", "KEKA", "bacancy"),
+    ("https://keyvalue.zohorecruit.in/jobs/Careers", "ZOHO_RECRUIT", "keyvalue"),
 ])
 def test_resolve_board(url: str, provider: str, slug: str) -> None:
     board = resolve_board(url)
     assert board is not None
     assert (board.provider, board.slug) == (provider, slug)
+
+
+def test_hr_system_boards_bamboohr_keka_zoho_and_workday_site() -> None:
+    from app.scanner.providers import DETAILS, PROVIDERS
+
+    zoho_jobs = [{"id": "77", "Posting_Title": "Magento Lead", "City": "Kochi", "State": "Kerala",
+                  "Country": "India", "Remote_Job": False, "Date_Opened": "2026-10-20",
+                  "Job_Type": "Full time", "Work_Experience": "8+ years", "Publish": True,
+                  "Job_Description": "<p>Adobe Commerce &amp; PHP</p>"},
+                 {"id": "78", "Posting_Title": "Hidden", "Publish": False}]
+    escaped = json.dumps(zoho_jobs).replace("&", "&amp;").replace('"', "&#34;")
+    http = FakeHttp({
+        "https://silk.bamboohr.com/careers/list": {"result": [
+            {"id": "53", "jobOpeningName": "PHP Lead", "location": {"city": "Pune", "state": None},
+             "atsLocation": {"country": "India"}, "employmentStatusLabel": "Full-Time"}]},
+        "https://silk.bamboohr.com/careers/53/detail": {"result": {"jobOpening": {
+            "description": "<p>Magento 2</p>", "datePosted": "2026-10-19"}}},
+        "https://bacancy.keka.com/careers/api/jobs/default/active": [
+            {"id": 5, "title": "Laravel Developer", "description": "<div>PHP</div>",
+             "experience": "5+ Years", "publishedOn": "2026-10-21T05:25:41.123Z",
+             "jobLocations": [{"name": "Remote", "city": "Ahmedabad", "state": "GJ",
+                               "countryCode": "IN"}]}],
+        "https://keyvalue.zohorecruit.in/jobs/Careers":
+            f'<input type="hidden" value="{escaped}" id="jobs">',
+        "https://wd3.myworkdaysite.com/wday/cxs/havas/Group/jobs": {
+            "total": 1, "jobPostings": [{"title": "Dev", "externalPath": "/job/Pune/Dev_1"}]},
+    })
+
+    def run(url: str) -> list[ScannedJob]:
+        board = resolve_board(url)
+        assert board is not None
+        return PROVIDERS[board.provider](board, http)
+
+    [bamboo] = run("https://silk.bamboohr.com/jobs")
+    DETAILS["BAMBOOHR"](bamboo, http)
+    assert (bamboo.title, bamboo.location, bamboo.url) == (
+        "PHP Lead", "Pune, India", "https://silk.bamboohr.com/careers/53")
+    assert "Magento 2" in bamboo.description and bamboo.posted == date(2026, 10, 19)
+
+    [keka] = run("https://bacancy.keka.com/careers")
+    assert (keka.url, keka.location, keka.remote) == (
+        "https://bacancy.keka.com/careers/jobdetails/5", "Ahmedabad, GJ, IN", True)
+    assert keka.description.startswith("Experience: 5+ Years") and "PHP" in keka.description
+
+    [zoho] = run("https://keyvalue.zohorecruit.in/careers")  # unpublished job left out
+    assert (zoho.title, zoho.location, zoho.posted) == ("Magento Lead", "Kochi, Kerala, India",
+                                                         date(2026, 10, 20))
+    assert zoho.url == "https://keyvalue.zohorecruit.in/jobs/Careers/77"
+    assert "Adobe Commerce & PHP" in zoho.description
+
+    [wd] = run("https://wd3.myworkdaysite.com/en-US/recruiting/havas/Group")
+    assert wd.url == "https://wd3.myworkdaysite.com/recruiting/havas/Group/job/Pune/Dev_1"
+
+
+def test_careers_page_listing_links_and_headings() -> None:
+    from app.scanner import htmljobs
+    from app.scanner.providers import PROVIDERS, careers_listing_board
+
+    links_page = """<nav><a href="/services/hire-magento-developers">Hire Magento Developers</a>
+      <a href="/blog/how-to-become-a-developer">How to become a developer</a></nav>
+      <a href="/careers/senior-magento-developer">Senior Magento Developer</a>
+      <a href="https://other.example/jobs/x">PHP Developer</a>
+      <a href="/careers/">Current Openings</a>"""
+    assert htmljobs.job_links(links_page, "https://acme.example/careers") == [
+        ("Senior Magento Developer", "https://acme.example/careers/senior-magento-developer")]
+
+    headings_page = """<h2>Why join us?</h2><p>Great team.</p>
+      <h3>Laravel Developer (3-5 yrs, Jaipur)</h3><p>PHP, Laravel, MySQL. Mail hr@acme.example</p>
+      <h3>Representative Office</h3><p>Dubai</p><h3>Connect to an expert</h3>
+      <h3>Software Tester</h3><p>Manual and Selenium.</p>"""
+    found = htmljobs.job_headings(headings_page, "https://acme.example/careers")
+    assert [h["title"] for h in found] == ["Laravel Developer (3-5 yrs, Jaipur)", "Software Tester"]
+    assert found[0]["url"] == "https://acme.example/careers#job/laravel-developer-3-5-yrs-jaipur"
+    assert "Laravel, MySQL" in found[0]["description"]
+
+    http = FakeHttp({"https://acme.example/careers/senior-magento-developer":
+                     "<header>Magento Shopify React</header><main><p>Own our Adobe Commerce stack."
+                     "</p></main><footer>Laravel</footer>",
+                     "https://acme.example/careers": links_page})
+    [job] = PROVIDERS["CAREERS_HTML"](careers_listing_board("https://acme.example/careers"), http)
+    assert (job.title, job.description) == ("Senior Magento Developer",
+                                            "Own our Adobe Commerce stack.")
 
 
 def test_resolve_board_ignores_unsupported() -> None:
@@ -248,6 +334,22 @@ def test_detect_boards_from_careers_page(db: Session) -> None:
     assert [(b.provider, b.slug) for _, b in target] == [("LEVER", "plainco")]
 
 
+def test_board_marked_invalid_is_not_used_or_found_again(client: TestClient, db: Session) -> None:
+    cid = company(db, "Plain Co", "https://plain.example.com/careers")
+    page = '<a href="https://jobs.lever.co/plainco">Open roles</a>'
+    service.detect_boards(db, [cid], fetch=lambda url: FetchResult(url, 200, page))
+    assert service.scan_targets(db, [cid])
+    res = client.post(f"/api/v1/companies/{cid}/evidence", json={
+        "field": "careers_url", "value": "https://jobs.lever.co/plainco",
+        "source_kind": "OFFICIAL_ATS", "verification_status": "INVALID",
+        "note": "Another company's board"})
+    assert res.status_code == 200
+    db.expire_all()
+    assert service.scan_targets(db, [cid]) == []
+    run = service.detect_boards(db, [cid], fetch=lambda url: FetchResult(url, 200, page))
+    assert run.stats["found"] == 0 and service.scan_targets(db, [cid]) == []
+
+
 # --- API -------------------------------------------------------------------------------------
 
 def test_api_status_settings_and_run(client: TestClient, db: Session,
@@ -351,8 +453,11 @@ def test_runs_left_running_by_a_restart_are_closed_at_startup(db: Session) -> No
     with pytest.raises(ConflictError):  # a fresh RUNNING run blocks a new one
         runner.start_background(db, "SCAN")
     # The start lock is released even when the start is refused.
+    # Only this database's locks: the running app shares the dev server and may hold its own.
     held = db.execute(text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
-                           "AND objid = :k"), {"k": runner.START_LOCK_ID}).scalar()
+                           "AND objid = :k AND database = (SELECT oid FROM pg_database "
+                           "WHERE datname = current_database())"),
+                      {"k": runner.START_LOCK_ID}).scalar()
     assert held == 0
 
     assert runner.close_interrupted(db) == 1

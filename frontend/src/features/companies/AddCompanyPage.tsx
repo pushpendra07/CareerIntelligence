@@ -133,7 +133,7 @@ export function AddCompanyPage() {
               <Field label="LinkedIn page" error={errors.linkedin_url?.message}><input className="input" placeholder="https://www.linkedin.com/company/…" {...register("linkedin_url")} /></Field>
             </div>
             <Field label="Careers page / job board" error={errors.careers_url?.message}
-              hint="Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee, Pinpoint, Teamtailor, SuccessFactors or Oracle Cloud boards can be searched for jobs">
+              hint="Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee, Pinpoint, Teamtailor, SuccessFactors, Oracle Cloud, BambooHR, Keka or Zoho Recruit boards can be searched for jobs">
               <input className="input" placeholder="https://boards.greenhouse.io/…" {...register("careers_url")} />
             </Field>
             <Field label="Job portal pages" error={errors.extra_links?.message} hint="The company's page on Naukri, LinkedIn, Foundit or Monster">

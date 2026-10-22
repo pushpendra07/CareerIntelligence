@@ -7,6 +7,48 @@ curl -s http://127.0.0.1:8010/api/v1/scanner/status | python3 -m json.tool      
 curl -s http://127.0.0.1:8010/api/v1/career-ops/status | python3 -m json.tool    # Career-Ops
 ```
 
+**Update 2026-10-22 — all companies checked for both scanners.**
+- *Find job boards* ran over all 2,960 companies without a board: 142 found (page link 10,
+  JobPosting data 10, name on a board 122). The name matches were checked by hand against each
+  board's own company name and postings; 12 were wrong (demo/sandbox boards, junk test accounts,
+  same-name companies, SmartRecruiters' `my-applications` page) and are recorded as **INVALID**
+  `careers_url` evidence on the company — a board marked INVALID is never used or re-found
+  (`board_for` / `detect_boards`). Job board search now covers **348 companies**
+  (SmartRecruiters 97, Greenhouse 74, Careers pages 47, Lever 25, Workday 23, Workable 18,
+  Ashby 14, Teamtailor 12, Oracle 10, Recruitee 8, SuccessFactors 9, Pinpoint 5); every company
+  has Job search on (*Search every company*).
+- Career-Ops `portals.yml`: 70 of its 84 entries were careers pages no Career-Ops reader
+  handles (silently skipped). 6 were pointed at their verified boards and 245 verified boards
+  from this app were appended (section "Added 2026-10-22 from Career Intelligence"); only boards
+  that answered with postings in `audit-portals.mjs` (or, for rate-limited Workable, in this
+  app's scan) were added. Career-Ops now reads **257 boards**; 64 entries remain careers pages
+  without a reader. Backup of the old file: `backups/portals.yml.2026-10-22.bak` (git-ignored).
+- Not added to Career-Ops: careers-page-only companies (no Career-Ops reader), boards that were
+  empty or failed in its audit (e.g. Valantic Greenhouse 404, Zigly SuccessFactors 404,
+  Pinpoint boards Cyncly/Forescout that its reader returns empty), and Workable boards that
+  stayed rate-limited (HTTP 429) with no postings seen.
+
+**Later on 2026-10-22 — every company in both scanners.**
+- New readers: BambooHR, Keka, Zoho Recruit, Workday on `myworkdaysite.com`, and **own careers
+  pages that list openings** as job-title links or headings (`CAREERS_HTML`,
+  `scanner/htmljobs.py`; no AI, everything still passes the title/location/age filters).
+- Websites for the 2,112 companies imported with only a name (Naukri list) were found from the
+  name: a domain is accepted only when its homepage title/site name matches the company, it is not
+  parked, its title/description says it is a software/IT company, and it carries the full name or
+  an India signal. 908 found and saved as `SECONDARY` / `PARTIALLY_VERIFIED` website evidence
+  (note says how); 4 wrong matches checked by hand and marked INVALID. ~1,200 remain without a
+  website (generic or unreachable names) — research them by hand (`scripts/company_queue.py`).
+- *Find job boards* over those and every company with a careers page: Job board search now covers
+  **949 companies** (own careers pages 435, JobPosting pages 86, SmartRecruiters 100,
+  Greenhouse 78, Workday 50, Keka 39, Zoho Recruit 36, Lever 25, Workable 21, Oracle 17,
+  Teamtailor 16, Ashby 15, SuccessFactors 9, BambooHR 8, Recruitee 8, Pinpoint 6).
+- Career-Ops `portals.yml` now has an entry for **every company** (3,165 entries): **320 job
+  boards** its scanner reads (no AI), and **2,860 `scan_method: websearch` entries** for companies
+  with no board it can read — `scan.mjs` only lists those; Career-Ops' AI agent searches them when
+  you run `/career-ops scan` (costs tokens). Second backup: `backups/portals.yml.2026-10-22-b.bak`.
+- Still not readable automatically: Darwinbox (Cloudflare bot check), sites that load jobs with
+  JavaScript, sites that block bots (HTTP 403), and companies with no website.
+
 **53 companies are in the curated list:** 49 by the built-in Job board search (10 of them also by Career-Ops)
 plus 4 only by Career-Ops. Across all companies in the app, 190+ boards are auto-scannable.
 Tracked companies without a supported board remain in "Not scannable" below.
@@ -161,7 +203,14 @@ no careers URL, still can't be scanned — use Add Job or Google Sheets.
 | Teamtailor | `<slug>.teamtailor.com` or the company's own careers domain | `https://<careers-domain>/jobs.rss` |
 | SAP SuccessFactors | `*.successfactors.com/eu`, `*.jobs2web.com`, or own domain | `GET <base>/tile-search-results/?startrow=0` (older sites) or `POST <base>/services/recruiting/v1/jobs` (newer); descriptions from each job page's JobPosting data |
 | Oracle Cloud HCM | `<tenant>.fa.<region>.oraclecloud.com/hcmUI/CandidateExperience/<lang>/sites/<site>` | `GET https://<host>/hcmRestApi/resources/latest/recruitingCEJobRequisitions?...finder=findReqs;siteNumber=<site>` |
+| Workday (site host) | `wd<N>.myworkdaysite.com/<lang>/recruiting/<tenant>/<Site>` | `POST https://wd<N>.myworkdaysite.com/wday/cxs/<tenant>/<Site>/jobs` (same body as Workday) |
+| BambooHR | `<slug>.bamboohr.com/careers` (or `/jobs`) | `https://<slug>.bamboohr.com/careers/list`; description from `/careers/<id>/detail` |
+| Keka | `<slug>.keka.com/careers` | `https://<slug>.keka.com/careers/api/jobs/default/active` |
+| Zoho Recruit | `<slug>.zohorecruit.in` / `.com` / `.eu` `/jobs/Careers` | the careers page itself: jobs JSON in `<input type="hidden" id="jobs">` |
 | Own careers page | any page with schema.org `JobPosting` (on it or on its job pages) | the page itself |
+
+Not supported: **Darwinbox** (its career sites are behind a Cloudflare bot check) and
+**Jobvite** (the one tracked company's board is retired; Career-Ops reads Jobvite).
 
 ## Rate limits and broken responses
 

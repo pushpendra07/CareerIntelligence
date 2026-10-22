@@ -23,6 +23,7 @@ from app.scanner.jsonld import job_links, job_postings
 from app.scanner.providers import (
     Board,
     Http,
+    careers_listing_board,
     careers_page_board,
     oracle_board,
     resolve_board,
@@ -135,6 +136,12 @@ def from_careers_page(url: str, http: Http, company: str | None = None) -> Found
         page = _get(http, link)
         if page is not None and job_postings(page.text):
             return Found(careers_page_board(res.url), "job_posting_data", link)
+    # No board, no data: openings listed as job-title links or headings on the page itself.
+    from app.scanner import htmljobs
+
+    if htmljobs.job_links(res.text, res.url, limit=1) or htmljobs.job_headings(res.text, res.url,
+                                                                                limit=1):
+        return Found(careers_listing_board(res.url), "page_listing", url)
     return None
 
 

@@ -2,8 +2,8 @@
 
 Each provider turns a company's board into `ScannedJob`s. Providers never touch the database;
 the scan service decides what to keep. Shapes were verified against live boards (Greenhouse,
-Lever, Ashby, SmartRecruiters, Workday, Pinpoint, Teamtailor); Recruitee and Workable follow
-their documented public APIs.
+Lever, Ashby, SmartRecruiters, Workday, Pinpoint, Teamtailor, BambooHR, Keka, Zoho Recruit);
+Recruitee and Workable follow their documented public APIs.
 """
 
 import json
@@ -91,6 +91,16 @@ _RULES: list[tuple[str, re.Pattern[str]]] = [
 ]
 _WORKDAY = re.compile(
     r"https?://([A-Za-z0-9_-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)")
+# Workday's other public host: the tenant is in the path (wd3.myworkdaysite.com/recruiting/havas/X).
+_WORKDAY_SITE = re.compile(
+    r"https?://(wd\d+)\.myworkdaysite\.com/(?:[a-z]{2}-[A-Z]{2}/)?recruiting/([A-Za-z0-9_-]+)/"
+    r"([A-Za-z0-9_-]+)")
+# Systems whose company is the subdomain: BambooHR, Keka, Zoho Recruit (.com / .in / .eu ...).
+_SUBDOMAIN_BOARDS = [
+    ("BAMBOOHR", re.compile(r"https?://([A-Za-z0-9-]+)\.bamboohr\.com")),
+    ("KEKA", re.compile(r"https?://([A-Za-z0-9-]+)\.keka\.com")),
+    ("ZOHO_RECRUIT", re.compile(r"https?://(([A-Za-z0-9-]+)\.zohorecruit\.(?:com|in|eu|com\.au|jp))")),
+]
 _IGNORED_SLUGS = {"embed", "v1", "boards", "jobs", "api", "www", "careers", "apply", "job", "j",
                   # shared Teamtailor/Recruitee/Pinpoint infrastructure, not company boards
                   "app", "tt", "assets", "cdn", "static", "scripts", "career", "images", "media",
@@ -154,6 +164,21 @@ def resolve_board(url: str | None) -> Board | None:
         tenant, wd, site = m.groups()
         return Board("WORKDAY", tenant, f"https://{tenant}.{wd}.myworkdayjobs.com/{site}",
                      {"host": f"{tenant}.{wd}.myworkdayjobs.com", "site": site})
+    if m := _WORKDAY_SITE.search(url):
+        wd, tenant, site = m.groups()
+        host = f"{wd}.myworkdaysite.com"
+        return Board("WORKDAY", tenant, f"https://{host}/recruiting/{tenant}/{site}",
+                     {"host": host, "site": site, "path": f"recruiting/{tenant}/{site}"})
+    for provider, pattern in _SUBDOMAIN_BOARDS:
+        if not (m := pattern.search(url)):
+            continue
+        if provider == "ZOHO_RECRUIT":  # keep the country host: .in and .com are separate
+            host, slug = m.group(1), m.group(2)
+            if slug.lower() not in _IGNORED_SLUGS:
+                return Board(provider, slug, f"https://{host}/jobs/Careers", {"host": host})
+        elif (slug := m.group(1)).lower() not in _IGNORED_SLUGS:
+            site = "bamboohr" if provider == "BAMBOOHR" else "keka"
+            return Board(provider, slug, f"https://{slug}.{site}.com/careers")
     for provider, pattern in _RULES:
         m = pattern.search(url)
         if m and m.group(1).lower() not in _IGNORED_SLUGS:
@@ -276,8 +301,9 @@ def workday(board: Board, http: Http) -> list[ScannedJob]:
         posts = data.get("jobPostings", [])
         for j in posts:
             path = j.get("externalPath", "")
+            page = board.extra.get("path") or site  # myworkdaysite: recruiting/<tenant>/<site>
             out.append(ScannedJob(
-                title=j.get("title", ""), url=f"https://{host}/{site}{path}",
+                title=j.get("title", ""), url=f"https://{host}/{page}{path}",
                 external_id=(j.get("bulletFields") or [None])[0], location=j.get("locationsText"),
                 employment_type=j.get("timeType"), needs_detail=True, detail_ref=f"{api}{path}"))
         offset += 20
@@ -520,6 +546,85 @@ def oracle_detail(job: ScannedJob, http: Http) -> None:
     job.description = text or job.description
 
 
+# --- HR systems with a public careers feed: BambooHR, Keka, Zoho Recruit ----------------------
+
+def bamboohr(board: Board, http: Http) -> list[ScannedJob]:
+    origin = f"https://{board.slug}.bamboohr.com"
+    data = _json(http, "GET", f"{origin}/careers/list")
+    out = []
+    for j in data.get("result") or []:
+        loc = j.get("location") or {}
+        ats = j.get("atsLocation") or {}
+        parts = (loc.get("city") or ats.get("city"), loc.get("state") or ats.get("state"),
+                 ats.get("country"))
+        place = ", ".join(x for x in parts if x)
+        out.append(ScannedJob(
+            title=j.get("jobOpeningName") or "", url=f"{origin}/careers/{j['id']}",
+            external_id=str(j["id"]), location=place or None, remote=bool(j.get("isRemote")),
+            employment_type=j.get("employmentStatusLabel"), needs_detail=True,
+            detail_ref=f"{origin}/careers/{j['id']}/detail"))
+    return out
+
+
+def bamboohr_detail(job: ScannedJob, http: Http) -> None:
+    if not job.detail_ref:
+        return
+    info = (_json(http, "GET", job.detail_ref).get("result") or {}).get("jobOpening") or {}
+    job.description = html_to_text(info.get("description")) or job.description
+    job.posted = _date(info.get("datePosted")) or job.posted
+
+
+def keka(board: Board, http: Http) -> list[ScannedJob]:
+    origin = f"https://{board.slug}.keka.com"
+    data = _json(http, "GET", f"{origin}/careers/api/jobs/default/active")
+    out = []
+    for j in data if isinstance(data, list) else []:
+        places = j.get("jobLocations") or []
+        place = "; ".join(", ".join(x for x in (p.get("city"), p.get("state"), p.get("countryCode"))
+                                    if x) for p in places if isinstance(p, dict)) or None
+        exp = f"Experience: {j['experience']}\n\n" if j.get("experience") else ""
+        out.append(ScannedJob(
+            title=j.get("title") or "", url=f"{origin}/careers/jobdetails/{j['id']}",
+            external_id=str(j["id"]), location=place,
+            remote=any("remote" in str(p.get("name", "")).lower() for p in places
+                       if isinstance(p, dict)),
+            description=exp + html_to_text(j.get("description")),
+            posted=_date(j.get("publishedOn"))))
+    return out
+
+
+_ZOHO_JOBS = re.compile(r'<input type="hidden" value="([^"]*)" id="jobs"')
+
+
+def zoho_recruit(board: Board, http: Http) -> list[ScannedJob]:
+    import html as html_lib
+
+    host = board.extra["host"]
+    res = http("GET", f"https://{host}/jobs/Careers", None)
+    if res.status != 200:
+        raise ProviderError(f"careers page returned HTTP {res.status}")
+    m = _ZOHO_JOBS.search(res.text)
+    if not m:
+        raise ProviderError("no job list on the Zoho Recruit careers page")
+    try:
+        data = json.loads(html_lib.unescape(m.group(1)))
+    except json.JSONDecodeError as exc:
+        raise ProviderError("job list on the Zoho Recruit page was not JSON") from exc
+    out = []
+    for j in data if isinstance(data, list) else []:
+        if j.get("Publish") is False:
+            continue
+        place = ", ".join(x for x in (j.get("City"), j.get("State"), j.get("Country")) if x)
+        exp = f"Experience: {j['Work_Experience']}\n\n" if j.get("Work_Experience") else ""
+        out.append(ScannedJob(
+            title=j.get("Posting_Title") or j.get("Job_Opening_Name") or "",
+            url=f"https://{host}/jobs/Careers/{j['id']}", external_id=str(j["id"]),
+            location=place or None, remote=bool(j.get("Remote_Job")),
+            description=exp + html_to_text(j.get("Job_Description")),
+            posted=_date(j.get("Date_Opened")), employment_type=j.get("Job_Type")))
+    return out
+
+
 # --- the company's own careers page (schema.org JobPosting) --------------------------------------
 
 def careers_page(board: Board, http: Http) -> list[ScannedJob]:
@@ -541,14 +646,55 @@ def careers_page(board: Board, http: Http) -> list[ScannedJob]:
     return list(jobs.values())
 
 
+_CHROME_RE = re.compile(r"<(header|nav|footer|aside|form)\b.*?</\1>", re.IGNORECASE | re.DOTALL)
+
+
+def main_text(html: str) -> str:
+    """A page's text without its header, menus, footer and forms (they list every technology
+    an agency offers, which would read as the job's skills)."""
+    m = re.search(r"<main\b.*?</main>", html, re.IGNORECASE | re.DOTALL)
+    return html_to_text(_CHROME_RE.sub(" ", m.group(0) if m else html))[:8000]
+
+
+def careers_listing_board(url: str) -> Board:
+    """A company's own careers page that lists openings as links or headings (no job board)."""
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    return Board("CAREERS_HTML", parts.hostname or "", url, {})
+
+
+def careers_html(board: Board, http: Http) -> list[ScannedJob]:
+    from app.scanner.htmljobs import job_headings, job_links
+    from app.scanner.jsonld import job_postings, to_fields
+
+    res = http("GET", board.url, None)
+    if res.status != 200:
+        raise ProviderError(f"careers page returned HTTP {res.status}")
+    jobs: dict[str, ScannedJob] = {}
+    for title, link in job_links(res.text, board.url, limit=25):
+        page = http("GET", link, None)
+        if page.status != 200:
+            continue
+        posted = [to_fields(p, link) for p in job_postings(page.text)]
+        if posted and posted[0]["title"]:  # the job page has proper data after all
+            jobs[link] = ScannedJob(**posted[0])
+        else:
+            jobs[link] = ScannedJob(title=title, url=link, description=main_text(page.text))
+    if not jobs:  # openings written on the careers page itself
+        for h in job_headings(res.text, board.url):
+            jobs[h["url"]] = ScannedJob(title=h["title"], url=h["url"],
+                                        description=h["description"])
+    return list(jobs.values())
+
+
 PROVIDERS: dict[str, Callable[[Board, Http], list[ScannedJob]]] = {
     "GREENHOUSE": greenhouse, "LEVER": lever, "ASHBY": ashby, "SMARTRECRUITERS": smartrecruiters,
     "WORKDAY": workday, "PINPOINT": pinpoint, "RECRUITEE": recruitee, "WORKABLE": workable,
     "TEAMTAILOR": teamtailor, "SUCCESSFACTORS": successfactors, "ORACLE": oracle,
-    "CAREERS_PAGE": careers_page,
+    "BAMBOOHR": bamboohr, "KEKA": keka, "ZOHO_RECRUIT": zoho_recruit,
+    "CAREERS_PAGE": careers_page, "CAREERS_HTML": careers_html,
 }
 DETAILS: dict[str, Callable[[ScannedJob, Http], None]] = {
     "SMARTRECRUITERS": smartrecruiters_detail, "WORKDAY": workday_detail,
-    "SUCCESSFACTORS": page_detail, "ORACLE": oracle_detail,
+    "SUCCESSFACTORS": page_detail, "ORACLE": oracle_detail, "BAMBOOHR": bamboohr_detail,
 }
 SUPPORTED = sorted(PROVIDERS)

@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.companies.verification import Claim, _usable, add_claim, recompute
+from app.companies.verification import Claim, _disproved_values, _usable, add_claim, recompute
 from app.core.errors import ConflictError
 from app.core.http import BlockedURLError, FetchResult, safe_request
 from app.core.urls import JobSource
@@ -93,7 +93,9 @@ def board_for(company: Company) -> Board | None:
     """The company's job board: one saved by board discovery, else the first supported board
     among its usable careers URLs."""
     saved = (company.attributes or {}).get("scanner_board")
-    if isinstance(saved, dict) and saved.get("provider") and saved.get("url"):
+    # A found board the user marked INVALID (wrong company, demo board) is never used again.
+    if isinstance(saved, dict) and saved.get("provider") and saved.get("url") \
+            and str(saved["url"]).lower() not in _disproved_values(company, "careers_url"):
         return Board(str(saved["provider"]), str(saved.get("slug") or ""), str(saved["url"]),
                      dict(saved.get("extra") or {}))
     urls = [s.value for s in _usable(company, "careers_url") if s.value]
@@ -352,6 +354,8 @@ def detect_boards(db: Session, company_ids: list[int] | None = None,
         found = r.pop("found")
         target = db.get(Company, r["company_id"])
         assert target is not None
+        if found and found.board.url.lower() in _disproved_values(target, "careers_url"):
+            found = None  # this board was marked as not the company's: don't save it again
         if r["found_careers_url"]:
             careers_n += 1
             add_claim(target, Claim("careers_url", r["found_careers_url"],
