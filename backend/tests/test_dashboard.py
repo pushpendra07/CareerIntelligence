@@ -42,7 +42,7 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     assert closed["new_this_week"] == 2 and closed["applied_this_week"] == 1
     client.post(f"/api/v1/jobs/{other['id']}/status", json={"status": "NOT_RELEVANT"})
     hidden = client.get("/api/v1/dashboard").json()["summary"]
-    assert hidden["total_jobs"] == 1  # not-relevant (and applied/rejected) jobs aren't open
+    assert hidden["total_jobs"] == 1  # not-relevant (rejected, withdrawn) jobs are finished
     kinds = [p["type"] for p in d["priorities"]]
     assert kinds[0] == "INTERVIEW" and "FOLLOW_UP" in kinds
     follow = next(p for p in d["priorities"] if p["type"] == "FOLLOW_UP")

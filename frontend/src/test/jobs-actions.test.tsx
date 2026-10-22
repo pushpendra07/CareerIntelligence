@@ -48,8 +48,8 @@ describe("status multi-select", () => {
     await userEvent.click(within(box).getByRole("button", { name: "Clear" }));
     const cleared = listUrls(api.fn).at(-1)!.searchParams.getAll("status");
     expect(cleared).toContain("NEW");
-    expect(cleared).not.toContain("NOT_RELEVANT"); // hidden unless picked
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except applied, rejected, not relevant");
+    expect(cleared).not.toContain("NOT_RELEVANT"); // finished: its own tab
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any open status");
   });
 });
 
@@ -290,5 +290,8 @@ describe("ticked jobs", () => {
     await userEvent.type(screen.getByLabelText("Location"), "Pune");
     await userEvent.click(document.body);
     expect(listUrls(api.fn).at(-1)!.searchParams.get("location")).toBe("Pune"); // a real change still filters
+
+    await userEvent.type(screen.getByLabelText("Technology"), "GraphQL{Enter}");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("technology")).toBe("GraphQL"); // Enter applies it
   });
 });

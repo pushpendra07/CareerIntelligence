@@ -763,3 +763,25 @@ def test_extension_download_is_set_up_for_this_app(client: TestClient) -> None:
     settings = zf.read("career-intelligence-extension/settings.js").decode()
     assert 'apiUrl: "http://testserver", appUrl: "http://127.0.0.1:5173"' in settings
     assert client.get("/api/v1/extension.zip", params={"app": "javascript:x"}).status_code == 422
+
+
+def test_search_finds_jobs_by_skill(client: TestClient, db: Session) -> None:
+    def add(title: str, url: str, required: list[str], preferred: list[str]) -> int:
+        job = ingest_job(db, JobInput(title=title, company_name="Skill Co", url=url,
+                                      origin="import", required_skills=required,
+                                      preferred_skills=preferred)).job
+        return job.id
+
+    m2 = add("Backend Developer", "https://skill.example/1", ["Magento 2", "PHP"], [])
+    gql = add("Platform Engineer", "https://skill.example/2", ["Java"], ["GraphQL"])
+    other = add("Frontend Developer", "https://skill.example/3", ["React"], [])
+    db.commit()
+
+    def found(**params: str) -> set[int]:
+        items = client.get("/api/v1/jobs", params={**params, "size": "100"}).json()["items"]
+        return {j["id"] for j in items} & {m2, gql, other}
+
+    assert found(q="magento2") == {m2}  # an alias finds the skill's canonical name
+    assert found(q="graphql") == {gql}  # nice-to-have skills count too
+    assert found(q="php") == {m2}  # not in any title: found through the skills
+    assert found(technology="magento2") == {m2}

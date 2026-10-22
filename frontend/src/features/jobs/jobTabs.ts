@@ -4,7 +4,10 @@ export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "R
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
   "CLOSED", "NOT_RELEVANT"];
 
-export const OPEN_STATUSES = JOB_STATUSES.filter((s) => s !== "CLOSED");
+/** Finished jobs: their own tabs, never in "All open". */
+export const FINISHED_STATUSES = ["REJECTED", "WITHDRAWN", "NOT_RELEVANT", "CLOSED"];
+/** Jobs still in play: what "All open" lists, the sum of the To review and In progress tabs. */
+export const OPEN_STATUSES = JOB_STATUSES.filter((s) => !FINISHED_STATUSES.includes(s));
 export const NEW_STATUSES = ["NEW", "DISCOVERED"];
 export const PENDING_STATUSES = ["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"];
 export const APPLIED_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK"];
@@ -32,12 +35,8 @@ export const JOB_TAB_GROUPS: { label: string; keys: string[] }[] = [
   { label: "Finished", keys: ARCHIVE_TABS },
 ];
 
-/** Shown only when picked in the Status filter (or in their own tab), like Closed jobs. */
-export const HIDDEN_BY_DEFAULT = ["APPLIED", "REJECTED", "NOT_RELEVANT"];
-
-/** The statuses a tab lists when no status is picked. */
-export const defaultStatuses = (tab: { key: string; statuses: string[] }) =>
-  tab.key === "all" ? tab.statuses.filter((s) => !HIDDEN_BY_DEFAULT.includes(s)) : tab.statuses;
+/** The statuses a tab lists when no status is picked: all of its own. */
+export const defaultStatuses = (tab: { key: string; statuses: string[] }) => tab.statuses;
 
 /** Where a tab lives: plain /jobs opens New, so All open has its own address. */
 export const tabHref = (key: string) => (key === "closed" ? "/jobs/closed" : `/jobs?tab=${key}`);

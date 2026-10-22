@@ -5,9 +5,10 @@ import { ListInput } from "../../components/ListInput";
 import { ErrorBox, Field } from "../../components/ui";
 import type { Application, JobDetail, Page } from "../../types/api";
 import { EmploymentTypeSelect, LocationInput, WorkModelPicker } from "./JobFields";
+import { postingUrl } from "./JobParts";
 
 type Form = {
-  title: string; location: string; work_model: string; employment_type: string;
+  title: string; url: string; location: string; work_model: string; employment_type: string;
   experience_min: string; experience_max: string; salary_min: string; salary_max: string; salary_currency: string;
   salary_text: string; posting_date: string; application_deadline: string; original_jd: string; notes: string;
   required_skills: string[]; preferred_skills: string[];
@@ -17,7 +18,7 @@ const s = (v: string | number | null | undefined) => (v === null || v === undefi
 
 function fromJob(j: JobDetail): Form {
   return {
-    title: j.title, location: s(j.location), work_model: j.work_model === "UNKNOWN" ? "" : j.work_model,
+    title: j.title, url: s(postingUrl(j)), location: s(j.location), work_model: j.work_model === "UNKNOWN" ? "" : j.work_model,
     employment_type: s(j.employment_type),
     experience_min: s(j.experience_min && Number(j.experience_min)), experience_max: s(j.experience_max && Number(j.experience_max)),
     salary_min: s(j.salary_min && Number(j.salary_min)), salary_max: s(j.salary_max && Number(j.salary_max)),
@@ -34,7 +35,7 @@ const LISTS = ["required_skills", "preferred_skills"];
 
 /** Field names as the user sees them, for the "what changed" line. */
 const LABELS: Record<string, string> = {
-  title: "Title", location: "Location", work_model: "Work model", employment_type: "Job type",
+  title: "Title", url: "Job link", location: "Location", work_model: "Work model", employment_type: "Job type",
   experience_min: "Experience", experience_max: "Experience", salary_min: "Salary", salary_max: "Salary",
   salary_currency: "Currency", salary_text: "Salary as posted", posting_date: "Posted on",
   application_deadline: "Apply by", original_jd: "Description", notes: "Notes",
@@ -98,6 +99,7 @@ const num = (v: string) => (v.trim() === "" ? undefined : Number(v));
 function problems(f: Form, appliedProblem: string): Partial<Record<keyof Form | "applied", string>> {
   const out: Partial<Record<keyof Form | "applied", string>> = {};
   if (!f.title.trim()) out.title = "Job title is required";
+  if (f.url.trim() && !/^(https?:\/\/)?[^\s/.]+\.[^\s]+$/i.test(f.url.trim())) out.url = "Paste the posting's web address, e.g. https://…";
   for (const k of NUMBERS as (keyof Form)[]) {
     const n = num(f[k] as string);
     if (n !== undefined && !(n >= 0 && n <= 50)) out[k] = "Years from 0 to 50";
@@ -178,6 +180,9 @@ export function EditJob({ job, onDone }: { job: JobDetail; onDone: () => void })
       }}>
       <Section title="Role">
         <Field label="Job title *" error={errors.title}><input className="input" value={f.title} onChange={set("title")} /></Field>
+        <Field label="Job link" error={errors.url} hint="The posting's page — Open posting and Check if still open use it; the old link is kept under Sources">
+          <input className="input" type="url" inputMode="url" placeholder="https://…" value={f.url} onChange={set("url")} />
+        </Field>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Job type"><EmploymentTypeSelect current={job.employment_type} value={f.employment_type} onChange={set("employment_type")} /></Field>
         </div>

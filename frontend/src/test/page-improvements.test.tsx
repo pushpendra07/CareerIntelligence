@@ -37,13 +37,13 @@ const lastList = (fn: { mock: { calls: unknown[][] } }) => fn.mock.calls.map((c)
   .filter((u) => u.pathname.endsWith("/jobs") && u.searchParams.get("size") !== "1").at(-1)!;
 
 describe("jobs list", () => {
-  it("row actions: Closed and Not relevant first, then the step forward; the rest is under ⋯", async () => {
+  it("row actions: Closed and Not relevant first, then Applied, Shortlist last; the rest is under ⋯", async () => {
     const api = mockApi({ "GET /jobs": listOf([ROW]), "POST /jobs/7/status": { ok: true } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     const closed = await screen.findByRole("button", { name: "Closed: Magento Lead" });
     const row = closed.parentElement!;
-    expect(within(row).getAllByRole("button").slice(0, 2).map((b) => b.getAttribute("aria-label")))
-      .toEqual(["Closed: Magento Lead", "Not relevant: Magento Lead"]);
+    expect(within(row).getAllByRole("button").slice(0, 4).map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Closed: Magento Lead", "Not relevant: Magento Lead", "Applied: Magento Lead", "Shortlist Magento Lead"]);
     await userEvent.click(screen.getByRole("button", { name: "Applied: Magento Lead" }));
     await userEvent.click(closed);
     await userEvent.click(screen.getByRole("button", { name: "Not relevant: Magento Lead" }));
@@ -115,6 +115,20 @@ describe("job page", () => {
     const nav = screen.getByRole("navigation", { name: "Sections" });
     expect(within(nav).getByRole("link", { name: "Description" })).toHaveAttribute("href", "#description");
     expect(document.getElementById("description")).not.toBeNull();
+  });
+
+  it("Tailor CV opens the CV tailor on the job page, not in the edit form", async () => {
+    mockApi(routes);
+    renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/7" });
+    const button = await screen.findByRole("button", { name: "Tailor CV" });
+    expect(screen.queryByLabelText(/Your CV/)).not.toBeInTheDocument();
+    await userEvent.click(button);
+    expect(screen.getByRole("heading", { name: "Tailor your CV for this job" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Your CV/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit job" }));
+    expect(screen.getAllByLabelText(/Your CV/)).toHaveLength(1); // only in the tailor card
+    await userEvent.click(screen.getByRole("button", { name: "Close Tailor CV" }));
+    expect(screen.queryByLabelText(/Your CV/)).not.toBeInTheDocument();
   });
 
   it("shows the company with its links and other jobs, and marks skills in the description", async () => {

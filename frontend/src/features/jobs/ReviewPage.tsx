@@ -137,9 +137,6 @@ export function ReviewPage() {
             <button className="btn-rose" disabled={!current || busy} onClick={() => decide("NOT_RELEVANT")}>
               Not relevant <kbd className="kbd">N</kbd>
             </button>
-            <button className="btn-amber" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
-              ★ Shortlist <kbd className="kbd">S</kbd>
-            </button>
             <button className="btn-secondary" disabled={!current || busy} onClick={skip}>
               Skip for now <kbd className="kbd">K</kbd>
             </button>
@@ -149,6 +146,9 @@ export function ReviewPage() {
               </a>
             )}
             {postingLink && <CopyLinkButton url={postingLink} />}
+            <button className="btn-amber" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
+              ★ Shortlist <kbd className="kbd">S</kbd>
+            </button>
             <span className="flex-1" />
             {current && <Link className="btn-secondary" to={`/jobs/${current.id}`}>All details</Link>}
           </div>

@@ -659,7 +659,13 @@ def filtered_jobs(f: JobFilters) -> Select[Any]:
     if f.q:
         q = f.q.strip()
         like = f"%{q}%"
-        match = or_(Job.title.ilike(like), Company.name.ilike(like), Job.location.ilike(like))
+        match = or_(Job.title.ilike(like), Company.name.ilike(like), Job.location.ilike(like),
+                    cast(Job.required_skills, String).ilike(like),
+                    cast(Job.preferred_skills, String).ilike(like))
+        # A skill under any of its names: "magento2" finds jobs listing "Magento 2".
+        if (skill := normalize_skill(q)) is not None:
+            match = or_(match, Job.required_skills.contains(cast([skill], JSONB)),
+                        Job.preferred_skills.contains(cast([skill], JSONB)))
         # "#123" or "123" also finds the job with that ID.
         digits = q.removeprefix("#")
         if digits.isdigit() and len(digits) < 12:
@@ -755,6 +761,17 @@ EDITABLE = {
 
 def update_job(db: Session, job_id: int, changes: dict[str, Any]) -> Job:
     job = get_job(db, job_id)
+    changes = dict(changes)
+    if "url" in changes:
+        # The posting's link: shown and opened as the job's link; earlier links stay as sources.
+        url = changes.pop("url")
+        if url:
+            _link_source(db, job, url)
+        job.source_url = url or None
+        if not changes:
+            record_activity(db, "job.updated", "job", job.id, job.title, {"fields": ["url"]})
+            db.commit()
+            return get_job(db, job_id)
     unknown = set(changes) - EDITABLE
     if unknown:
         raise DomainValidationError(f"Fields not editable: {sorted(unknown)}")
@@ -962,8 +979,21 @@ def add_source(
     db: Session, job_id: int, url: str, source: JobSource | None = None, detail: str | None = None
 ) -> Job:
     job = get_job(db, job_id)
+    detected = _link_source(db, job, url, source, detail)
+    record_activity(db, "job.source_added", "job", job.id, url, {"source": detected})
+    db.commit()
+    return get_job(db, job_id)
+
+
+def _link_source(
+    db: Session, job: Job, url: str, source: JobSource | None = None, detail: str | None = None
+) -> JobSource:
+    """Attach `url` to the job as a source; refused if it is not a link to one posting or
+    already belongs to another job. Returns the detected source."""
     if not is_http_url(url):
         raise DomainValidationError("Source URL must be an http(s) URL")
+    if is_listing_url(url):
+        raise DomainValidationError("That is a search or listing page, not one job's posting")
     normalized = normalize_url(url)
     clash = db.scalar(select(JobSourceLink).where(JobSourceLink.normalized_url == normalized))
     if clash and clash.job_id != job.id:
@@ -978,9 +1008,7 @@ def add_source(
         normalized,
         detected.external_id,
     )
-    record_activity(db, "job.source_added", "job", job.id, url, {"source": detected.source})
-    db.commit()
-    return get_job(db, job_id)
+    return detected.source
 
 
 def merge_jobs(db: Session, keep_id: int, merge_id: int) -> Job:

@@ -16,6 +16,7 @@ import { EmailDraft } from "./EmailDraft";
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
+import { CvTailor } from "./CvTailor";
 import { ContactLinks } from "../../components/ContactLinks";
 import { StickyBar, useScrolledPast } from "../../components/StickyBar";
 import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
@@ -123,10 +124,10 @@ export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; on
     actions = <>
       {closed}
       <button className="btn-rose" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
-      <button className="btn-amber" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
       <button className="btn-emerald" disabled={busy} onClick={() => setStatus("APPLIED")}
         title="Already applied — records the application">✓ Applied</button>
       {posting}
+      <button className="btn-amber" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
     </>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     text = job.recommended_cv ? `Ready to apply — send your “${job.recommended_cv.name}” CV.` : "Ready to apply.";
@@ -192,9 +193,9 @@ function QuickActions({ job, setStatus, busy }: { job: JobDetail; setStatus: (s:
     <span className="inline-flex items-center gap-1" data-testid="quick-actions">
       {open && <button className={`btn-slate ${b}`} disabled={busy} onClick={() => setStatus("CLOSED")} title="The posting is no longer open">Closed</button>}
       {deciding && <button className={`btn-rose ${b}`} disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>}
-      {deciding && <button className={`btn-amber ${b}`} disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>}
       {open && <button className={`btn-emerald ${b}`} disabled={busy} onClick={() => setStatus("APPLIED")} title="Already applied — records the application">✓ Applied</button>}
       {url && <a className={`btn-sky ${b}`} href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a>}
+      {deciding && <button className={`btn-amber ${b}`} disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>}
     </span>
   );
 }
@@ -207,6 +208,7 @@ export function JobDetailPage() {
   const qc = useQueryClient();
   const applying = search.get("apply") === "1";
   const [editing, setEditing] = useState(false);
+  const [tailoring, setTailoring] = useState(false);
   // The sticky bar repeats title, company and score only once the heading has scrolled away.
   const [heading, setHeading] = useState<HTMLElement | null>(null);
   const headingGone = useScrolledPast(heading);
@@ -283,12 +285,21 @@ export function JobDetailPage() {
           </select>
           {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
           <span className="flex-1" />
+          <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setTailoring((t) => !t)} aria-expanded={tailoring}
+            aria-controls="tailor" title="Check your CV's ATS score for this job and get a copy with its skills added">{tailoring ? "Close Tailor CV" : "Tailor CV"}</button>
           <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>{editing ? "Close edit" : "Edit job"}</button>
         </div>
         <div className="mt-3 border-t border-slate-100 pt-3">
           <PostingCheck job={j} onMarkClosed={() => status.mutate("CLOSED")} busy={status.isPending} />
         </div>
       </Card>
+      {tailoring && (
+        <Card title="Tailor your CV for this job" id="tailor" className="scroll-mt-32"
+          actions={<button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => setTailoring(false)}>Close</button>}>
+          <p className="mb-3 text-xs text-slate-500">Your CV is not saved: it is read in memory, scored against this job's skills, and a tailored copy is downloaded.</p>
+          <CvTailor jobId={j.id} />
+        </Card>
+      )}
       <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
       <nav aria-label="Sections" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">

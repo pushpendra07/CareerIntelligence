@@ -79,6 +79,7 @@ class JobPreviewIn(BaseModel):
 
 class JobUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
+    url: str | None = Field(default=None, max_length=2000)  # the posting's link; empty clears it
     location: str | None = None
     work_model: WorkModel | None = None
     employment_type: str | None = None
@@ -96,6 +97,8 @@ class JobUpdate(BaseModel):
     preferred_skills: list[str] | None = None
     qualifications: list[str] | None = None
     notes: str | None = None
+
+    _check_url = field_validator("url")(lambda cls, v: _url(v))
 
 
 class StatusIn(BaseModel):

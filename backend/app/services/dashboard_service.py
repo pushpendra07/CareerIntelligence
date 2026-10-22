@@ -19,6 +19,7 @@ from app.models.job import Job, JobSourceLink, JobStatus
 from app.models.match import JobMatch
 from app.models.offer import Offer, OfferStatus
 from app.services import description_service, freshness
+from app.services.job_service import JOB_FINISHED
 from app.skills.catalog import SKILLS
 
 UNAPPLIED = [
@@ -66,13 +67,9 @@ def _count(db: Session, stmt: Any) -> int:
 
 def summary(db: Session) -> dict[str, int]:
     all_jobs = select(func.count()).select_from(Job)
-    # Job cards open the "Open jobs" tab, so closed positions are counted separately.
-    # Same set as the "All open" tab: closed, applied, rejected and not-relevant jobs are left out
-    # (applications have their own cards).
-    jobs = all_jobs.where(Job.status.not_in([
-        JobStatus.CLOSED.value, JobStatus.APPLIED.value, JobStatus.REJECTED.value,
-        JobStatus.NOT_RELEVANT.value,
-    ]))
+    # Same set as the "All open" tab: every job still in play (to review or in progress);
+    # finished ones (rejected, withdrawn, not relevant, closed) are left out.
+    jobs = all_jobs.where(Job.status.not_in([s.value for s in JOB_FINISHED]))
     today = date.today()
     return {
         "total_jobs": _count(db, jobs),

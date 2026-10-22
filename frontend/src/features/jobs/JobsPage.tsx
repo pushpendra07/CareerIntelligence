@@ -12,7 +12,7 @@ import { experienceRange, formatDate, formatShortDate, humanize, salaryRange } f
 import { prefs } from "../../utils/storage";
 import { usePhone } from "../../utils/media";
 import { ARCHIVE_TABS, JOB_STATUSES, JOB_TABS, JOB_TAB_GROUPS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses, tabHref } from "./jobTabs";
-export { JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, HIDDEN_BY_DEFAULT, defaultStatuses } from "./jobTabs";
+export { JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses } from "./jobTabs";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
   "source", "status", "posted_after", "posted_within", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
@@ -227,9 +227,9 @@ function NextStep({ job }: { job: Job }) {
   if (NEW_STATUSES.includes(job.status)) {
     main = <>
       {dismiss}
+      {applied}
       <button className={b} disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
         title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>Shortlist</button>
-      {applied}
     </>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     main = <>
@@ -507,11 +507,11 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
         className={sticky ? "sticky z-20 -mx-2 bg-page/85 px-2 py-1 backdrop-blur-md" : ""}>
       <section className="card space-y-2 p-3!">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="input min-w-56 flex-1" placeholder="Search title, company, location or job ID (#123)" aria-label="Search jobs"
+          <input className="input min-w-56 flex-1" placeholder="Search title, company, skill, location or job ID (#123)" aria-label="Search jobs"
             key={params.get("q") ?? ""} defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
           {tab.key === "all" && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
-            emptyLabel="All except applied, rejected, not relevant" /></div>}
+            emptyLabel="Any open status" /></div>}
           <select className="input w-auto" aria-label="Sort" value={sort} onChange={(e) => sortBy(e.target.value)} title="Remembered until you change it or press Reset">
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -553,7 +553,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
               key={params.get("min_score") ?? ""} defaultValue={params.get("min_score") ?? ""} onBlur={(e) => e.target.value !== (params.get("min_score") ?? "") && set("min_score", e.target.value)} />
             {select("recommendation", RECS, "Any recommendation")}
             {select("tier", ["TIER_A", "TIER_B", "TIER_C"], "Any company tier")}
-            <input className="input" placeholder="Technology (e.g. magento2)" aria-label="Technology" defaultValue={params.get("technology") ?? ""}
+            <input className="input" placeholder="Skill (e.g. magento2, GraphQL)" aria-label="Technology" key={`tech-${params.get("technology") ?? ""}`}
+              defaultValue={params.get("technology") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("technology", e.currentTarget.value)}
               onBlur={(e) => set("technology", e.target.value)} />
             <input className="input" placeholder="Location (e.g. Bengaluru)" aria-label="Location" defaultValue={params.get("location") ?? ""}
               onBlur={(e) => set("location", e.target.value)} />
@@ -613,8 +614,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                           {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
                           <AddedViaTags values={j.added_via} />
                         </div>
-                      </td>
                         <JobSkills job={j} active={params.get("technology")} onPick={(v) => set("technology", v)} />
+                      </td>
                       <td className="td max-w-32 text-xs" title={[j.location, j.work_model !== "UNKNOWN" ? humanize(j.work_model) : ""].filter(Boolean).join(" · ")}>
                         <div className="truncate">{j.location ?? "—"}</div>
                         {j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}

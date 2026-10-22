@@ -289,6 +289,12 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   shared sticky back bar (`components/StickyBar.tsx`). Companies: `/companies/duplicates`
   (`CompanyDuplicatesPage.tsx`, `GET /companies/duplicates`), bulk actions (`POST /companies/bulk`),
   facets (`GET /companies/facets`).
+- **Tailor a CV for a job** (job page → **Tailor CV** button, `features/jobs/CvTailor.tsx`): `POST /jobs/{id}/cv-check`
+  (ATS score, `cv/ats.py`) and `POST /jobs/{id}/cv-tailor` (DOCX copy, `cv/tailor_docx.py`, service
+  `services/cv_tailor.py`). In memory only: the uploaded CV is **never** stored, logged or put in
+  the database. Only text inside existing runs changes (format kept); only skills the user ticks
+  are added, never invented. A PDF/TXT CV is tailored as a plain Word copy built from its
+  text (`cv/text_docx.py`; the PDF's design is not copied).
 - **Export:** Settings → Backup & import → Back up your data (`GET /api/v1/export/{entity}`, `/export/all`).
 
 ## Packaging and first run
@@ -470,7 +476,9 @@ New (sorted `-created_at`); with filters in the link it opens All open. Closed /
 a job page returns to the last list (`lastJobListUrl` in `JobNav.tsx`). Tab → statuses:
 new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
 Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback · selected = Offer+Accepted · rejected ·
-not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).
+not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `jobTabs.ts`; grouped by
+stage in `JOB_TAB_GROUPS`). All open = every unfinished job = the sum of the to-review and
+in-progress tabs; the dashboard's `total_jobs` uses the same set (`JOB_FINISHED`).
 Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).
 Every job has `added_via` (list, in arrival order): `manual` | `sheet` | `scanner` | `career_ops` |
 `file` | `ai_search`, set by `ingest_job` from `JobInput.origin` (`manual`, `sheet`, `scan`, `career_ops`,

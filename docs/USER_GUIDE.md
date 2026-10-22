@@ -223,26 +223,41 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 
 ## 7. Work through your jobs
 
-- **Edit a job:** on the job page click **Edit** — title, **location** (type or pick from
+- **Edit a job:** on the job page click **Edit** — title, **job link** (the posting's page that
+  *Open posting* uses; the old link stays under Sources), **location** (type or pick from
   your preferred locations and common cities), **work model** (**Onsite · Hybrid · Remote ·
   Not stated**), **job type** (Full-time, Contract, Contract-to-hire, Part-time, Internship,
   Freelance), experience, salary, dates, **Applied on**, description and notes. *Applied on*
   corrects the date of the job's application (automatic ones are marked "date approximate"
   until you do); on a job you haven't applied to, picking a date records the application. Only changed fields are saved,
   the job is re-scored, and your values are kept when the description is read again.
+- **Tailor your CV for a job:** on the job page → **Tailor CV** (next to Edit job), upload
+  a CV (DOCX, PDF or TXT). You get an **ATS score** (0–100: required skills 50, nice-to-have 20,
+  job title 15, experience 15; parts the job doesn't state are left out) and every job skill as
+  *in your CV*, *you have a more specific form* (e.g. Magento 2 for Magento, ticked for you),
+  *related* or *missing*. Tick only the skills you really have, then **Create tailored CV (DOCX)**:
+  you get a copy of **your own file, same format**, with the ticked skills added to your Skills
+  section (next to skills of the same kind), the job's skills listed first in each skill line, and
+  optionally the job title in front of your headline. The score before → after and anything still
+  missing is shown. Skills you don't tick are never added, so the score reaches only what your real
+  experience supports. From a PDF (or TXT) you get a **Word copy**: the same text, with headings
+  and bullets, in a plain layout (the PDF's design isn't copied), so check it before sending. For
+  a copy that looks exactly like your CV, upload its Word version. **The CV is not saved** anywhere (no file, no database row, no backup);
+  the download is the only copy. Uses the job's saved skills.
   *Not stated* hands the work model back to the description. **Add Job** has the same
   location, work model and job type choices right under the job URL.
 - **Fastest way to triage: Jobs → Review new** (or the button on Today). It shows
   new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
   description. **Closed** (`C`), **Not relevant** (`N`), **Shortlist** (`S`), **Skip for now** (`K`),
   **Open posting** (`O`), **Undo** (`U`). Pick *Score 70+* to see only strong matches.
-- **Jobs → All jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected** and,
-  on the right for finished jobs, **Rejected · Not pursuing · Closed**, each with a count.
+- **Jobs → All jobs**. One bar of tabs, grouped by stage, each with a count: **All open** ·
+  *To review* **New · Pending** · *In progress* **Applied · Interview · Selected** · *Finished*
+  **Rejected · Not pursuing · Closed**. **All open** is every job still in play, so its count is
+  New + Pending + Applied + Interview + Selected (the same number as *Jobs* on Today).
   The page opens on **New** — jobs that just arrived, newest first (*Recently added*). Setting a
   status moves the job to its tab (Shortlist → Pending, Applied → Applied, Not relevant → Not
   pursuing, Closed → Closed). Links from Today and Insights that carry filters open **All open**.
-  On a computer the tabs, with counts, are under **Jobs** in the menu (on phones, or with the menu
-  hidden, they show as a row above the list).
+  Each job shows its skills; click one to list only jobs with that skill (click again to clear).
   A tab with several statuses shows a chip per status with its count (Pending: *Reviewing ·
   Shortlisted · Ready to apply · On hold*; Applied: *Applied · Recruiter contacted · Screening*);
   click one to see only that status, **All** for the whole tab.

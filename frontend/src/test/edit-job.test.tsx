@@ -9,7 +9,8 @@ const JOB = {
   id: 7, title: "Magento Lead", location: "Bengaluru", work_model: "UNKNOWN", employment_type: null,
   experience_min: "8.0", experience_max: null, salary_min: null, salary_max: null, salary_currency: null,
   posting_date: null, application_deadline: null, original_jd: "Build things", notes: null,
-  company: { id: 1, name: "Acme" },
+  company: { id: 1, name: "Acme" }, source_url: "https://acme.example/jobs/old",
+  source_links: [{ id: 1, source: "COMPANY_SITE", original_url: "https://acme.example/jobs/old" }],
 } as unknown as JobDetail;
 
 afterEach(() => vi.unstubAllGlobals());
@@ -29,6 +30,22 @@ describe("EditJob", () => {
     const patch = api.calls.find((c) => c.method === "PATCH");
     expect(patch?.body).toEqual({ location: "Pune, India", work_model: "HYBRID", employment_type: "Contract" });
     expect(api.calls.some((c) => c.method === "POST")).toBe(false); // applied date untouched
+  });
+
+  it("changes the job link, and refuses text that isn't one", async () => {
+    const api = mockApi({ "PATCH /jobs/7": JOB, "GET /preferences": {}, "GET /applications": { items: [], total: 0 } });
+    const done = vi.fn();
+    renderAt(<EditJob job={JOB} onDone={done} />);
+    const link = screen.getByLabelText(/Job link/);
+    expect(link).toHaveValue("https://acme.example/jobs/old");
+    fireEvent.change(link, { target: { value: "not a link" } });
+    expect(screen.getByText(/Paste the posting's web address/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    fireEvent.change(link, { target: { value: "https://careers.acme.example/jobs/42" } });
+    expect(screen.getByText(/Changed: Job link/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(done).toHaveBeenCalled());
+    expect(api.calls.find((c) => c.method === "PATCH")?.body).toEqual({ url: "https://careers.acme.example/jobs/42" });
   });
 
   it("corrects the applied date of an automatic application", async () => {
@@ -65,7 +82,7 @@ describe("EditJob", () => {
   });
 
   it("clears values with null and converts numbers", () => {
-    const before = { title: "A", location: "Pune", work_model: "REMOTE", employment_type: "", experience_min: "8", experience_max: "",
+    const before = { title: "A", url: "", location: "Pune", work_model: "REMOTE", employment_type: "", experience_min: "8", experience_max: "",
       salary_min: "", salary_max: "", salary_currency: "", salary_text: "", posting_date: "", application_deadline: "", original_jd: "x", notes: "",
       required_skills: [], preferred_skills: [] };
     expect(changedFields(before, { ...before, location: "", work_model: "", experience_max: "12", salary_currency: "inr" }))

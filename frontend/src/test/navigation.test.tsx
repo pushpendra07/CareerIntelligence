@@ -95,7 +95,7 @@ describe("job status tabs", () => {
     expect(list.searchParams.get("closed")).toBe("true");
     expect(list.searchParams.getAll("status")).toEqual(["CLOSED"]);
     const tab = async (name: RegExp) => screen.findByRole("tab", { name });
-    expect(await tab(/All open\s*405/)).toHaveAttribute("href", "/jobs?tab=all&q=magento");
+    expect(await tab(/All open\s*408/)).toHaveAttribute("href", "/jobs?tab=all&q=magento");
     expect(await tab(/^New\s*400/)).toHaveAttribute("href", "/jobs?tab=new&q=magento");
     expect(await tab(/Pending\s*2/)).toHaveAttribute("href", "/jobs?tab=pending&q=magento");
     expect(await tab(/Applied\s*4/)).toBeInTheDocument();
@@ -141,20 +141,20 @@ describe("job status tabs", () => {
     expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument();
   });
 
-  it("all-open tab hides closed positions", async () => {
+  it("all-open tab lists every job still in play: the sum of the to-review and in-progress tabs", async () => {
     const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=all" });
     expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
     expect(listRequest(api.fn).searchParams.get("closed")).toBe("false");
-    // Not relevant is hidden until picked in the Status filter.
     const sent = listRequest(api.fn).searchParams.getAll("status");
-    expect(sent).toContain("NEW");
-    for (const hidden of ["NOT_RELEVANT", "APPLIED", "REJECTED"]) expect(sent).not.toContain(hidden);
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("All except applied, rejected, not relevant");
+    for (const open of ["NEW", "SHORTLISTED", "APPLIED", "RECRUITER_CONTACTED", "INTERVIEW", "OFFER"]) expect(sent).toContain(open);
+    for (const finished of ["NOT_RELEVANT", "REJECTED", "WITHDRAWN", "CLOSED"]) expect(sent).not.toContain(finished);
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any open status");
     await userEvent.click(screen.getByRole("button", { name: "Status" }));
     const box = screen.getByRole("listbox", { name: "Job statuses" });
     expect(box).not.toHaveTextContent("Closed");
-    await userEvent.click(within(box).getByLabelText("Not Relevant"));
-    expect(listRequest(api.fn, true).searchParams.getAll("status")).toEqual(["NOT_RELEVANT"]);
+    expect(box).not.toHaveTextContent("Not Relevant"); // finished jobs have their own tabs
+    await userEvent.click(within(box).getByLabelText("Applied"));
+    expect(listRequest(api.fn, true).searchParams.getAll("status")).toEqual(["APPLIED"]);
   });
 });

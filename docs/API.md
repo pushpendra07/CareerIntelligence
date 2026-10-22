@@ -77,7 +77,9 @@ Conventions:
 - `POST /api/v1/jobs`
 - `GET /api/v1/jobs` (`q` also matches a job ID: `#123` or `123`)
 - `GET /api/v1/jobs/{job_id}`
-- `PATCH /api/v1/jobs/{job_id}`
+- `PATCH /api/v1/jobs/{job_id}` — any of the editable fields; `url` sets the posting's link
+  (kept as a source too; 422 for a search/listing page or a link that belongs to another job;
+  `""` clears it)
 - `GET /api/v1/jobs/status-counts` (jobs per status for the same filters as `GET /jobs`)
 - `GET /api/v1/jobs/fetch-descriptions` — open jobs still missing a description, and the latest run
 - `POST /api/v1/jobs/fetch-descriptions` `{"limit": 40, "min_score": 0}` — read missing
@@ -88,6 +90,19 @@ Conventions:
 - `POST /api/v1/jobs/bulk` `{"job_ids": [..], "action": "status", "status": "NOT_RELEVANT"}` or
   `{"job_ids": [..], "action": "delete"}` — up to 500 jobs; delete skips jobs with
   applications/interviews/offers and lists them in `skipped`
+- `POST /api/v1/jobs/{job_id}/cv-check` (multipart `file`: DOCX, PDF, TXT, MD) — ATS score of the
+  CV for this job: `{format, can_edit, builds_copy, report, suggested[]}` (`builds_copy`: a
+  PDF/TXT CV is tailored as a plain Word copy); `report` = `{score, parts{required,
+  preferred, title, experience: {earned, max}}, keywords[{skill, importance, status: found |
+  implied | related | missing, via}], title_words_missing[], experience_required,
+  experience_found, notes[]}`; `suggested` = implied skills (safe to add). 422 if the job has no
+  skills. The CV is not saved.
+- `POST /api/v1/jobs/{job_id}/cv-tailor` (multipart `file` DOCX, PDF, TXT or MD, `add` repeated = skills to add,
+  only the job's own skills are accepted, `use_title` bool) — a copy of the DOCX in the same format
+  (only text inside existing runs changes) with the skills added and the job's skills first:
+  `{before, after, added[], not_added[], reordered_lines, headline, notes[], filename,
+  content_base64}`. A PDF/TXT/MD CV is first rebuilt as a plain Word copy from its text (the
+  first note says so). Nothing is saved.
 - `GET /api/v1/jobs/{job_id}/email-draft` — an email to HR for this job, built without AI from
   the job, the current match (exact skill matches, shared domains) and your profile (current
   role, the project highlight most relevant to the job's skills, a certification the job asks
