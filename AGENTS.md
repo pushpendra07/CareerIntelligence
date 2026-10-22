@@ -270,6 +270,8 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   Settings → Job sources → Chrome extension (`GET /api/v1/extension.zip?app=`, `services/extension_package.py`
   writes this app's addresses into `settings.js`; the Docker image copies `browser-extension/`).
 - **Add Job** (button on Jobs / Dashboard): paste a job URL and description → live preview → Save & analyze.
+  Company box: `features/jobs/CompanyInput.tsx` (`GET /companies/suggest`, `company_service.suggest` /
+  `match_by_name`); a picked company is sent as `company_id`, else the name is matched or a company added.
   Use this for LinkedIn / Naukri / Indeed (they can't be scanned).
 - **CSV / JSON upload:** Settings → Backup & import → Import a file (`POST /api/v1/import/{jobs|recruiters}`;
   companies: `POST /api/v1/companies/import`, which also reads a Naukri company-list export).
@@ -526,6 +528,6 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
 
 `GET /api/v1/jobs` (filters: q, min_score, status[], closed, source, …) ·
 `POST /api/v1/jobs` · `DELETE /api/v1/jobs/{id}` · `POST /api/v1/matches/reanalyze` ·
-`GET /api/v1/dashboard` · `GET /api/v1/reports/{name}?from=&to=&group=` (`services/report_service.py`) · `GET /api/v1/cv-advice` (skills to add to the CV / skills missing) · `POST /api/v1/scanner/run` · `GET /api/v1/scanner/status` ·
+`GET /api/v1/dashboard` · `GET /api/v1/reports/{name}?from=&to=&group=` (`services/report_service.py`; pipeline, market, activity in `report_more.py`; findings from your own data only) · `GET /api/v1/reports/summary?days=` (Insights' executive summary) · `GET /api/v1/cv-advice` (skills to add to the CV / skills missing) · `POST /api/v1/scanner/run` · `GET /api/v1/scanner/status` ·
 `POST /api/v1/career-ops/import` · `POST /api/v1/career-ops/sync` · `GET /api/v1/sheets` ·
 `POST /api/v1/sheets/{id}/import-rows`. Full list: `docs/API.md` or `/docs`.

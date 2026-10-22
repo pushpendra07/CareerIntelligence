@@ -207,7 +207,7 @@ Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to m
 | **Job board search** (built-in) | Settings → Job board search → **Search now** (or company page → Search its board) | Companies on supported job boards — full descriptions, 1–3 min |
 | **Job collector** (Chrome extension) | Install once: Settings → Job sources → **Chrome extension** → **Download extension (.zip)** → unzip → `chrome://extensions` → Developer mode → **Load unpacked**. On any job page click its icon → the job is added (or "Already in your list: #id") | LinkedIn, Naukri, Indeed, Foundit, Glassdoor, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, company careers pages |
 | **AI search** | Jobs → **AI search** → click a portal → pick the title and **Location** (one multi-select: Remote / Hybrid / Onsite and your cities; remote = anywhere in India, hybrid/onsite = each city) → **Job collector** (automatic, default) or **Claude** / **Gemini** (the portal opens with your search filled in and the prompt copied: open the assistant, paste, Enter) or **Job collector** (the extension reads up to N jobs and brings them back to be checked). Or pick portals → **Copy prompt** → give it to Claude (Chrome extension / Desktop) or Gemini; it searches in your browser and pastes the jobs into *Jobs from the assistant* → **Check** (shows new vs already saved) → **Add N new jobs**. Tagged *AI search* | LinkedIn, Naukri, Indeed, Foundit, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, Glassdoor |
-| **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
+| **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze**. The Company box suggests your companies as you type: pick one to link the job to it; a typed name is linked to the same company ("Acme Pvt Ltd" = Acme), and a new company is added only when none matches — the line under the box says which | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
 | **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now**, or automatically (*Run automatically*: every N hours, and import as soon as Career-Ops finds something new) — set up once with `./scripts/setup-career-ops.sh` | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
@@ -223,6 +223,11 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 
 ## 7. Work through your jobs
 
+- **Contact person:** every job page has a *Contact person* card (right column, also under
+  *Contact* in the section links): **+ Add contact person** — name, role, email, phone / WhatsApp,
+  LinkedIn, all optional — then **Edit** or **Remove** (removing keeps the person in Recruiters).
+  Email and phone are links (mail, call, WhatsApp). Add Job has the same fields in its *Contact
+  person* box. Someone you already have (same email, LinkedIn or phone) is reused, not added twice.
 - **Edit a job:** on the job page click **Edit** — title, **job link** (the posting's page that
   *Open posting* uses; the old link stays under Sources), **location** (type or pick from
   your preferred locations and common cities), **work model** (**Onsite · Hybrid · Remote ·
@@ -453,6 +458,16 @@ accepted & rejected**; these choices are remembered in this browser.
   LinkedIn / Indeed / Naukri, are marked and skipped next time; their job page says to paste it.
   Scores are recalculated as soon as a description arrives.
 - **Insights** (tab next to Today): every chart comes with a one-line takeaway.
+  - *Executive summary* — pick the last **7, 30 or 90 days**: the key numbers (jobs found,
+    applications, answer rate, interviews, offers, days to first answer, applications gone
+    quiet, jobs waiting for review, jobs reviewed, median pay shown), each against the period
+    before and linked to its report, and **What the numbers say**: findings worked out from
+    your own data (problems first, each with a link to act). A change is only called out when
+    it's large and rests on enough cases (5+), and activity is only compared from when it
+    started being recorded. No outside benchmarks are used.
+  - *Pipeline health* — how far the period's applications got, and active applications by age.
+  - *Market & pay* — pay shown (INR, per year), median pay by seniority, experience asked for,
+    companies posting the most jobs.
   - *How your search is going* — applications, applied this week (vs last week), response and
     interview rate, good jobs not applied; a **last 12 weeks** chart of jobs found and
     applications sent; the application funnel (with a link to follow-ups due when few answer);
@@ -467,13 +482,24 @@ accepted & rejected**; these choices are remembered in this browser.
     what to change).
   - *Skills* — the required skills you miss most, CV advice, most requested skills.
 
-- **Reports** (menu): one report per area — **Overview, Jobs found, Applications, Interviews,
-  Offers, Companies, Job sources, Follow-ups, Skills, Scans & imports**.
+- **Reports** (menu): one report per area, grouped — *Summary*: **Overview**; *Pipeline*:
+  **Pipeline health, Applications, Interviews, Offers, Follow-ups**; *Market*: **Jobs found,
+  Market & pay, Skills, Companies**; *Operations*: **Job sources, Your activity, Scans & imports**.
+  - **Pipeline health**: answer rate, answers → interview, interview → offer, median days to the
+    first answer, applications with no update for 14+ days; cohorts by when you applied (answer
+    and interview rate per week, still waiting) and every active application, oldest first.
+  - **Market & pay**: pay shown (middle of the range, INR per year; other currencies left out
+    and counted), median pay by seniority, experience asked for, seniority, onsite / hybrid /
+    remote over time, companies posting the most jobs.
+  - **Your activity**: jobs reviewed, shortlisted, applied and dismissed per period; jobs found
+    vs jobs reviewed; the new jobs waiting for you, by age; median days from found to decided.
+  - Every report starts with **Key findings** in plain words (problems first).
   - Pick a **Period** (today, last 7 / 30 / 90 days, this or last month, this year, last 12 months, or
     custom dates) and **Group by** (automatic, day, week, month). The choice stays in the
     address, so a report link can be bookmarked.
-  - The top cards compare each number with the period of the same length just before
-    (▲ / ▼, green when it's better — e.g. fewer rejections is green).
+  - The top cards compare each number with the period of the same length just before: the
+    change (in points for a rate, in % for a count), green when it's better (fewer rejections is
+    green; neutral counts such as *Dismissed* have no colour), and the previous value.
   - Charts: trends over time, stacked bars (e.g. jobs by source, applications by how you
     applied), donuts with counts and percentages (status, onsite / hybrid / remote, job type),
     and ranked bars (locations, companies, skills, sources).

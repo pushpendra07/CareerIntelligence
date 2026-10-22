@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { BarChart, Funnel } from "../../components/charts";
 import { Card, ErrorBox, Spinner, PageIntro, Stat, WeekChange } from "../../components/ui";
 import type { Bar } from "../../types/api";
-import { humanize, sourceName } from "../../utils/format";
+import { formatDate, humanize, sourceName } from "../../utils/format";
 import { CVAdviceSummary } from "../cvs/CVAdvice";
-import { ReportChart, type Report } from "../reports/ReportsPage";
+import { Findings, KpiCard, ReportChart, type Finding, type Kpi, type Report } from "../reports/ReportsPage";
 
 interface Analytics {
   scores: {
@@ -25,6 +25,49 @@ type TopCompany = { id: number; label: string; value: number; jobs: number; avg_
 type Charts = Record<string, Bar[]> & { source_quality?: SourceQuality[]; top_companies?: TopCompany[] };
 
 const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
+
+type Summary = { from: string; to: string; days: number; previous: { from: string; to: string };
+  kpis: (Kpi & { report: string })[]; findings: Finding[] };
+/** Periods for the summary; each matches a quick range on the Reports page. */
+const PERIODS = [{ days: 7, label: "7 days" }, { days: 30, label: "30 days" }, { days: 90, label: "90 days" }];
+const reportLink = (days: number) => (report: string) => `/reports/${report}?range=${days}d`;
+
+/** The executive summary: the KPIs that matter most against the period before, and what the
+ * numbers say (problems first), each linking to the report or the place to act. */
+function ExecutiveSummary({ days }: { days: number }) {
+  const s = useQuery({ queryKey: ["reports", "summary", days], queryFn: () => api.get<Summary>("/reports/summary", { days }),
+    placeholderData: (prev) => prev });
+  if (s.isLoading) return <Spinner />;
+  if (s.error) return <ErrorBox error={s.error} />;
+  const d = s.data!;
+  return (
+    <>
+      <p className="text-xs text-slate-500">
+        {formatDate(d.from)} – {formatDate(d.to)}, compared with {formatDate(d.previous.from)} – {formatDate(d.previous.to)}.
+        {s.isFetching && " Updating…"}
+      </p>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {d.kpis.map((k) => <KpiCard key={`${k.report}-${k.key}`} k={k} to={reportLink(days)(k.report)} />)}
+      </div>
+      <Findings items={d.findings} title="What the numbers say" reportLink={reportLink(days)} />
+    </>
+  );
+}
+
+/** Charts from one report for the same period, by chart id. */
+function ReportCharts({ name, days, ids, title }: { name: string; days: number; ids: string[]; title: string }) {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - days + 1);
+  const r = useQuery({ queryKey: ["reports", name, "insights", days],
+    queryFn: () => api.get<Report>(`/reports/${name}`, { from: iso(from), to: iso(to) }), placeholderData: (prev) => prev });
+  if (r.isLoading) return <Card title={title}><Spinner /></Card>;
+  const charts = ids.map((id) => r.data?.charts.find((c) => c.id === id)).filter((c) => !!c);
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {charts.map((c) => <ReportChart key={c.id} c={{ ...c, filter: null }} />)}
+    </div>
+  );
+}
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -84,6 +127,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function AnalyticsPage() {
+  const [params, setParams] = useSearchParams();
+  const days = PERIODS.some((p) => String(p.days) === params.get("days")) ? Number(params.get("days")) : 30;
   const a = useQuery({ queryKey: ["analytics"], queryFn: () => api.get<Analytics>("/dashboard/analytics") });
   const f = useQuery({ queryKey: ["funnels"], queryFn: () => api.get<Record<string, { stage: string; value: number }[]>>("/dashboard/funnels") });
   const c = useQuery({ queryKey: ["dashboard", "charts"], queryFn: () => api.get<Charts>("/dashboard/charts") });
@@ -122,6 +167,25 @@ export function AnalyticsPage() {
         <div><h1>Insights</h1><PageIntro>What's working in your search, where good jobs come from, and what to improve.</PageIntro></div>
         <Link className="btn-secondary" to="/reports">Reports for any period →</Link>
       </div>
+
+      <Section title="Executive summary">
+        <div role="group" aria-label="Period" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs text-slate-500">Last</span>
+          {PERIODS.map((p) => (
+            <button key={p.days} type="button" aria-pressed={p.days === days}
+              onClick={() => setParams((old) => { const n = new URLSearchParams(old); n.set("days", String(p.days)); return n; }, { replace: true })}
+              className={`rounded-full px-3 py-1 text-sm ${p.days === days ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <ExecutiveSummary days={days} />
+      </Section>
+
+      <Section title="Pipeline health">
+        <ReportCharts name="pipeline" days={days} ids={["stages", "age"]} title="Pipeline health" />
+        <p className="text-xs"><Link className="link" to={reportLink(days)("pipeline")}>Cohorts, conversion and every active application →</Link></p>
+      </Section>
 
       <Section title="How your search is going">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -229,6 +293,11 @@ export function AnalyticsPage() {
               format={(b) => `${b.value}%`} color="bg-sky-500" />
           </Card>
         </div>
+      </Section>
+
+      <Section title="Market & pay">
+        <ReportCharts name="market" days={days} ids={["salary", "pay_by_level", "experience", "hiring"]} title="Market & pay" />
+        <p className="text-xs"><Link className="link" to={reportLink(days)("market")}>All market figures and the jobs behind them →</Link></p>
       </Section>
 
       <Section title="Skills">

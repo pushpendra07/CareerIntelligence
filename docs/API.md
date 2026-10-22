@@ -58,6 +58,9 @@ Conventions:
   `company_size` (`1-50`, `51-200`, `201-1000`, `1001-5000`, `5001+`) and sorts by `-rating`
   (portal rating weighted by its number of reviews). Rows include `rating` and `rating_reviews`.
 - `GET /api/v1/companies/facets` — industries, company sizes and portals in use, with counts.
+- `GET /api/v1/companies/suggest?q=&limit=8` — companies matching a name being typed (2+
+  characters): `match` = the company a job with exactly this name is linked to (null: a new
+  company would be added), `items` (`id, name, tier, website, jobs, match`), the match first.
 - `GET /api/v1/companies/duplicates` — groups of companies that may be one (similar name or same
   website); `POST /api/v1/companies/duplicates/dismiss {"company_ids": [...]}` stops suggesting a group.
 - `POST /api/v1/companies/bulk {"company_ids", "action": "job_search_on"|"job_search_off"|"tier"|"delete", "tier"?}`
@@ -73,8 +76,13 @@ Conventions:
 - `PATCH /api/v1/recruiters/{contact_id}`
 
 ### jobs
+- `PUT /api/v1/jobs/{job_id}/contact` `{name?, job_title?, email?, phone?, linkedin_url?}` — the
+  job's contact person (at least one of name/email/phone/LinkedIn; empty clears a field). Someone
+  already saved with the same email, LinkedIn or phone is linked instead of added twice.
+- `DELETE /api/v1/jobs/{job_id}/contact` — unlink it (the contact stays in Recruiters)
 - `POST /api/v1/jobs/preview`
-- `POST /api/v1/jobs`
+- `POST /api/v1/jobs` — optional `company_id`: link the job to that company (picked from the
+  suggestions) instead of matching `company` by name
 - `GET /api/v1/jobs` (`q` also matches a job ID: `#123` or `123`)
 - `GET /api/v1/jobs/{job_id}`
 - `PATCH /api/v1/jobs/{job_id}` — any of the editable fields; `url` sets the posting's link
@@ -211,12 +219,18 @@ Conventions:
   company, location, score and `applied` / `applied_on` / `application_status`.
 
 ### reports
-- `GET /api/v1/reports` — the available reports (`key`, `title`, `description`)
+- `GET /api/v1/reports` — the available reports (`key`, `title`, `description`, `section`:
+  Summary | Pipeline | Market | Operations)
+- `GET /api/v1/reports/summary?days=30` — executive summary for the last `days` (1–3650):
+  `kpis` (each with its `report`), `findings` (problems first, each with its `report`), `from`,
+  `to`, `previous`
 - `GET /api/v1/reports/{name}?from=&to=&group=day|week|month` — one report (default: last 90
   days, group chosen from the range): `kpis` (with `previous` = the period of equal length
   before), `charts` (`kind`: line, bar, stacked, donut, hbar; `series`; `data`) and `table`
-  (`columns`, `rows`, max 2000) and `jobs` (the jobs behind the numbers, or null). Names: overview, jobs, applications, interviews, offers,
-  companies, sources, followups, skills, scans.
+  (`columns`, `rows`, max 2000) and `jobs` (the jobs behind the numbers, or null), and
+  `findings` (`tone` good | bad | info, `text`, `link`?). A KPI may carry `sample` [now,
+  previous]: the cases a rate or median rests on. Names: overview, pipeline, jobs, market,
+  applications, interviews, offers, companies, sources, followups, skills, activity, scans.
 
 ### career-ops
 - `GET /api/v1/career-ops/status` — includes `automation` (`schedule_hours`, `auto_import`, `next_scan_at`); change it with `PATCH /api/v1/settings/app {"career_ops": {"schedule_hours": 24, "auto_import": true}}`

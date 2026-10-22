@@ -4,6 +4,7 @@ Every report returns the same shape so the UI can draw any of them:
 
     {"report", "title", "description", "from", "to", "group", "periods",
      "kpis":   [{"key", "label", "value", "previous", "unit", "better"}],
+     "findings": [{"tone": good | bad | info, "text", "link"?}],
      "charts": [{"id", "title", "kind", "series": [{"key", "label"}], "data": [{"label", ...}],
                  "note"}],
      "table":  {"title", "columns": [{"key", "label", "kind"}], "rows": [...]}}
@@ -33,6 +34,7 @@ from app.models.scan import ScanRun
 Group = Literal["day", "week", "month"]
 TABLE_LIMIT = 2000  # rows sent per table (chart clicks filter these in the browser)
 TOP = 8  # categories shown before "Other"
+MIN_SAMPLE = 5  # cases needed before a rate or median is compared with the previous period
 BY1 = (text("1"),)  # GROUP BY the first (and second) selected column
 BY2 = (text("1"), text("2"))
 
@@ -43,6 +45,8 @@ INTERVIEWED = ["INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED"]
 REPORTS: dict[str, tuple[str, str]] = {
     "overview": ("Overview", "Everything at a glance: jobs found, applications, answers, "
                  "interviews and offers over time."),
+    "pipeline": ("Pipeline health", "Conversion from application to offer, how long employers "
+                 "take, applications going quiet, and cohorts by when you applied."),
     "jobs": ("Jobs found", "Jobs added in the period: where they came from, how well they "
              "fit, where and how you'd work."),
     "applications": ("Applications", "What you applied to, how employers answered and how "
@@ -50,12 +54,21 @@ REPORTS: dict[str, tuple[str, str]] = {
     "interviews": ("Interviews", "Interview rounds: how many, what kind, and how they went."),
     "offers": ("Offers", "Offers received, their pay and what you decided."),
     "companies": ("Companies", "Per company: jobs, applications, interviews and offers."),
+    "market": ("Market & pay", "What the market asks for: pay shown, experience, seniority, "
+               "remote share and who is hiring."),
     "sources": ("Job sources", "Which sources bring jobs that fit and lead to interviews."),
     "followups": ("Follow-ups", "Follow-ups planned, done on time, late or still open."),
     "skills": ("Skills", "Skills most asked for in the period's jobs, and how often you "
                "have them."),
+    "activity": ("Your activity", "What you did: jobs reviewed, shortlisted, applied and "
+                 "dismissed, and the backlog waiting for you."),
     "scans": ("Scans & imports", "Job scans and imports: runs, results and failures."),
 }
+# Reports grouped for the menu: summary, the pipeline, the market, how the search runs.
+SECTIONS = {"overview": "Summary", "pipeline": "Pipeline", "applications": "Pipeline",
+            "interviews": "Pipeline", "offers": "Pipeline", "followups": "Pipeline",
+            "jobs": "Market", "market": "Market", "skills": "Market", "companies": "Market",
+            "sources": "Operations", "activity": "Operations", "scans": "Operations"}
 
 
 # When a job was found: the date your Google Sheet says it was added (jobs imported from a
@@ -126,6 +139,10 @@ class Range:
             return col.between(lo, hi)
         return (col >= self._ts(lo)) & (col < self._ts(hi + timedelta(days=1)))
 
+    def bucket_of(self, when: date | datetime) -> date:
+        """The start date of the period a Python date or datetime falls in."""
+        return _bucket_start(when.date() if isinstance(when, datetime) else when, self.group)
+
     def bucket(self, col: Any) -> Any:
         """SQL expression: the start date of the period `col` falls in."""
         return cast(func.date_trunc(self.group, col), Date)
@@ -157,9 +174,12 @@ def _count(db: Session, stmt: Any) -> int:
 
 
 def kpi(label: str, key: str, now: float | int | None, previous: float | int | None = None,
-        unit: str = "", better: str = "up") -> dict[str, Any]:
+        unit: str = "", better: str = "up", sample: tuple[int, int] | None = None
+        ) -> dict[str, Any]:
+    """`sample`: how many cases a rate or median rests on (now, previous); findings compare
+    the two periods only when both have at least MIN_SAMPLE."""
     return {"key": key, "label": label, "value": now, "previous": previous, "unit": unit,
-            "better": better}
+            "better": better, "sample": list(sample) if sample else None}
 
 
 def pct(part: int, whole: int) -> int | None:
@@ -418,8 +438,12 @@ def _jobs(db: Session, r: Range) -> dict[str, Any]:
                 prev["avg"] and int(prev["avg"])),
             kpi("Score 80+", "strong", now["strong"], prev["strong"]),
             kpi("With a description", "jd", pct(now["jd"], now["n"]), pct(prev["jd"], prev["n"]),
-                "%"),
+                "%", sample=(now["n"], prev["n"])),
         ],
+        "findings": [{"tone": "bad", "link": "/jobs?jd_status=MISSING",
+                      "text": f"{100 - (pct(now['jd'], now['n']) or 0)}% of the period's jobs "
+                              "have no description, so their scores are rough guesses."}]
+        if now["n"] and (pct(now["jd"], now["n"]) or 0) < 80 else [],
         "charts": [
             chart("added", "Jobs found per period, by source", "stacked", data, series),
             chart("scores", "How well they fit (score)", "bar", score_data, [("value", "Jobs")],
@@ -488,12 +512,12 @@ def _applications(db: Session, r: Range) -> dict[str, Any]:
         "kpis": [
             kpi("Applications", "apps", now["n"], prev["n"]),
             kpi("Answer rate", "answer_rate", pct(now["answered"], now["n"]),
-                pct(prev["answered"], prev["n"]), "%"),
+                pct(prev["answered"], prev["n"]), "%", sample=(now["n"], prev["n"])),
             kpi("Interview rate", "interview_rate", pct(now["iv"], now["n"]),
-                pct(prev["iv"], prev["n"]), "%"),
+                pct(prev["iv"], prev["n"]), "%", sample=(now["n"], prev["n"])),
             kpi("Rejected", "rejected", now["rejected"], prev["rejected"], better="down"),
             kpi("Days to first answer (median)", "days", now["days"], prev["days"],
-                " days", better="down"),
+                " days", better="down", sample=(now["answered"], prev["answered"])),
         ],
         "charts": [
             chart("per_period", "Applications per period, by how you applied", "stacked",
@@ -556,7 +580,8 @@ def _interviews(db: Session, r: Range) -> dict[str, Any]:
             kpi("Completed", "done", now["done"], prev["done"]),
             kpi("Passed", "passed", now["passed"], prev["passed"]),
             kpi("Pass rate", "pass_rate", pct(now["passed"], decided),
-                pct(prev["passed"], prev["passed"] + prev["failed"]), "%"),
+                pct(prev["passed"], prev["passed"] + prev["failed"]), "%",
+                sample=(decided, prev["passed"] + prev["failed"])),
             kpi("Coming up (from today)", "upcoming", upcoming),
         ],
         "charts": [
@@ -718,7 +743,18 @@ def _sources(db: Session, r: Range) -> dict[str, Any]:
     data, series = _stacked(r, list(per))
     best = max((x for x in out if x["jobs"] >= 3 and x["avg"] is not None),
                key=lambda x: x["avg"], default=None)
+    most_iv = max((x for x in out if x["interviews"]), key=lambda x: x["interviews"], default=None)
+    findings = []
+    if best:
+        findings.append({"tone": "good", "link": f"/jobs?source={best['source']}",
+                         "text": f"{nice(best['source'])} brings the best-fitting jobs (average "
+                                 f"score {best['avg']} over {best['jobs']} jobs)."})
+    if most_iv:
+        findings.append({"tone": "good",
+                         "text": f"Most interviews came from {nice(most_iv['source'])} "
+                                 f"({most_iv['interviews']} of {most_iv['apps']} applications)."})
     return {
+        "findings": findings,
         "kpis": [
             kpi("Sources used", "n", len(out)),
             kpi("Best average score", "best", best["avg"] if best else None),
@@ -883,15 +919,62 @@ def _scans(db: Session, r: Range) -> dict[str, Any]:
     }
 
 
-BUILDERS: dict[str, Callable[[Session, Range], dict[str, Any]]] = {
+_BUILT_HERE: dict[str, Callable[[Session, Range], dict[str, Any]]] = {
     "overview": _overview, "jobs": _jobs, "applications": _applications,
     "interviews": _interviews, "offers": _offers, "companies": _companies,
     "sources": _sources, "followups": _followups, "skills": _skills, "scans": _scans,
 }
+# Pipeline health, market and activity live in report_more (they use the helpers above).
+from app.services import report_more  # noqa: E402
+
+BUILDERS: dict[str, Callable[[Session, Range], dict[str, Any]]] = {
+    k: {**_BUILT_HERE, **report_more.BUILDERS}[k] for k in REPORTS}
 
 
 def catalog() -> list[dict[str, str]]:
-    return [{"key": k, "title": t, "description": d} for k, (t, d) in REPORTS.items()]
+    return [{"key": k, "title": t, "description": d, "section": SECTIONS[k]}
+            for k, (t, d) in REPORTS.items()]
+
+
+MAX_FINDINGS = 6
+
+
+def _show(value: float | int, unit: str) -> str:
+    return f"{value:g}{unit}" if isinstance(value, float) else f"{value}{unit}"
+
+
+def kpi_findings(kpis: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
+    """Plain-words notes on the KPIs that changed a lot against the previous period: a rate
+    by 5+ points, a count by a quarter or more (and at least 3)."""
+    out = []
+    for k in kpis:
+        v, p, unit = k["value"], k["previous"], k["unit"]
+        if v is None or p is None or unit == "money" or v == p:
+            continue
+        if k.get("sample") and min(k["sample"]) < MIN_SAMPLE:
+            continue  # too few cases to call it a change
+        up = v > p
+        # better: "up" or "down" says which way is good; anything else is neutral.
+        tone = ("info" if k["better"] not in ("up", "down")
+                else "good" if up == (k["better"] == "up") else "bad")
+        if unit == "%":
+            if abs(v - p) < 5:
+                continue
+            text = (f"{k['label']}: {v}% against {p}% in the previous period "
+                    f"({'+' if up else '−'}{abs(v - p)} points).")
+        elif p < MIN_SAMPLE:
+            if abs(v - p) < 3:
+                continue
+            text = (f"{k['label']}: {_show(v, unit)}, against "
+                    f"{_show(p, unit) if p else 'none'} in the previous period.")
+        else:
+            change = abs(v - p) * 100 / p
+            if abs(v - p) < 3 or change < 25:
+                continue
+            text = (f"{k['label']}: {_show(v, unit)}, {'up' if up else 'down'} {round(change)}% "
+                    f"on the previous period ({_show(p, unit)}).")
+        out.append({"tone": tone, "text": text})
+    return out[:limit]
 
 
 def build(db: Session, name: str, start: date | None = None, end: date | None = None,
@@ -908,7 +991,42 @@ def build(db: Session, name: str, start: date | None = None, end: date | None = 
     r = Range(start, end, group)
     title, description = REPORTS[name]
     body = BUILDERS[name](db, r)
+    findings = [*body.pop("findings", []), *kpi_findings(body["kpis"])][:MAX_FINDINGS]
     return {"report": name, "title": title, "description": description,
-            "from": start.isoformat(), "to": end.isoformat(), "group": group,
+            "section": SECTIONS[name], "from": start.isoformat(), "to": end.isoformat(),
+            "group": group,
             "previous": {"from": r.prev_start.isoformat(), "to": r.prev_end.isoformat()},
-            "jobs": None, **body}
+            "jobs": None, **body, "findings": findings}
+
+
+# The executive summary: the KPIs that matter most, from several reports, and their findings.
+SUMMARY_KPIS = [("overview", "jobs"), ("overview", "apps"), ("pipeline", "answer_rate"),
+                ("overview", "interviews"), ("overview", "offers"), ("pipeline", "days"),
+                ("pipeline", "stale"), ("activity", "backlog"), ("activity", "reviewed"),
+                ("market", "lpa")]
+SUMMARY_FINDINGS = ["pipeline", "activity", "overview", "sources", "market", "jobs"]
+
+
+def summary(db: Session, days: int = 30) -> dict[str, Any]:
+    if not 1 <= days <= 3650:
+        raise DomainValidationError("Pick between 1 and 3650 days")
+    end = date.today()
+    start = end - timedelta(days=days - 1)
+    built = {n: build(db, n, start, end) for n in dict.fromkeys(
+        [n for n, _ in SUMMARY_KPIS] + SUMMARY_FINDINGS)}
+    kpis = []
+    for name, key in SUMMARY_KPIS:
+        k = next((x for x in built[name]["kpis"] if x["key"] == key), None)
+        if k is not None:
+            kpis.append({**k, "report": name})
+    findings, seen = [], set()
+    for name in SUMMARY_FINDINGS:
+        for f in built[name]["findings"]:
+            if f["text"] not in seen:
+                seen.add(f["text"])
+                findings.append({**f, "report": name})
+    order = {"bad": 0, "good": 1, "info": 2}
+    findings.sort(key=lambda f: order.get(f["tone"], 3))
+    first = built[SUMMARY_FINDINGS[0]]
+    return {"from": start.isoformat(), "to": end.isoformat(), "days": days,
+            "previous": first["previous"], "kpis": kpis, "findings": findings[:10]}

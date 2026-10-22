@@ -33,8 +33,9 @@ describe("ReportsPage", () => {
   it("shows KPIs with the change, charts, and a sortable, filterable table", async () => {
     const api = mockApi({ "GET /reports": CATALOG, "GET /reports/applications": REPORT });
     renderAt(<ReportsPage />, { path: "/reports/:name", route: "/reports/applications?range=30d" });
-    expect(await screen.findByText("▲ 4 vs previous period")).toHaveClass("text-emerald-600");
-    expect(screen.getByText("▲ 2 vs previous period")).toHaveClass("text-rose-600"); // more rejections is worse
+    expect(await screen.findByText("▲ 50%")).toHaveClass("text-emerald-600"); // 12 vs 8
+    expect(screen.getByText("vs 8 before")).toBeInTheDocument();
+    expect(screen.getByText("▲ 2")).toHaveClass("text-rose-600"); // more rejections is worse; 3 vs 1: no % from a tiny base
     expect(screen.getByRole("img", { name: "Where they are now chart" })).toBeInTheDocument();
     expect(screen.getByText("Nothing in this period")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Magento Lead" })).toHaveAttribute("href", "/jobs/5");
@@ -49,6 +50,33 @@ describe("ReportsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Score/ })); // then lowest first
     const cells = screen.getAllByRole("row").slice(1).map((r) => r.textContent);
     expect(cells[0]).toContain("PHP Architect");
+  });
+
+  it("groups the reports by area and lists what the numbers say", async () => {
+    const catalog = [
+      { key: "overview", title: "Overview", description: "", section: "Summary" },
+      { key: "pipeline", title: "Pipeline health", description: "", section: "Pipeline" },
+      { key: "market", title: "Market & pay", description: "", section: "Market" },
+    ];
+    const report = { ...REPORT, report: "pipeline", kpis: [
+      { key: "answer_rate", label: "Answer rate", value: 20, previous: 35, unit: "%", better: "up" as const },
+      { key: "dismissed", label: "Dismissed", value: 30, previous: 10, unit: "", better: "none" as const },
+      { key: "days", label: "Days to first answer", value: 2, previous: 30, unit: " days", better: "down" as const, sample: [9, 2] },
+    ], findings: [
+      { tone: "bad" as const, text: "3 active applications have had no update for 14+ days.", link: "/applications" },
+      { tone: "info" as const, text: "Employers answered in 6 days (median of 9 answers)." },
+    ] };
+    mockApi({ "GET /reports": catalog, "GET /reports/pipeline": report });
+    renderAt(<ReportsPage />, { path: "/reports/:name", route: "/reports/pipeline" });
+    expect(await screen.findByRole("link", { name: "Pipeline health" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("navigation", { name: "Reports" })).toHaveTextContent(/Summary.*Overview.*Pipeline.*Pipeline health.*Market.*Market & pay/);
+    expect(await screen.findByText("▼ 15 pts")).toHaveClass("text-rose-600"); // a rate changes in points
+    expect(screen.getByText("▲ 200%")).toHaveClass("text-slate-500"); // neutral KPI: no colour
+    expect(screen.getByText("30 days before · too few to compare")).toBeInTheDocument(); // 2 cases before
+    const list = screen.getByRole("list", { name: "Key findings" });
+    expect(list).toHaveTextContent(/no update for 14\+ days.*Employers answered/);
+    expect(screen.getByLabelText("Needs attention")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Act on it →" })).toHaveAttribute("href", "/applications");
   });
 
   it("asks for the chosen dates and group", async () => {

@@ -17,6 +17,7 @@ from app.schemas.job import (
     BulkJobsIn,
     JobCommentIn,
     JobCommentOut,
+    JobContactIn,
     JobCreate,
     JobCreateOut,
     JobDetail,
@@ -71,6 +72,7 @@ def detail(db: DB, job: Job) -> JobDetail:
             "email": r.email,
             "phone": r.phone,
             "linkedin_url": r.linkedin_url,
+            "job_title": r.job_title,
             "status": r.status,
         }
     out.activity = [
@@ -101,6 +103,7 @@ def create_job(db: DB, body: JobCreate) -> JobCreateOut:
     data = JobInput(
         title=body.title,
         company_name=body.company,
+        company_id=body.company_id,
         url=body.url,
         source=body.source,
         location=body.location,
@@ -306,6 +309,17 @@ def check_posting(db: DB, job_id: int) -> JobDetail:
 def email_draft(db: DB, job_id: int) -> dict[str, Any]:
     """A ready-to-edit email to HR for this job, from the job, your match and your profile."""
     return email_draft_service.draft_for_job(db, job_id)
+
+
+@router.put("/jobs/{job_id}/contact", response_model=JobDetail)
+def set_contact(db: DB, job_id: int, body: JobContactIn) -> JobDetail:
+    """Set the job's contact person (name, role, email, phone, LinkedIn; all optional)."""
+    return detail(db, job_service.set_contact(db, job_id, body.model_dump()))
+
+
+@router.delete("/jobs/{job_id}/contact", response_model=JobDetail)
+def remove_contact(db: DB, job_id: int) -> JobDetail:
+    return detail(db, job_service.remove_contact(db, job_id))
 
 
 @router.post("/jobs/{job_id}/sources", response_model=JobDetail)

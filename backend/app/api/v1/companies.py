@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -83,6 +83,14 @@ def list_companies(
 @router.get("/companies/stats")
 def stats(db: DB) -> dict[str, Any]:
     return company_service.company_stats(db)
+
+
+@router.get("/companies/suggest")
+def suggest(db: DB, q: Annotated[str, Query(max_length=200)] = "",
+            limit: Annotated[int, Query(ge=1, le=20)] = 8) -> dict[str, Any]:
+    """Companies matching a name being typed (Add Job). `match`: the company a job with exactly
+    this name is linked to; null means a new company would be added."""
+    return company_service.suggest(db, q, limit)
 
 
 @router.get("/companies/facets")

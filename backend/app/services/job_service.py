@@ -68,6 +68,7 @@ PARSED_FIELDS = (
 class JobInput:
     title: str
     company_name: str
+    company_id: int | None = None  # a company chosen by the user: link to it, don't match
     url: str | None = None
     source: JobSource | None = None  # explicit override; otherwise detected from the URL
     source_detail: str | None = None
@@ -434,6 +435,51 @@ def _recruiter(db: Session, company: Company, data: JobInput) -> Contact | None:
     return save_contact(db, {k: v for k, v in payload.items() if v is not None})
 
 
+def set_contact(db: Session, job_id: int, fields: dict[str, str | None]) -> Job:
+    """Set the job's contact person. Someone you already have (same email, LinkedIn or phone)
+    is linked rather than added twice; otherwise the job's current contact is updated, or a
+    new contact is added for the job's company. Empty values clear a field."""
+    job = get_job(db, job_id)
+    clean = {k: (v.strip() if isinstance(v, str) else v) or None for k, v in fields.items()}
+    if phone := clean.get("phone"):
+        clean["phone"] = normalize_phone(phone) or phone
+    if not any(clean.get(k) for k in ("name", "email", "phone", "linkedin_url")):
+        raise DomainValidationError("Give at least a name, email, phone or LinkedIn")
+    same = None
+    for col in ("email", "linkedin_url", "phone"):
+        if clean.get(col):
+            same = db.scalar(select(Contact).where(getattr(Contact, col) == clean[col]))
+            if same is not None:
+                break
+    contact = same or job.recruiter_contact
+    if contact is None:
+        contact = Contact(name="Contact", company_id=job.company_id, contact_type="RECRUITER",
+                          source="manual")
+        db.add(contact)
+    editing = contact is job.recruiter_contact
+    for key, value in clean.items():
+        if value is not None or editing:  # someone else's details are only added to
+            setattr(contact, key, value)
+    contact.name = contact.name or clean.get("email") or clean.get("phone") or "Contact"
+    db.flush()
+    job.recruiter_contact_id = contact.id
+    record_activity(db, "job.contact_set", "job", job.id, contact.name,
+                    {"contact_id": contact.id})
+    db.commit()
+    return get_job(db, job_id)
+
+
+def remove_contact(db: Session, job_id: int) -> Job:
+    """Unlink the job's contact person (the contact itself stays in Recruiters)."""
+    job = get_job(db, job_id)
+    if job.recruiter_contact_id is not None:
+        record_activity(db, "job.contact_removed", "job", job.id, None,
+                        {"contact_id": job.recruiter_contact_id})
+        job.recruiter_contact_id = None
+        db.commit()
+    return get_job(db, job_id)
+
+
 def ingest_job(
     db: Session, data: JobInput, *, analyze: bool = True, commit: bool = True
 ) -> IngestResult:
@@ -457,7 +503,12 @@ def ingest_job(
     # Scans, imports and Add Job may run at the same time; take turns so two of them can't
     # both decide "not seen yet" and save the same posting twice. Held until commit.
     db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": INGEST_LOCK_ID})
-    company = find_or_create_by_name(db, data.company_name)
+    if data.company_id is not None:
+        company = db.get(Company, data.company_id)
+        if company is None:
+            raise NotFoundError(f"Company {data.company_id} not found")
+    else:
+        company = find_or_create_by_name(db, data.company_name)
     manual = _manual_values(data) if data.origin in ("manual", "import", "sheet", "agent") else {}
 
     existing, matched_by = find_duplicate(db, company, data, normalized, source, external_id)

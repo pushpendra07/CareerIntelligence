@@ -16,8 +16,8 @@ import { EmailDraft } from "./EmailDraft";
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
+import { JobContact } from "./JobContact";
 import { CvTailor } from "./CvTailor";
-import { ContactLinks } from "../../components/ContactLinks";
 import { StickyBar, useScrolledPast } from "../../components/StickyBar";
 import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
@@ -181,7 +181,7 @@ export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; on
 /** Statuses that end the decision: the page goes back to the list after setting one. */
 const DISMISSED = ["CLOSED", "NOT_RELEVANT"];
 
-const SECTIONS: [string, string][] = [["fit", "Fit"], ["description", "Description"], ["email", "Email to HR"], ["follow-ups", "Follow-ups"], ["comments", "Comments"]];
+const SECTIONS: [string, string][] = [["fit", "Fit"], ["description", "Description"], ["email", "Email to HR"], ["contact", "Contact"], ["follow-ups", "Follow-ups"], ["comments", "Comments"]];
 
 /** The main decision buttons, small, for the sticky bar once the page has scrolled. */
 function QuickActions({ job, setStatus, busy }: { job: JobDetail; setStatus: (s: string) => void; busy: boolean }) {
@@ -329,6 +329,7 @@ export function JobDetailPage() {
         </div>
         <div className="min-w-0 space-y-4">
           <CompanyCard companyId={j.company.id} jobId={j.id} />
+          <div id="contact" className="scroll-mt-32"><JobContact key={`${j.id}-${j.recruiter?.id ?? 0}`} job={j} /></div>
           <div id="follow-ups" className="scroll-mt-32">
             <Card title="Follow-ups">
               {followups.data?.items.length ? (
@@ -352,15 +353,6 @@ export function JobDetailPage() {
             </Card>
           ) : null}
           <div id="comments" className="scroll-mt-32"><JobComments jobId={j.id} comments={j.comments ?? []} /></div>
-          {j.recruiter && (
-            <Card title="Recruiter">
-              <div className="space-y-1 text-sm">
-                <div>{j.recruiter.name} <StatusBadge value={j.recruiter.status} /></div>
-                <ContactLinks email={j.recruiter.email} phone={j.recruiter.phone} linkedin={j.recruiter.linkedin_url} />
-                <Link className="link text-xs" to={`/recruiters?q=${encodeURIComponent(j.recruiter.email ?? j.recruiter.name)}`}>Open in Recruiters</Link>
-              </div>
-            </Card>
-          )}
           <CareerOpsPanel job={j} />
           <Card>
             <details>

@@ -313,19 +313,69 @@ def get_company(db: Session, company_id: int) -> Company:
     return company
 
 
-def find_or_create_by_name(db: Session, name: str) -> Company:
-    """Used by job entry: reuse a matching company, or create a DISCOVERED one."""
+def match_by_name(db: Session, name: str) -> Company | None:
+    """The company a job entry with this name would be linked to, if there is one."""
     key = company_key(name)
     if not key:
-        raise DomainValidationError("Company name is required")
+        return None
     # The strict key first: a company saved under it ("aspiresoftwaresolutions") is a closer
     # match than the one holding the shared key ("aspire" = Aspire Systems).
     company = db.scalar(select(Company).where(Company.name_key == company_key_strict(name)))
     if company is None:
         company = db.scalar(select(Company).where(Company.name_key == key))
     if company is None:
-        index = load_index(db)
-        company = index.find(name, None)
+        company = load_index(db).find(name, None)
+    return company
+
+
+def suggest(db: Session, q: str, limit: int = 8) -> dict[str, Any]:
+    """Companies for a name being typed: `match` is the one a job with exactly this name would
+    be linked to (None: a new company would be added); `items` are the closest names, that one
+    first, then names starting with the text, then those with the most jobs."""
+    from app.models.job import Job
+
+    text_ = q.strip()
+    if len(text_) < 2:
+        return {"match": None, "items": []}
+    match = match_by_name(db, text_)
+    like = f"%{text_}%"
+    key = company_key(text_)
+    jobs = (select(Job.company_id, func.count(Job.id).label("n"))
+            .group_by(Job.company_id).subquery())
+    wanted = or_(Company.name.ilike(like), cast(Company.aliases, String).ilike(like))
+    if key:
+        wanted = or_(wanted, Company.name_key.like(f"%{key}%"))
+    starts = Company.name.ilike(f"{text_}%")
+    rows = db.execute(
+        select(Company, func.coalesce(jobs.c.n, 0))
+        .outerjoin(jobs, jobs.c.company_id == Company.id)
+        .where(wanted)
+        .order_by(starts.desc(), func.coalesce(jobs.c.n, 0).desc(), Company.name)
+        .limit(limit)
+    ).all()
+    found = [(c, n) for c, n in rows]
+    if match is not None and all(c.id != match.id for c, _ in found):
+        n = db.scalar(select(func.count(Job.id)).where(Job.company_id == match.id)) or 0
+        found = [(match, n), *found][:limit]
+    elif match is not None:
+        found.sort(key=lambda x: x[0].id != match.id)  # the match first, the rest as ranked
+
+    def item(c: Company, n: int) -> dict[str, Any]:
+        return {"id": c.id, "name": c.name, "tier": c.tier, "website": c.website,
+                "jobs": int(n), "verification_status": c.verification_status,
+                "aliases": c.aliases or [], "match": match is not None and c.id == match.id}
+
+    return {"match": item(match, next(n for c, n in found if c.id == match.id))
+            if match is not None else None,
+            "items": [item(c, n) for c, n in found]}
+
+
+def find_or_create_by_name(db: Session, name: str) -> Company:
+    """Used by job entry: reuse a matching company, or create a DISCOVERED one."""
+    key = company_key(name)
+    if not key:
+        raise DomainValidationError("Company name is required")
+    company = match_by_name(db, name)
     if company is None:
         company = Company(
             name=name.strip(),

@@ -8,7 +8,15 @@ import { api } from "../../api/client";
 import { Card, ErrorBox, PageIntro, Pagination, Spinner, usePageSize } from "../../components/ui";
 import { formatDate, formatMoney, humanize } from "../../utils/format";
 
-type Kpi = { key: string; label: string; value: number | null; previous: number | null; unit: string; better: "up" | "down" };
+export type Kpi = { key: string; label: string; value: number | null; previous: number | null; unit: string;
+  /** Which way is good; "none" = neutral (no colour). */
+  better: "up" | "down" | "none"; report?: string;
+  /** Cases a rate or median rests on [now, previous]; below MIN_SAMPLE they aren't compared. */
+  sample?: number[] | null };
+/** Same as the server's MIN_SAMPLE (services/report_service.py). */
+export const MIN_SAMPLE = 5;
+/** A plain-words conclusion computed from the data (no outside benchmarks). */
+export type Finding = { tone: "good" | "bad" | "info"; text: string; link?: string; report?: string };
 type Chart = { id: string; title: string; kind: "line" | "bar" | "stacked" | "donut" | "hbar"; note: string | null;
   /** Row field that a click on a bar/slice filters the tables by (matching the item's `code`). */
   filter?: string | null;
@@ -19,8 +27,8 @@ type Table = { title: string; columns: Column[]; rows: Row[]; total: number };
 type Column = { key: string; label: string; kind: string };
 type Row = Record<string, string | number | null | string[]>;
 export type Report = {
-  report: string; title: string; description: string; from: string; to: string; group: string;
-  previous: { from: string; to: string }; kpis: Kpi[]; charts: Chart[];
+  report: string; title: string; description: string; section?: string; from: string; to: string; group: string;
+  previous: { from: string; to: string }; kpis: Kpi[]; charts: Chart[]; findings?: Finding[];
   table: Table;
   /** The jobs behind the numbers (reports whose main table isn't already jobs). */
   jobs?: Table | null;
@@ -31,7 +39,9 @@ export const matches = (row: Row, pick: Pick | null) => {
   const v = row[pick.key];
   return Array.isArray(v) ? v.includes(pick.code) : String(v) === pick.code;
 };
-type Catalog = { key: string; title: string; description: string }[];
+type Catalog = { key: string; title: string; description: string; section?: string }[];
+/** Menu order of the report groups. */
+const SECTION_ORDER = ["Summary", "Pipeline", "Market", "Operations"];
 
 /** Distinct series colours, readable in light and dark themes. */
 export const COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#a855f7", "#14b8a6", "#ec4899", "#64748b"];
@@ -61,21 +71,68 @@ function fmt(v: Row[string] | undefined, kind: string, row?: Row): string {
   return String(v);
 }
 
-function KpiCard({ k }: { k: Kpi }) {
-  const value = k.value === null ? "—" : k.unit === "money" ? formatMoney(k.value) : `${k.value}${k.unit}`;
-  const diff = k.value !== null && k.previous !== null ? k.value - k.previous : null;
-  const good = diff !== null && diff !== 0 && (diff > 0) === (k.better === "up");
-  return (
-    <div className="card p-3">
+const show = (v: number | null, unit: string) => (v === null ? "—" : unit === "money" ? formatMoney(v) : `${v}${unit}`);
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** One KPI: the value, the change against the previous period (points for a rate, % for a
+ * count) and the previous value. Green/red only when the KPI says which way is good. */
+export function KpiCard({ k, to }: { k: Kpi; to?: string }) {
+  const diff = k.value !== null && k.previous !== null ? round1(k.value - k.previous) : null;
+  const few = !!k.sample && Math.min(...k.sample) < MIN_SAMPLE;
+  const tone = diff === null || diff === 0 || k.better === "none" || few ? "text-slate-500"
+    : (diff > 0) === (k.better === "up") ? "text-emerald-600" : "text-rose-600";
+  const rate = k.unit === "%";
+  // A % change from a tiny base (97 vs 2 = +4750%) says little: below MIN_SAMPLE show the difference.
+  const share = diff !== null && !rate && k.previous && k.previous >= MIN_SAMPLE ? Math.round((diff * 100) / k.previous) : null;
+  const change = diff === null ? null : diff === 0 ? "No change"
+    : `${diff > 0 ? "▲" : "▼"} ${rate ? `${Math.abs(diff)} pts` : share !== null && k.unit !== "money" ? `${Math.abs(share)}%` : show(Math.abs(diff), k.unit)}`;
+  const body = (
+    <>
       <div className="text-xs font-medium text-slate-500">{k.label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {diff !== null && (
-        <div className={`text-xs ${diff === 0 ? "text-slate-400" : good ? "text-emerald-600" : "text-rose-600"}`}
-          title={`Previous period: ${k.unit === "money" ? formatMoney(k.previous) : `${k.previous}${k.unit}`}`}>
-          {diff === 0 ? "same as before" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}${k.unit === "money" ? "" : k.unit} vs previous period`}
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{show(k.value, k.unit)}</div>
+      {change !== null && (few ? (
+        <div className="mt-0.5 text-xs text-slate-400" title={`Rests on ${k.sample!.join(" and ")} cases: fewer than ${MIN_SAMPLE} in a period is too few to call it a change`}>
+          {show(k.previous, k.unit)} before · too few to compare
         </div>
-      )}
-    </div>
+      ) : (
+        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs">
+          <span className={tone}>{change}</span>
+          <span className="text-slate-400">vs {show(k.previous, k.unit)} before</span>
+        </div>
+      ))}
+    </>
+  );
+  return to
+    ? <Link to={to} className="card block p-3 transition hover:shadow-md" title="Open the report">{body}</Link>
+    : <div className="card p-3">{body}</div>;
+}
+
+const TONE: Record<Finding["tone"], { icon: string; cls: string; label: string }> = {
+  bad: { icon: "!", cls: "bg-rose-100 text-rose-700", label: "Needs attention" },
+  good: { icon: "✓", cls: "bg-emerald-100 text-emerald-700", label: "Going well" },
+  info: { icon: "i", cls: "bg-sky-100 text-sky-700", label: "Worth knowing" },
+};
+
+/** What the numbers say, in plain words: problems first, each with where to act. */
+export function Findings({ items, title = "Key findings", reportLink }: { items: Finding[]; title?: string;
+  reportLink?: (report: string) => string }) {
+  if (!items.length) return null;
+  return (
+    <Card title={title}>
+      <ul className="space-y-2" aria-label={title}>
+        {items.map((f) => (
+          <li key={f.text} className="flex items-start gap-2.5 text-sm">
+            <span aria-label={TONE[f.tone].label} title={TONE[f.tone].label}
+              className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${TONE[f.tone].cls}`}>{TONE[f.tone].icon}</span>
+            <span className="text-slate-700">
+              {f.text}
+              {f.link && <> <Link className="link whitespace-nowrap" to={f.link}>Act on it →</Link></>}
+              {!f.link && f.report && reportLink && <> <Link className="link whitespace-nowrap text-xs" to={reportLink(f.report)}>Details</Link></>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -285,13 +342,24 @@ export function ReportsPage() {
         <div><h1>Reports</h1><PageIntro>Every part of your search over any period, with charts, a comparison with the period before, and the details behind each number.</PageIntro></div>
         <button className="btn-secondary print:hidden" onClick={() => window.print()}>Print / save as PDF</button>
       </div>
-      <nav aria-label="Reports" className="flex flex-wrap gap-1.5 print:hidden">
-        {(catalog.data ?? []).map((c) => (
-          <Link key={c.key} to={`/reports/${c.key}${keep}`} title={c.description} aria-current={c.key === name ? "page" : undefined}
-            className={`rounded-full px-3 py-1 text-sm ${c.key === name ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
-            {c.title}
-          </Link>
-        ))}
+      <nav aria-label="Reports" className="card flex flex-wrap gap-x-6 gap-y-3 p-3! print:hidden">
+        {SECTION_ORDER.map((section) => {
+          const items = (catalog.data ?? []).filter((c) => (c.section ?? "Summary") === section);
+          if (!items.length) return null;
+          return (
+            <div key={section} className="min-w-0">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{section}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {items.map((c) => (
+                  <Link key={c.key} to={`/reports/${c.key}${keep}`} title={c.description} aria-current={c.key === name ? "page" : undefined}
+                    className={`rounded-full px-3 py-1 text-sm ${c.key === name ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+                    {c.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
       <div className="flex flex-wrap items-end gap-3 text-sm print:hidden">
         <label><span className="label">Period</span>
@@ -319,6 +387,7 @@ export function ReportsPage() {
             <p className="text-sm text-slate-500">{r.description} {formatDate(r.from)} – {formatDate(r.to)}, by {r.group}. Compared with {formatDate(r.previous.from)} – {formatDate(r.previous.to)}.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{r.kpis.map((k) => <KpiCard key={k.key} k={k} />)}</div>
+          <Findings items={r.findings ?? []} />
           <div className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
             {r.charts.map((c) => <ReportChart key={c.id} c={c} pick={pick} onPick={onPick} />)}
           </div>

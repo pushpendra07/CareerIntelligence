@@ -22,6 +22,8 @@ class JobCreate(BaseModel):
 
     title: str = Field(min_length=1, max_length=300)
     company: str = Field(min_length=1, max_length=200)
+    # The company picked from the suggestions: the job is linked to exactly this one.
+    company_id: int | None = None
     url: str | None = Field(default=None, max_length=2000)
     source: JobSource | None = None  # manual override of the detected source
     location: str | None = Field(default=None, max_length=300)
@@ -99,6 +101,33 @@ class JobUpdate(BaseModel):
     notes: str | None = None
 
     _check_url = field_validator("url")(lambda cls, v: _url(v))
+
+
+class JobContactIn(BaseModel):
+    """The job's contact person (recruiter / HR). Every field is optional; at least one is
+    needed. An empty value clears that field."""
+
+    name: str | None = Field(default=None, max_length=200)
+    job_title: str | None = Field(default=None, max_length=200)
+    email: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=40)
+    linkedin_url: str | None = Field(default=None, max_length=500)
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if v and not is_email(v):
+            raise ValueError("invalid email address")
+        return v.lower() or None
+
+    @field_validator("linkedin_url")
+    @classmethod
+    def _li(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if v and not is_linkedin_profile_url(v):
+            raise ValueError("must be a linkedin.com/in/ profile URL")
+        return ensure_scheme(v).split("?")[0] if v else None
 
 
 class StatusIn(BaseModel):

@@ -15,6 +15,13 @@ def list_reports() -> list[dict[str, str]]:
     return report_service.catalog()
 
 
+@router.get("/reports/summary")
+def get_summary(db: DB, days: Annotated[int, Query(ge=1, le=3650)] = 30) -> dict[str, Any]:
+    """Executive summary for the last `days` days: the key KPIs from several reports with the
+    previous period, and the most important findings (problems first)."""
+    return report_service.summary(db, days)
+
+
 @router.get("/reports/{name}")
 def get_report(
     db: DB,

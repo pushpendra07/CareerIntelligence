@@ -34,6 +34,43 @@ describe("insights", () => {
   });
 });
 
+describe("insights: executive summary", () => {
+  it("shows the key KPIs for the chosen period, linked to their reports, and the findings", async () => {
+    const days: string[] = [];
+    mockApi({
+      "GET /dashboard/analytics": { scores: { average_component_factor: {}, by_recommendation: [], average_score: null,
+        average_score_applied: null, interview_rate_by_score: [] }, skill_gaps: [], top_requested_skills: [] },
+      "GET /dashboard/funnels": {}, "GET /dashboard/charts": {}, "GET /dashboard": { summary: {} },
+      "GET /reports/summary": (u: URL) => {
+        days.push(u.searchParams.get("days") ?? "");
+        return {
+          from: "2026-09-23", to: "2026-10-22", days: Number(u.searchParams.get("days")), previous: { from: "2026-08-24", to: "2026-09-22" },
+          kpis: [
+            { key: "apps", label: "Applications", value: 40, previous: 20, unit: "", better: "up", report: "overview" },
+            { key: "backlog", label: "Waiting for review (now)", value: 523, previous: null, unit: "", better: "down", report: "activity" },
+          ],
+          findings: [{ tone: "bad", text: "523 new jobs are waiting for a decision.", link: "/jobs/review", report: "activity" },
+            { tone: "good", text: "Linkedin brings the best-fitting jobs.", report: "sources" }],
+        };
+      },
+      "GET /reports/pipeline": { charts: [{ id: "stages", title: "How far the period's applications got", kind: "hbar", note: null,
+        series: [{ key: "value", label: "Applications" }], data: [{ label: "Applied", value: 40 }] }] },
+      "GET /reports/market": { charts: [] },
+    });
+    renderAt(<AnalyticsPage />, { path: "/analytics", route: "/analytics" });
+    const summary = await screen.findByRole("region", { name: "Executive summary" });
+    expect(await within(summary).findByRole("link", { name: /Applications\s*40/ })).toHaveAttribute("href", "/reports/overview?range=30d");
+    expect(within(summary).getByText("▲ 100%")).toBeInTheDocument();
+    const findings = within(summary).getByRole("list", { name: "What the numbers say" });
+    expect(within(findings).getByRole("link", { name: "Act on it →" })).toHaveAttribute("href", "/jobs/review");
+    expect(within(findings).getByRole("link", { name: "Details" })).toHaveAttribute("href", "/reports/sources?range=30d");
+    expect(await screen.findByRole("img", { name: "How far the period's applications got chart" })).toBeInTheDocument();
+    await userEvent.click(within(summary).getByRole("button", { name: "7 days" }));
+    expect(await within(summary).findByRole("link", { name: /Applications\s*40/ })).toHaveAttribute("href", "/reports/overview?range=7d");
+    expect(days).toEqual(["30", "7"]);
+  });
+});
+
 describe("insights: answers by score, companies, activity", () => {
   it("compares answer rates above and below 80, links companies, hides unknown work models", async () => {
     mockApi({

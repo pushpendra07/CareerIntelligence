@@ -9,6 +9,7 @@ import { Badge, Card, Chips, ErrorBox, Field, PageIntro } from "../../components
 import { WebSearch, jobTopic } from "../../components/WebSearch";
 import type { JobDetail } from "../../types/api";
 import { formatMoney, humanize, splitList } from "../../utils/format";
+import { CompanyInput } from "./CompanyInput";
 import { EmploymentTypeSelect, LocationInput, WorkModelPicker } from "./JobFields";
 
 const optionalUrl = z.string().trim().refine((v) => !v || /^(https?:\/\/)?[^\s/]+\.[^\s]+$/i.test(v), "Enter a valid URL");
@@ -80,6 +81,8 @@ export function AddJobPage() {
     resolver: zodResolver(jobSchema), defaultValues: EMPTY,
   });
   const [url, jd, title, company, jobLocation, workModel] = watch(["url", "jd", "title", "company", "location", "work_model"]);
+  // The company picked from the suggestions (null: matched by name on save, or added).
+  const [companyId, setCompanyId] = useState<number | null>(null);
   const [debounced, setDebounced] = useState({ url: "", jd: "", title: "" });
   useEffect(() => {
     const t = setTimeout(() => setDebounced({ url, jd, title }), 500);
@@ -91,7 +94,8 @@ export function AddJobPage() {
     enabled: Boolean(debounced.jd.trim() || debounced.url.trim()),
   });
   const save = useMutation({
-    mutationFn: (v: JobForm) => api.post<{ job: JobDetail; created: boolean; duplicate_matched_by: string | null }>("/jobs", toPayload(v)),
+    mutationFn: (v: JobForm) => api.post<{ job: JobDetail; created: boolean; duplicate_matched_by: string | null }>("/jobs",
+      { ...toPayload(v), ...(companyId !== null ? { company_id: companyId } : {}) }),
     onSuccess: (res) => navigate(`/jobs/${res.job.id}`, { state: { duplicate: !res.created, matchedBy: res.duplicate_matched_by } }),
   });
   const p = preview.data?.parsed;
@@ -102,7 +106,11 @@ export function AddJobPage() {
         <Card className="space-y-3 lg:col-span-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Job Title *" error={errors.title?.message}><input className="input" {...register("title")} /></Field>
-            <Field label="Company *" error={errors.company?.message}><input className="input" {...register("company")} /></Field>
+            <Field label="Company *" error={errors.company?.message}>
+              <CompanyInput value={company} error={!!errors.company} companyId={companyId}
+                onChange={(name) => setValue("company", name, { shouldDirty: true, shouldValidate: !!errors.company })}
+                onPick={(c) => setCompanyId(c?.id ?? null)} inputProps={{ name: "company", "aria-label": "Company *" }} />
+            </Field>
           </div>
           <WebSearch label="Find on other portals with" topic={jobTopic({ title, company, location: jobLocation, url })} />
           <Field label="Job URL" error={errors.url?.message} hint="LinkedIn, Naukri, Indeed, ATS or careers page">
@@ -120,8 +128,17 @@ export function AddJobPage() {
           <Field label="Job Description *" error={errors.jd?.message}>
             <textarea className="input min-h-72 font-mono text-xs" placeholder="Paste the full job description" {...register("jd")} />
           </Field>
+          <section role="group" aria-label="Contact person" className="space-y-2 rounded-lg border border-slate-200 p-3">
+            <h3 className="text-sm font-semibold text-slate-700">Contact person <span className="ml-1 text-xs font-normal text-slate-400">optional · recruiter or HR, shown on the job page</span></h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Contact name"><input className="input" placeholder="e.g. Priya Sharma" {...register("recruiter_name")} /></Field>
+              <Field label="Contact email" error={errors.recruiter_email?.message}><input className="input" type="email" {...register("recruiter_email")} /></Field>
+              <Field label="Contact phone / WhatsApp" error={errors.recruiter_phone?.message}><input className="input" inputMode="tel" placeholder="98765 43210" {...register("recruiter_phone")} /></Field>
+              <Field label="Contact LinkedIn" error={errors.recruiter_linkedin?.message}><input className="input" placeholder="https://www.linkedin.com/in/…" {...register("recruiter_linkedin")} /></Field>
+            </div>
+          </section>
           <button type="button" className="link text-sm" onClick={() => setShowDetails((s) => !s)}>
-            {showDetails ? "Hide" : "Show"} optional details (salary, experience, recruiter, skills…)
+            {showDetails ? "Hide" : "Show"} optional details (salary, experience, skills…)
           </button>
           {showDetails && (
             <div className="grid gap-3 sm:grid-cols-3">
@@ -135,10 +152,6 @@ export function AddJobPage() {
               <Field label="Currency"><input className="input" placeholder="INR" maxLength={3} {...register("salary_currency")} /></Field>
               <Field label="Posting date"><input className="input" type="date" {...register("posting_date")} /></Field>
               <Field label="Application deadline"><input className="input" type="date" {...register("application_deadline")} /></Field>
-              <Field label="Recruiter"><input className="input" {...register("recruiter_name")} /></Field>
-              <Field label="Recruiter LinkedIn" error={errors.recruiter_linkedin?.message}><input className="input" {...register("recruiter_linkedin")} /></Field>
-              <Field label="Recruiter email" error={errors.recruiter_email?.message}><input className="input" {...register("recruiter_email")} /></Field>
-              <Field label="Recruiter phone / WhatsApp" error={errors.recruiter_phone?.message}><input className="input" inputMode="tel" placeholder="98765 43210" {...register("recruiter_phone")} /></Field>
               <Field label="Required skills" hint="comma separated (overrides JD parsing)"><input className="input" {...register("required_skills")} /></Field>
               <Field label="Preferred skills"><input className="input" {...register("preferred_skills")} /></Field>
               <Field label="Qualifications"><input className="input" {...register("qualifications")} /></Field>
