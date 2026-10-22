@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { humanize } from "../utils/format";
+import { formatDate, humanize, timeSince } from "../utils/format";
 import { prefs } from "../utils/storage";
 import { Icon } from "./icons";
 
@@ -87,6 +87,29 @@ export function JobStatusBadge({ value }: { value: string | null | undefined }) 
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
       {humanize(value)}
     </span>
+  );
+}
+
+/** What each job status means for you: the next thing to do, in a few words. */
+export const JOB_STATUS_NEXT: Record<string, string> = {
+  DISCOVERED: "not reviewed yet", NEW: "not reviewed yet", REVIEWING: "decide: shortlist or drop",
+  SHORTLISTED: "apply next", READY_TO_APPLY: "apply next", ON_HOLD: "paused",
+  APPLIED: "waiting for a reply", RECRUITER_CONTACTED: "reply to the recruiter", SCREENING: "screening in progress",
+  INTERVIEW: "prepare for the interview", AWAITING_FEEDBACK: "waiting for feedback", OFFER: "decide on the offer",
+  ACCEPTED: "offer accepted", REJECTED: "ended", WITHDRAWN: "you withdrew",
+  NOT_RELEVANT: "hidden from open lists", CLOSED: "posting no longer open",
+};
+
+/** The current status, unmistakably: the status pill, then what it means and how long it's been so. */
+export function JobStatusSummary({ status, since }: { status: string; since?: string | null }) {
+  const ago = timeSince(since);
+  return (
+    <div className="min-w-0">
+      <JobStatusBadge value={status} />
+      <div className="mt-0.5 text-xs text-slate-500" title={since ? `Status set ${formatDate(since)}` : undefined}>
+        {JOB_STATUS_NEXT[status] ?? ""}{ago && <> · <span className="tabular-nums">{ago === "today" ? "since today" : ago}</span></>}
+      </div>
+    </div>
   );
 }
 

@@ -466,6 +466,14 @@ def test_status_usage_counts_status_changes(client: TestClient) -> None:
     assert list(usage.items())[:2] == [("NOT_RELEVANT", 2), ("APPLIED", 1)]
 
 
+def test_list_shows_when_the_status_was_set(client: TestClient) -> None:
+    job = add(client)["job"]
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "SHORTLISTED"})
+    row = next(j for j in client.get("/api/v1/jobs").json()["items"] if j["id"] == job["id"])
+    assert row["status"] == "SHORTLISTED"
+    assert row["status_changed_at"]
+
+
 def test_ingest_service_for_importers(db: Session) -> None:
     result = ingest_job(
         db,

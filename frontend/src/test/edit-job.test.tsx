@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EditJob, changedFields } from "../features/jobs/EditJob";
+import { EditJob, amountReadout, changedFields, parseAmount } from "../features/jobs/EditJob";
 import { WorkModelPicker } from "../features/jobs/JobFields";
 import type { JobDetail } from "../types/api";
 import { mockApi, renderAt } from "./utils";
@@ -66,9 +66,50 @@ describe("EditJob", () => {
 
   it("clears values with null and converts numbers", () => {
     const before = { title: "A", location: "Pune", work_model: "REMOTE", employment_type: "", experience_min: "8", experience_max: "",
-      salary_min: "", salary_max: "", salary_currency: "", posting_date: "", application_deadline: "", original_jd: "x", notes: "" };
+      salary_min: "", salary_max: "", salary_currency: "", salary_text: "", posting_date: "", application_deadline: "", original_jd: "x", notes: "",
+      required_skills: [], preferred_skills: [] };
     expect(changedFields(before, { ...before, location: "", work_model: "", experience_max: "12", salary_currency: "inr" }))
       .toEqual({ location: null, work_model: null, experience_max: 12, salary_currency: "INR" });
+  });
+});
+
+describe("EditJob salary, skills and checks", () => {
+  it("reads salary shorthand and shows it in lakhs", () => {
+    expect(parseAmount("30L")).toBe(3000000);
+    expect(parseAmount("30 LPA")).toBe(3000000);
+    expect(parseAmount("1.2Cr")).toBe(12000000);
+    expect(parseAmount("30,00,000")).toBe(3000000);
+    expect(parseAmount("50k")).toBe(50000);
+    expect(parseAmount("lots")).toBeNull();
+    expect(parseAmount(" ")).toBeUndefined();
+    expect(amountReadout("30L", "")).toBe("₹30 LPA · 3,000,000 a year");
+    expect(amountReadout("120000", "usd")).toBe("120,000 USD a year");
+  });
+
+  it("saves typed salary and edited skills", async () => {
+    const api = mockApi({ "PATCH /jobs/7": JOB, "GET /preferences": {}, "GET /applications": { items: [], total: 0 } });
+    const done = vi.fn();
+    renderAt(<EditJob job={{ ...JOB, required_skills: ["PHP"], preferred_skills: [] } as JobDetail} onDone={done} />);
+    fireEvent.change(screen.getByLabelText(/^Salary from/), { target: { value: "30L" } });
+    expect(screen.getByText("₹30 LPA · 3,000,000 a year")).toBeInTheDocument();
+    const skills = screen.getByRole("textbox", { name: "Required skills" });
+    fireEvent.change(skills, { target: { value: "Magento" } });
+    fireEvent.keyDown(skills, { key: "Enter" });
+    expect(screen.getByText(/Changed: Salary, Required skills/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(done).toHaveBeenCalled());
+    expect(api.calls.find((c) => c.method === "PATCH")?.body).toEqual({ salary_min: 3000000, required_skills: ["PHP", "Magento"] });
+  });
+
+  it("marks a range that runs backwards and undoes changes", async () => {
+    mockApi({ "GET /preferences": {}, "GET /applications": { items: [], total: 0 } });
+    renderAt(<EditJob job={JOB} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Experience to (years)"), { target: { value: "5" } });
+    expect(screen.getByText("Must be at least the “from” value")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo changes" }));
+    expect(screen.getByLabelText("Experience to (years)")).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Undo changes" })).not.toBeInTheDocument();
   });
 });
 

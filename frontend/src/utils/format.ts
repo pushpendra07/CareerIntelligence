@@ -30,6 +30,18 @@ export function formatShortDate(value: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(!sameYear && { year: "numeric" }) });
 }
 
+/** How long ago, in words for a narrow column: "today", "1 day", "5 days", "3 weeks", "2 months". */
+export function timeSince(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const days = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  if (days < 1) return "today";
+  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks`;
+  return `${Math.floor(days / 30)} months`;
+}
+
 export function formatDateTime(value: string | null | undefined, withYear = false): string {
   if (!value) return "—";
   const d = new Date(value);

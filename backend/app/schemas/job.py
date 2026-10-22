@@ -172,6 +172,7 @@ class JobOut(BaseModel):
     posting_date: date | None
     application_deadline: date | None
     status: str
+    status_changed_at: datetime | None = None
     match_score: int | None
     recommendation: str | None
     score_stale: bool

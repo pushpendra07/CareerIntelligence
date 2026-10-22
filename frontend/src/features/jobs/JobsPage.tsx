@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, CopyLinkButton, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
+import { Badge, Card, CopyLinkButton, Empty, ErrorBox, JobStatusSummary, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobPreview } from "./JobPreview";
@@ -205,33 +205,34 @@ function NextStep({ job }: { job: Job }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
     meta: { toastError: true },
   });
-  const b = "whitespace-nowrap px-2 py-1 text-xs";
+  // Actions are plain buttons with verbs, so they never look like the status pill above them.
+  const b = "btn-secondary whitespace-nowrap px-2 py-0.5 text-xs font-medium";
   const applied = (
-    <button className={`btn-emerald ${b}`} disabled={status.isPending} aria-label={`Applied: ${job.title}`}
-      title="Already applied — records the application" onClick={() => status.mutate("APPLIED")}>✓ Applied</button>
+    <button className={b} disabled={status.isPending} aria-label={`Applied: ${job.title}`}
+      title="Already applied — records the application" onClick={() => status.mutate("APPLIED")}>Mark applied</button>
   );
   const dismiss = <>
-    <button className={`btn-slate ${b}`} disabled={status.isPending} aria-label={`Closed: ${job.title}`}
-      title="The posting is no longer open" onClick={() => status.mutate("CLOSED")}>Closed</button>
-    <button className={`btn-rose ${b}`} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
+    <button className={b} disabled={status.isPending} aria-label={`Closed: ${job.title}`}
+      title="The posting is no longer open" onClick={() => status.mutate("CLOSED")}>Mark closed</button>
+    <button className={b} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
       title="Not a fit — hides it from the open lists" onClick={() => status.mutate("NOT_RELEVANT")}>Not relevant</button>
   </>;
   let main: ReactNode = null;
   if (NEW_STATUSES.includes(job.status)) {
     main = <>
       {dismiss}
-      <button className={`btn-amber ${b}`} disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
-        title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>★ Shortlist</button>
+      <button className={b} disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
+        title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>Shortlist</button>
       {applied}
     </>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     main = <>
       {dismiss}
-      <Link className={`btn-primary ${b}`} to={`/jobs/${job.id}?apply=1`} aria-label={`Apply to ${job.title}`}>Apply</Link>
+      <Link className="btn-primary whitespace-nowrap px-2 py-0.5 text-xs" to={`/jobs/${job.id}?apply=1`} aria-label={`Apply to ${job.title}`}>Apply</Link>
       {applied}
     </>;
   } else if (APPLIED_STATUSES.includes(job.status)) {
-    main = <Link className={`btn-secondary ${b}`} to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
+    main = <Link className={b} to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
   }
   return (
     <span className="inline-flex max-w-[15rem] flex-wrap items-center gap-1">
@@ -263,10 +264,10 @@ function JobCards({ jobs, selected, toggle }: { jobs: Job[]; selected: Set<numbe
               {j.salary_text && <span>{j.salary_text}</span>}
               <span className="text-slate-400">posted {formatDate(j.posting_date)} · #{j.id}</span>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <JobStatusBadge value={j.status} /><AddedViaTags values={j.added_via} />
-              <span className="ml-auto"><NextStep job={j} /></span>
+            <div className="mt-2 flex flex-wrap items-start gap-2">
+              <JobStatusSummary status={j.status} since={j.status_changed_at} /><AddedViaTags values={j.added_via} />
             </div>
+            <div className="mt-2 border-t border-dashed border-slate-200 pt-2"><NextStep job={j} /></div>
           </div>
         </li>
       ))}
@@ -590,8 +591,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                         <div className="text-slate-500" title={`Added to this app: ${formatDate(j.created_at)}`}>added {formatShortDate(j.created_at)}</div>
                       </td>
                       <td className="td min-w-[15rem]">
-                        <JobStatusBadge value={j.status} />
-                        <div className="mt-1"><NextStep job={j} /></div>
+                        <JobStatusSummary status={j.status} since={j.status_changed_at} />
+                        <div className="mt-1.5 border-t border-dashed border-slate-200 pt-1.5"><NextStep job={j} /></div>
                       </td>
                     </tr>
                   ))}

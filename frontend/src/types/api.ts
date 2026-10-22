@@ -38,6 +38,8 @@ export interface Job {
   posting_date: string | null;
   application_deadline: string | null;
   status: string;
+  /** When the status was last set (null for jobs from before this was recorded). */
+  status_changed_at?: string | null;
   match_score: number | null;
   recommendation: string | null;
   score_stale: boolean;

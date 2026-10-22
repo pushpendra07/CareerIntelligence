@@ -55,6 +55,18 @@ describe("jobs list", () => {
     expect(within(menu).getByRole("menuitem", { name: "Open posting: Magento Lead" })).toHaveAttribute("href", ROW.source_url);
   });
 
+  it("status: the pill, what it means and since when; actions are verbs below it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-22T10:00:00Z"));
+    mockApi({ "GET /jobs": listOf([{ ...ROW, status: "SHORTLISTED", status_changed_at: "2026-10-19T09:00:00Z" }]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    expect(await screen.findByText(/^apply next ·/)).toHaveAttribute("title", expect.stringContaining("Status set"));
+    expect(screen.getByText("3 days")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Closed: Magento Lead" })).toHaveTextContent("Mark closed");
+    expect(screen.getByRole("button", { name: "Applied: Magento Lead" })).toHaveTextContent("Mark applied");
+    vi.useRealTimers();
+  });
+
   it("quick views set several filters; each active filter is a removable chip", async () => {
     const api = mockApi({ "GET /jobs": listOf([ROW]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
