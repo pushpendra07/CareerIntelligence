@@ -7,6 +7,15 @@ Adds jobs to your Career Intelligence app straight from the browser. No AI, no t
   The job is saved right away and the popup shows **Added #123 · score 78**, **Already in your
   list: #512** (the link is added to that job), or **You deleted this job before → Add it anyway**.
   If the page doesn't show a title or company, the popup asks for them.
+- **Fill an application:** on a job application form (Greenhouse, Lever, Ashby, Workday,
+  SmartRecruiters, Workable, a company's own form…) click the icon → **Fill this application**.
+  Empty fields it recognises are filled from your app (name, email, phone, LinkedIn, city,
+  experience, current/expected CTC, notice period, relocation, work authorisation, GitHub,
+  portfolio, your own saved questions and answers, a cover note) and your CV is attached when the
+  form has a file field. Filled fields are outlined green. It never overwrites a field, never
+  fills questions about someone else (referrer, reference…), and **never submits**: check the
+  form, press Submit, then click **I submitted it — record application** (the job becomes
+  Applied with a follow-up date). Details and answers live in the app (job page → Apply assistant).
 - **Collect from a portal:** in the app, **Jobs → AI search → (portal) → Job collector**. The
   extension opens the portal's search, reads up to N jobs one by one (a few seconds each), and
   brings them back to the page, which checks them for duplicates before you click **Add**.
@@ -41,12 +50,14 @@ the same browser first.
 |---|---|
 | `manifest.json` | Manifest V3. Permissions: `activeTab` + `scripting` (read the page you click it on), `tabs` (collector tab), `storage` (addresses); hosts: the app on 127.0.0.1/localhost and the supported portals |
 | `extract.js` | Reads a job page: schema.org `JobPosting` data first, then each portal's page layout, then the page itself (careers sites). Also lists job links on a portal's search page. Read-only |
-| `popup.html` / `popup.js` | The toolbar button: read the current tab → `POST /api/v1/jobs/agent-import` → show the result |
+| `popup.html` / `popup.js` | The toolbar button: an application form → fill it (`GET /api/v1/apply/lookup`, `/jobs/{id}/apply-kit`, the CV file) and record it (`POST /jobs/{id}/applied`); any other page → `POST /api/v1/jobs/agent-import` |
+| `autofill.js` | Fills an application form from the apply kit: matches fields by label/name/placeholder, sets values like typing, attaches the CV. Never submits or clicks. Tested in `frontend/src/test/extension-autofill.test.ts` |
 | `background.js` | The collector: opens the portal search, reads the links, opens each job, sends the jobs back to the app tab. Only accepts requests from the app's own pages and only opens the supported portals' https pages; one collection at a time |
 | `bridge.js` | Runs on the app's pages only: marks the page (`data-ci-collector`) and relays messages between the app and `background.js` |
 | `settings.js` | The app/API addresses and the import call |
 
-It never logs in, clicks Apply, messages anyone, or sends data anywhere except your own app.
+It never logs in, clicks Apply or Submit, messages anyone, or sends data anywhere except your own
+app (and, when you fill a form, into that form on your screen).
 Portals change their pages from time to time; if a field stops being read, update the selectors
 in `extract.js` (`PAGE` for job pages, `LINKS` for search pages). The reader is tested in
 `frontend/src/test/extension-extract.test.ts`.

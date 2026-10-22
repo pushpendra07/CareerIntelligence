@@ -380,6 +380,22 @@ export function KeyValue({ items }: { items: [string, ReactNode][] }) {
 }
 
 /** Copies a job's portal link to share it anywhere; says "Copied" for a moment. */
+/** Copy any text, saying "Copied ✓" for a moment. `label` names it for screen readers. */
+export function CopyButton({ text, label = "Copy", compact = false }: { text: string; label?: string; compact?: boolean }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = () => {
+    const done = (s: "copied" | "failed") => { setState(s); window.setTimeout(() => setState("idle"), 1500); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => done("copied"), () => done("failed"));
+    else done("failed");
+  };
+  return (
+    <button type="button" className={`btn-secondary shrink-0 ${compact ? "px-1.5 py-0.5 text-[11px]" : "px-2 py-1 text-xs"}`} onClick={copy}
+      aria-label={label} title={state === "failed" ? "Couldn't copy: select the text instead" : label}>
+      {state === "copied" ? "Copied ✓" : state === "failed" ? "Copy failed" : "Copy"}
+    </button>
+  );
+}
+
 export function CopyLinkButton({ url, compact = false, className }: { url: string; compact?: boolean; className?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const copy = () => {

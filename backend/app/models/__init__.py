@@ -6,6 +6,7 @@ from app.models.application import Application, ApplicationEvent, FollowUp
 from app.models.career_ops import CareerOpsImport
 from app.models.company import Company, CompanyFieldSource, Contact
 from app.models.cv import CV, CVVersion
+from app.models.email_update import EmailUpdate
 from app.models.interview import Interview, InterviewQuestion
 from app.models.job import DeletedJob, Job, JobComment, JobSourceLink
 from app.models.match import JobMatch, ScoringConfigRow
@@ -31,6 +32,7 @@ __all__ = [
     "CompanyFieldSource",
     "Contact",
     "DeletedJob",
+    "EmailUpdate",
     "Job",
     "JobMatch",
     "JobComment",

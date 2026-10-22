@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     advisor,
     applications,
+    apply,
     auth,
     career_ops,
     chat,
@@ -10,6 +11,7 @@ from app.api.v1 import (
     cv_tailor,
     cvs,
     dashboard,
+    email,
     health,
     interviews,
     jobs,
@@ -32,7 +34,9 @@ api_router.include_router(profile.router)
 api_router.include_router(companies.router)
 api_router.include_router(jobs.router)
 api_router.include_router(cv_tailor.router)
+api_router.include_router(apply.router)
 api_router.include_router(applications.router)
+api_router.include_router(email.router)
 api_router.include_router(interviews.router)
 api_router.include_router(offers.router)
 api_router.include_router(reports.router)

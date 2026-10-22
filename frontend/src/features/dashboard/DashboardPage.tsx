@@ -9,6 +9,7 @@ import { formatDate, formatDateTime } from "../../utils/format";
 import { FetchDescriptions } from "../jobs/FetchDescriptions";
 import { BestMatches, ComingUp, GettingStarted, JobSources } from "./widgets";
 import { WeeklyGoals } from "./WeeklyGoals";
+import { EmailUpdatesCard } from "../email/EmailUpdates";
 import { CVAdviceSummary } from "../cvs/CVAdvice";
 
 interface Dashboard {
@@ -174,6 +175,7 @@ export function DashboardPage() {
           <BestMatches />
         </div>
         <div className="min-w-0 space-y-4">
+          <EmailUpdatesCard pending={s.email_updates ?? 0} />
           <WeeklyGoals />
           <ComingUp />
           <JobSources newThisWeek={s.new_this_week ?? 0} />

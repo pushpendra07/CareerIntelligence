@@ -31,8 +31,9 @@ export const SECTIONS: Section[] = [
   { to: "/applications/board", label: "Pipeline", icon: "pipeline", hint: "Board of applications by stage, interviews, offers and recruiters",
     tabs: [{ to: "/applications/board", label: "Board" }, { to: "/applications", label: "Applications" }, { to: "/interviews", label: "Interviews" },
       { to: "/offers", label: "Offers" }, { to: "/recruiters", label: "Recruiters" }] },
-  { to: "/followups", label: "Follow-ups", icon: "followups", hint: "Who to chase and when", tabs: [{ to: "/followups", label: "Follow-ups" }],
-    badge: (s) => s.due_followups },
+  { to: "/followups", label: "Follow-ups", icon: "followups", hint: "Who to chase and when, and what your inbox says",
+    tabs: [{ to: "/followups", label: "Follow-ups" }, { to: "/followups/email", label: "Email updates" }],
+    badge: (s) => (s.due_followups ?? 0) + (s.email_updates ?? 0) || undefined },
   { to: "/reports", label: "Reports", icon: "reports", hint: "Charts and details for any period: jobs, applications, interviews, offers, sources…",
     tabs: [{ to: "/reports", label: "Reports" }] },
   { to: "/profile", label: "My profile", icon: "profile", hint: "Your experience, what you want, CVs and interview answers",
@@ -40,7 +41,7 @@ export const SECTIONS: Section[] = [
       { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
   { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
     tabs: [{ to: "/settings", label: "Job sources" }, { to: "/settings/scoring", label: "Scoring" },
-      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/data", label: "Backup & import" },
+      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" },
       { to: "/settings/about", label: "About & AI" }] },
 ];
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Career Intelligence – Job collector",
-  "version": "1.1.1",
-  "description": "Add the job you are looking at (LinkedIn, Naukri, Indeed, company careers pages…) to your Career Intelligence app in one click.",
+  "version": "1.2.0",
+  "description": "Add the job you are looking at to your Career Intelligence app in one click, and fill job application forms with your details and CV (you check and submit).",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Add this job to Career Intelligence",

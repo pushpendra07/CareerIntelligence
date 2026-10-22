@@ -247,7 +247,14 @@ def fire(db: Session, rule: dict[str, Any], test: bool = False,
             return None
         msg = (rule["label"], "Nothing to do right now, so this reminder would stay quiet.", "/")
     title, body, url = msg
-    event = ReminderEvent(rule_id=rule["id"], title=title[:200], body=body, url=url, test=test)
+    return notify(db, rule["id"], title, body, url, test=test, desktop=desktop)
+
+
+def notify(db: Session, rule_id: str, title: str, body: str, url: str, test: bool = False,
+           desktop: bool | None = None) -> ReminderEvent:
+    """Show a notification: the bell, a toast, and a desktop notification when turned on.
+    Also used by other parts of the app (e.g. new email updates)."""
+    event = ReminderEvent(rule_id=rule_id, title=title[:200], body=body, url=url, test=test)
     db.add(event)
     db.flush()
     old = db.scalars(select(ReminderEvent.id).order_by(ReminderEvent.id.desc())

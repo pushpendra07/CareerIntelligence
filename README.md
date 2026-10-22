@@ -168,6 +168,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Global search** across jobs, companies, recruiters, applications, interviews, CVs and skills
   (⌘K command palette).
 - **Notifications & reminders**: a bell with what needs you, scheduled reminders, macOS notifications.
+- **Email updates**: reads your inbox (Gmail, Yahoo Mail or any IMAP mailbox; app password, read-only) and suggests status changes
+  from rejections, interview invites, assessments and offers — you confirm each one.
 - **Backup & import** (CSV/JSON, including a full JSON backup of everything) and **Google Sheets** import.
 - **Audit log** of every important action.
 
@@ -790,7 +792,6 @@ Any other agent: tell it *"Read AGENTS.md first."*
 ## 🗺 Known limitations & roadmap
 
 - **Scanned PDFs.** CVs need extractable text; there is no OCR.
-- **Email notifications.** Not implemented yet. Reminders appear in Today's Priorities and Follow-ups.
 - **LinkedIn / Naukri / Indeed.** They are not scanned on a schedule: they have no public jobs API
   and forbid scraping. Use the **Job collector** extension (one click on a job page), **AI search**,
   or **Add Job** (paste URL + JD).

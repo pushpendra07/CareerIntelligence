@@ -291,12 +291,29 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   shared sticky back bar (`components/StickyBar.tsx`). Companies: `/companies/duplicates`
   (`CompanyDuplicatesPage.tsx`, `GET /companies/duplicates`), bulk actions (`POST /companies/bulk`),
   facets (`GET /companies/facets`).
+- **Apply assistant** (job page, `features/jobs/ApplyAssistant.tsx`; `services/apply_service.py`,
+  `api/v1/apply.py`): apply kit (`GET /jobs/{id}/apply-kit`), saved answers (`/apply/answers`,
+  app settings `apply`), `POST /jobs/{id}/applied`, `GET /apply/lookup`. The extension's
+  `autofill.js` fills forms from the kit and attaches the CV — it **never submits**; the user does.
 - **Tailor a CV for a job** (job page → **Tailor CV** button, `features/jobs/CvTailor.tsx`): `POST /jobs/{id}/cv-check`
   (ATS score, `cv/ats.py`) and `POST /jobs/{id}/cv-tailor` (DOCX copy, `cv/tailor_docx.py`, service
   `services/cv_tailor.py`). In memory only: the uploaded CV is **never** stored, logged or put in
   the database. Only text inside existing runs changes (format kept); only skills the user ticks
   are added, never invented. A PDF/TXT CV is tailored as a plain Word copy built from its
   text (`cv/text_docx.py`; the PDF's design is not copied).
+- **Email updates** (Settings → Email to connect; review at Follow-ups → Email updates,
+  `features/email/EmailUpdates.tsx`; backend `services/email_updates.py`, IMAP reader
+  `integrations/email_inbox.py`, API `api/v1/email.py`, model `EmailUpdate`): reads the user's
+  inbox over IMAP (Gmail `imap.gmail.com`, Yahoo `imap.mail.yahoo.com`, or any IMAP server;
+  app passwords), **read-only** (BODY.PEEK, folder opened read-only), on a schedule (thread
+  started in `main.py`, app settings `email`; where the last check stopped: `email_sync`).
+  Headers first; the text only of job-search emails (contact / company domain / ATS sender /
+  job words in the subject; alerts skipped). Rule-based `classify` (rejection, offer, interview,
+  assessment, received, recruiter; conditional "if…" sentences ignored) and matching to company
+  and job; the status is only **suggested** (`confirm` applies it via `set_status`, never
+  backwards — `is_needed`). The account (with app password) lives in
+  `backend/secrets/email-account.json` (0600), never in the database, backups or API output.
+  Tests use a fake mailbox (`tests/test_email_updates.py`), never the network.
 - **Export:** Settings → Backup & import → Back up your data (`GET /api/v1/export/{entity}`, `/export/all`).
 
 ## Packaging and first run
@@ -530,4 +547,4 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
 `POST /api/v1/jobs` · `DELETE /api/v1/jobs/{id}` · `POST /api/v1/matches/reanalyze` ·
 `GET /api/v1/dashboard` · `GET /api/v1/reports/{name}?from=&to=&group=` (`services/report_service.py`; pipeline, market, activity in `report_more.py`; findings from your own data only) · `GET /api/v1/reports/summary?days=` (Insights' executive summary) · `GET /api/v1/cv-advice` (skills to add to the CV / skills missing) · `POST /api/v1/scanner/run` · `GET /api/v1/scanner/status` ·
 `POST /api/v1/career-ops/import` · `POST /api/v1/career-ops/sync` · `GET /api/v1/sheets` ·
-`POST /api/v1/sheets/{id}/import-rows`. Full list: `docs/API.md` or `/docs`.
+`POST /api/v1/sheets/{id}/import-rows` · `POST /api/v1/email/check` · `GET /api/v1/email/updates`. Full list: `docs/API.md` or `/docs`.

@@ -13,7 +13,13 @@ from app.integrations.career_ops import service as career_ops
 from app.matching.config import ENGINE_VERSION
 from app.models.app_settings import AppSettings as AppSettingsRow
 from app.scanner.filters import DEFAULT_SCANNER_SETTINGS, validate_scanner_settings
-from app.services import backup_service, data_io, extension_package, goals_service
+from app.services import (
+    backup_service,
+    data_io,
+    email_updates,
+    extension_package,
+    goals_service,
+)
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
 
@@ -74,6 +80,7 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "backups": backup_service.DEFAULTS,  # automatic backups (Settings -> Backup & import)
     "career_ops": career_ops.DEFAULT_SETTINGS,  # automatic Scan + import / import on change
     "assistant": chat_service.DEFAULT_SETTINGS,  # the Assistant chat on/off, AI on/off
+    "email": email_updates.DEFAULTS,  # checking the inbox for job-search emails (Settings -> Email)
 }
 
 
@@ -112,6 +119,8 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         merged["assistant"] = chat_service.validate_settings(merged["assistant"])
     if "career_ops" in body:
         merged["career_ops"] = career_ops.validate_settings(merged["career_ops"])
+    if "email" in body:
+        merged["email"] = email_updates.validate_settings(merged["email"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}

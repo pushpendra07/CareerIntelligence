@@ -144,6 +144,18 @@ Conventions:
 - `PUT /api/v1/settings/scoring`
 - `GET /api/v1/settings/scoring/history`
 
+### apply
+- `GET /api/v1/jobs/{job_id}/apply-kit` — what the application form asks for: `applicant` (name,
+  email, phone, LinkedIn, city, experience, current/expected CTC, notice period, relocation, work
+  authorisation, GitHub, portfolio), `labels`, `answers` (saved Q&A), `cv` (`download` path),
+  `cover_note`, `email` (`to, subject, body` when there's a contact) and `missing`. Nothing is sent.
+- `GET /api/v1/apply/kit` — the same without a job · `GET/PUT /api/v1/apply/answers` — the saved
+  answers (app settings `apply`)
+- `GET /api/v1/apply/lookup?url=` — the job a posting or its application form (…/apply) belongs
+  to, by link or the board's job ID; 404 if none
+- `POST /api/v1/jobs/{job_id}/applied` `{method?, cv_version_id?, note?}` — you submitted it:
+  creates the application (job → Applied, follow-up in 7 days); an open one is returned as is
+
 ### applications
 - `POST /api/v1/applications` — `applied_on` is optional (default today; 422 if in the future);
   the first follow-up is due 7 days after it
@@ -211,6 +223,25 @@ Conventions:
   invalid → 422). `POST /api/v1/reminder-rules/{id}/test` fires one now.
 - `GET /api/v1/reminder-events?after=&limit=` — reminders that fired (newest first). The API checks
   the schedules every 30 s (`services/reminder_service.py`).
+
+### email updates
+- `GET /api/v1/email/account` → `{connected, user, host, port, folder, is_gmail, provider (gmail |
+  yahoo | other), settings,
+  last_check: {at, messages, read, found, to_review, more, error}, checking, pending}` (never the
+  password). `PUT /api/v1/email/account {user, password, host?, port?, folder?}` logs in once
+  (IMAP over SSL, read-only) and saves the account to `backend/secrets/email-account.json`;
+  a refused login → 422. `DELETE /api/v1/email/account` forgets it (updates are kept).
+- `POST /api/v1/email/check` — read new messages now (409 while a check runs). Settings:
+  `PATCH /api/v1/settings/app {"email": {"auto_check", "every_minutes" (5–1440), "first_days"
+  (1–365), "notify"}}`.
+- `GET /api/v1/email/updates?state=PENDING|DONE|DISMISSED&job_id=&limit=` → `[{id, kind (OFFER |
+  REJECTION | INTERVIEW | ASSESSMENT | RECEIVED | RECRUITER), state, subject, sender_name,
+  sender_email, received_at, evidence, match_reason, company, job, candidates, suggested_status,
+  applied_status, open_url}]`.
+- `POST /api/v1/email/updates/{id}/confirm {job_id?, status?, change_status?}` sets the job status
+  (the suggested one unless `status` is given; `change_status: false` only links the email) and
+  adds the email as a job comment. `POST /api/v1/email/updates/{id}/dismiss`;
+  `POST /api/v1/email/updates/confirm-all` confirms every pending update that knows its job.
 
 ### goals & reminders
 - `GET /api/v1/goals/week` — this week's goals (Mon–Sun): per goal `target, done, left,

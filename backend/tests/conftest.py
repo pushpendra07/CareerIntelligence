@@ -34,6 +34,14 @@ def _no_real_google_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
     monkeypatch.setattr(google_api, "DEFAULT_KEY_FILE", tmp_path / "no-google-key.json")
 
 
+@pytest.fixture(autouse=True)
+def _no_real_email_account(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Tests never read the email account saved on this machine (backend/secrets/)."""
+    from app.integrations import email_inbox
+
+    monkeypatch.setattr(email_inbox, "ACCOUNT_FILE", tmp_path / "secrets" / "email-account.json")
+
+
 def _test_database_url() -> str:
     if url := os.environ.get("TEST_DATABASE_URL"):
         return url

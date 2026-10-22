@@ -18,7 +18,7 @@ from app.models.interview import Interview, InterviewResult, InterviewStatus
 from app.models.job import Job, JobSourceLink, JobStatus
 from app.models.match import JobMatch
 from app.models.offer import Offer, OfferStatus
-from app.services import description_service, freshness
+from app.services import description_service, email_updates, freshness
 from app.services.job_service import JOB_FINISHED
 from app.skills.catalog import SKILLS
 
@@ -127,6 +127,8 @@ def summary(db: Session) -> dict[str, int]:
             .select_from(FollowUp)
             .where(FollowUp.completed.is_(False), FollowUp.due_date <= today),
         ),
+        # Job-search emails waiting for Confirm / Dismiss (Settings -> Email).
+        "email_updates": email_updates.pending_count(db),
         "companies": _count(db, select(func.count()).select_from(Company)),
         # Last 7 days, for "this week" on the dashboard.
         "new_this_week": _count(

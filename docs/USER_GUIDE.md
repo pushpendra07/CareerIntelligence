@@ -236,6 +236,18 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   corrects the date of the job's application (automatic ones are marked "date approximate"
   until you do); on a job you haven't applied to, picking a date records the application. Only changed fields are saved,
   the job is re-scored, and your values are kept when the description is read again.
+- **Apply assistant** (job page → **Apply assistant**, also in *Next step* for shortlisted jobs and
+  from the preview): everything the application asks for in one place — the CV to send (download,
+  or **Tailor it for this job**), a cover note (editable, **Copy**), your details and saved answers
+  with **Copy** buttons (missing ones are named), **Open application page ↗**, **Email <HR>** when
+  the job has a contact person (attach the downloaded CV), and **✓ I applied on the site / by
+  email**, which marks the job Applied, records the application with that CV and plans a
+  follow-up. **Edit saved answers** keeps what forms ask every time (current and expected CTC,
+  notice period, relocation, work authorisation, current company/title, GitHub, portfolio) and
+  your own questions and answers. With the **Chrome extension**, on the application page click
+  its icon → **Fill this application**: empty fields are filled and the CV attached; you check
+  the form and press Submit, then **I submitted it — record application**. Nothing is ever
+  submitted for you.
 - **Tailor your CV for a job:** on the job page → **Tailor CV** (next to Edit job), upload
   a CV (DOCX, PDF or TXT). You get an **ATS score** (0–100: required skills 50, nice-to-have 20,
   job title 15, experience 15; parts the job doesn't state are left out) and every job skill as
@@ -416,6 +428,20 @@ accepted & rejected**; these choices are remembered in this browser.
   is already rejected or closed, it says so and offers **Dismiss**. When several are late,
   **Move all N to today / tomorrow / +3 days / +1 week** reschedules them in one click. Applying
   plans a follow-up for you; add more from the job page or **+ New reminder**.
+- **Email updates** (Follow-ups → Email updates): connect your inbox once in **Settings → Email**
+  — pick **Gmail**, **Yahoo Mail** or **Other (IMAP)** (typing a @gmail / @yahoo address picks it
+  for you). Gmail: turn on 2-Step Verification, create an **app password** at
+  myaccount.google.com/apppasswords. Yahoo: Account security (login.yahoo.com/account/security)
+  → **Generate app password**. Paste that password, not your normal one. The app checks every 30 minutes (change it there)
+  and finds **rejections, interview invites, assessments, offers, "thanks for applying"** and
+  recruiters writing to you. Each one shows the sentence that gave it away, the job it matched
+  (by the sender's domain, a recruiter you saved, the company or job title in the email) and the
+  status it suggests. **Confirm** sets that status (or pick another, or *Don't change*) and adds
+  the email to the job's comments; **Dismiss** ignores it. When it can't tell which job, pick one.
+  Nothing changes until you confirm, statuses never move backwards, and a suggestion you already
+  made by hand disappears by itself. Read-only: nothing is marked read, moved or sent; only the
+  headers of new mail are read, the text only of job-search emails, and only one sentence is
+  kept. The password stays in `backend/secrets/`, never in the database or backups.
 - **Recruiters** (Pipeline → Recruiters; **+ Add contact** opens the form): contacts with company, role, email, **phone /
   WhatsApp** (click to call or open WhatsApp), LinkedIn, status and next follow-up, plus the
   jobs they're the recruiter for.
@@ -532,7 +558,7 @@ accepted & rejected**; these choices are remembered in this browser.
 
 ## 12. Settings reference
 
-Settings has four tabs:
+Settings has these tabs (plus **Reminders** and **Email** — connect your inbox, how often to check):
 
 | Tab | What's there |
 |---|---|
@@ -573,7 +599,7 @@ when their job board is known (**Find job boards**).
 2. If the scanner isn't scheduled: Settings → Job board search → **Search now**; import new sheet rows.
 3. **Review new jobs**: shortlist the strong ones, mark the rest *Not relevant* (keys `S` / `N`).
 4. Apply to shortlisted jobs with the recommended CV; add a follow-up reminder.
-5. Update application and interview statuses as things happen.
+5. Confirm **Email updates** (Follow-ups → Email updates) — replies from companies update the statuses for you.
 6. After changing your CV or profile, scores update by themselves.
 
 Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI coding agents*.

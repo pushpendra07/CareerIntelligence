@@ -84,7 +84,7 @@ export function JobPreview({ id, ids, onOpen, onClose, top = 0 }: {
             )}
           </div>
           <KeyFacts job={j} />
-          <NextStep job={j} busy={status.isPending} setStatus={(s) => status.mutate(s)}
+          <NextStep job={j} onAssist={() => navigate(`/jobs/${j.id}?assist=1`)} busy={status.isPending} setStatus={(s) => status.mutate(s)}
             onApply={() => navigate(`/jobs/${j.id}?apply=1`)} />
           <section><h3 className="mb-2 text-sm font-semibold">Does it fit you?</h3><FitSummary job={j} /></section>
           <section><h3 className="mb-2 text-sm font-semibold">Job description</h3>

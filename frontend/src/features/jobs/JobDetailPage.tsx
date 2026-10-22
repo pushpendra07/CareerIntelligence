@@ -14,10 +14,12 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { PostingCheck } from "./PostingCheck";
 import { EmailDraft } from "./EmailDraft";
 import { WebSearch, jobTopic } from "../../components/WebSearch";
+import { JobEmails } from "../email/EmailUpdates";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
 import { JobContact } from "./JobContact";
 import { CvTailor } from "./CvTailor";
+import { ApplyAssistant } from "./ApplyAssistant";
 import { StickyBar, useScrolledPast } from "../../components/StickyBar";
 import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
@@ -112,7 +114,9 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
 }
 
 /** The one thing to do next, depending on where the job is in your search. */
-export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: () => void; setStatus: (s: string) => void; busy: boolean }) {
+export function NextStep({ job, onApply, onAssist, setStatus, busy }: { job: JobDetail; onApply: () => void;
+  /** Opens the Apply assistant (details, CV, cover note; the extension fills the form). */
+  onAssist?: () => void; setStatus: (s: string) => void; busy: boolean }) {
   const url = postingUrl(job);
   const posting = url && <><a className="btn-sky" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a><CopyLinkButton url={url} /></>;
   const closed = <button className="btn-slate" disabled={busy} onClick={() => setStatus("CLOSED")}
@@ -135,6 +139,7 @@ export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; on
     text = job.recommended_cv ? `Ready to apply — send your “${job.recommended_cv.name}” CV.` : "Ready to apply.";
     actions = <>
       {closed}
+      {onAssist && <button className="btn-primary" onClick={onAssist} title="Your details, CV, cover note and answers ready; the extension fills the form">Apply assistant</button>}
       {url && <a className="btn-sky" href={url} target="_blank" rel="noopener noreferrer">1. Apply on the site ↗</a>}
       <button className="btn-primary" onClick={onApply}>{url ? "2. Record that I applied" : "Record application"}</button>
     </>;
@@ -213,6 +218,7 @@ export function JobDetailPage() {
   const applying = search.get("apply") === "1";
   const [editing, setEditing] = useState(false);
   const [tailoring, setTailoring] = useState(false);
+  const [assisting, setAssisting] = useState(() => search.get("assist") === "1");
   // The sticky bar repeats title, company and score only once the heading has scrolled away.
   const [heading, setHeading] = useState<HTMLElement | null>(null);
   const headingGone = useScrolledPast(heading);
@@ -289,6 +295,8 @@ export function JobDetailPage() {
           </select>
           {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
           <span className="flex-1" />
+          <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setAssisting((a) => !a)} aria-expanded={assisting}
+            aria-controls="apply-assistant" title="Your details, CV, cover note and answers ready for the application form">{assisting ? "Close Apply assistant" : "Apply assistant"}</button>
           <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setTailoring((t) => !t)} aria-expanded={tailoring}
             aria-controls="tailor" title="Check your CV's ATS score for this job and get a copy with its skills added">{tailoring ? "Close Tailor CV" : "Tailor CV"}</button>
           <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>{editing ? "Close edit" : "Edit job"}</button>
@@ -297,6 +305,7 @@ export function JobDetailPage() {
           <PostingCheck job={j} onMarkClosed={() => status.mutate("CLOSED")} busy={status.isPending} />
         </div>
       </Card>
+      {assisting && <div id="apply-assistant" className="scroll-mt-32"><ApplyAssistant jobId={j.id} onTailor={() => setTailoring(true)} /></div>}
       {tailoring && (
         <Card title="Tailor your CV for this job" id="tailor" className="scroll-mt-32"
           actions={<button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => setTailoring(false)}>Close</button>}>
@@ -304,7 +313,8 @@ export function JobDetailPage() {
           <CvTailor jobId={j.id} />
         </Card>
       )}
-      <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
+      <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending}
+        onAssist={() => { setAssisting(true); setTimeout(() => document.getElementById("apply-assistant")?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 50); }} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
       <nav aria-label="Sections" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
         {SECTIONS.map(([hash, label]) => <a key={hash} className="hover:text-indigo-700" href={`#${hash}`}>{label}</a>)}
@@ -357,6 +367,7 @@ export function JobDetailPage() {
             </Card>
           ) : null}
           <div id="comments" className="scroll-mt-32"><JobComments jobId={j.id} comments={j.comments ?? []} /></div>
+          <JobEmails jobId={j.id} />
           <CareerOpsPanel job={j} />
           <Card>
             <details>
