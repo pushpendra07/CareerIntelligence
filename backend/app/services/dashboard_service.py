@@ -8,7 +8,7 @@ import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Integer, Numeric, case, cast, func, or_, select, text
+from sqlalchemy import Numeric, case, cast, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models.application import Application, FollowUp
@@ -35,6 +35,29 @@ APPLIED_OR_LATER = [
     JobStatus.INTERVIEW.value, JobStatus.AWAITING_FEEDBACK.value, JobStatus.OFFER.value,
     JobStatus.ACCEPTED.value, JobStatus.REJECTED.value,
 ]
+
+
+# Application statuses that mean the employer answered (a rejection is an answer too).
+NO_ANSWER = ["APPLIED", "WITHDRAWN", "ON_HOLD", "CLOSED"]
+
+SCORE_BANDS = ["90-100", "80-89", "70-79", "60-69", "0-59"]
+
+# Spellings of the same city, so "Bangalore" and "Bengaluru, Karnataka, India" count together.
+CITY_ALIASES = {"bangalore": "Bengaluru", "gurgaon": "Gurugram", "bombay": "Mumbai",
+                "madras": "Chennai", "calcutta": "Kolkata", "new delhi": "Delhi"}
+
+
+def _score_band(score: Any) -> Any:
+    return case(
+        (score >= 90, "90-100"), (score >= 80, "80-89"), (score >= 70, "70-79"),
+        (score >= 60, "60-69"), else_="0-59",
+    )
+
+
+def city(location: str) -> str:
+    """The city part of a location ("Bengaluru, Karnataka, India" -> "Bengaluru")."""
+    first = location.split(",")[0].strip()
+    return CITY_ALIASES.get(first.lower(), first) or location.strip()
 
 
 def _count(db: Session, stmt: Any) -> int:
@@ -78,8 +101,8 @@ def summary(db: Session) -> dict[str, int]:
         # Any answer from the employer, including a rejection.
         "responses": _count(
             db,
-            select(func.count()).select_from(Application).where(Application.status.not_in(
-                ["APPLIED", "WITHDRAWN", "ON_HOLD", "CLOSED"])),
+            select(func.count()).select_from(Application).where(
+                Application.status.not_in(NO_ANSWER)),
         ),
         # 1 while the background refresher is re-scoring (services/freshness.py).
         "scores_updating": int(freshness.is_running()),
@@ -117,6 +140,18 @@ def summary(db: Session) -> dict[str, int]:
             select(func.count()).select_from(Application)
             .where(Application.created_at >= datetime.now(UTC) - timedelta(days=7)),
         ),
+        # The 7 days before that, to show the change.
+        "new_last_week": _count(db, all_jobs.where(
+            Job.created_at.between(datetime.now(UTC) - timedelta(days=14),
+                                   datetime.now(UTC) - timedelta(days=7)))),
+        "applied_last_week": _count(
+            db,
+            select(func.count()).select_from(Application).where(Application.created_at.between(
+                datetime.now(UTC) - timedelta(days=14), datetime.now(UTC) - timedelta(days=7))),
+        ),
+        # Good open jobs not applied to yet (70+, the "worth a look" line used on Today).
+        "unapplied_70_plus": _count(db, all_jobs.where(
+            Job.status.in_(UNAPPLIED), Job.match_score >= 70)),
     }
 
 
@@ -125,16 +160,9 @@ def _pairs(rows: Any) -> list[dict[str, Any]]:
 
 
 def charts(db: Session) -> dict[str, Any]:
-    bucket = case(
-        (Job.match_score >= 90, "90-100"),
-        (Job.match_score >= 80, "80-89"),
-        (Job.match_score >= 70, "70-79"),
-        (Job.match_score >= 60, "60-69"),
-        (Job.match_score.is_not(None), "0-59"),
-        else_="Not scored",
-    )
+    bucket = case((Job.match_score.is_(None), "Not scored"), else_=_score_band(Job.match_score))
     by_score: dict[str, int] = dict(db.execute(select(bucket, func.count()).group_by(bucket)).all())
-    order = ["90-100", "80-89", "70-79", "60-69", "0-59", "Not scored"]
+    order = [*SCORE_BANDS, "Not scored"]
 
     week = func.date_trunc("week", Interview.scheduled_at)
     interviews_over_time = [
@@ -147,27 +175,35 @@ def charts(db: Session) -> dict[str, Any]:
         ).all()
     ]
     location = func.jsonb_array_elements_text(Job.locations).table_valued("value")
-    top_locations = db.execute(
+    by_city: dict[str, int] = {}
+    for loc, n in db.execute(
         select(location.c.value, func.count())
         .select_from(Job)
         .join(location, text("true"))
         .group_by(location.c.value)
-        .order_by(func.count().desc())
-        .limit(10)
-    ).all()
+    ).all():
+        by_city[city(loc)] = by_city.get(city(loc), 0) + int(n)
+    top_locations = sorted(by_city.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
 
+    # Companies with the most good (70+) jobs still open to you, then the best average.
+    strong = func.count(case((Job.match_score >= 70, Job.id)))
     top_companies = [
         {
+            "id": cid,
             "label": name,
-            "value": int(n),
+            "value": int(good),
+            "jobs": int(n),
             "avg_score": round(float(avg), 1) if avg else None,
             "tier": tier,
         }
-        for name, tier, n, avg in db.execute(
-            select(Company.name, Company.tier, func.count(Job.id), func.avg(Job.match_score))
+        for cid, name, tier, good, n, avg in db.execute(
+            select(Company.id, Company.name, Company.tier, strong, func.count(Job.id),
+                   func.avg(Job.match_score))
             .join(Job, Job.company_id == Company.id)
+            .where(Job.status.in_(UNAPPLIED))
             .group_by(Company.id)
-            .order_by(func.avg(Job.match_score).desc().nulls_last(), func.count(Job.id).desc())
+            .having(strong > 0)
+            .order_by(strong.desc(), func.avg(Job.match_score).desc().nulls_last())
             .limit(10)
         ).all()
     ]
@@ -366,18 +402,23 @@ def score_analytics(db: Session) -> dict[str, Any]:
 
 
 def _interview_rate_by_score(db: Session) -> list[dict[str, Any]]:
-    bucket = (cast(Job.match_score, Integer) / 10 * 10).label("bucket")
+    """Per score band of the jobs applied to: applications, answers and interviews."""
+    bucket = _score_band(Job.match_score).label("bucket")
     has_iv = select(Interview.id).where(Interview.job_id == Job.id).exists()
-    rows = db.execute(
-        select(bucket, func.count(), func.sum(case((has_iv, 1), else_=0)))
-        .join(Application, Application.job_id == Job.id)
-        .where(Job.match_score.is_not(None))
-        .group_by(bucket)
-        .order_by(bucket)
-    ).all()
+    rows = {
+        b: (int(n), int(a or 0), int(i or 0))
+        for b, n, a, i in db.execute(
+            select(bucket, func.count(),
+                   func.sum(case((Application.status.not_in(NO_ANSWER), 1), else_=0)),
+                   func.sum(case((has_iv, 1), else_=0)))
+            .join(Application, Application.job_id == Job.id)
+            .where(Job.match_score.is_not(None))
+            .group_by(bucket)
+        ).all()
+    }
     return [
-        {"label": f"{b}-{b + 9}", "applications": int(n), "interviews": int(i or 0)}
-        for b, n, i in rows
+        {"label": b, "applications": rows[b][0], "answers": rows[b][1], "interviews": rows[b][2]}
+        for b in SCORE_BANDS if b in rows
     ]
 
 
@@ -413,13 +454,16 @@ def priorities(db: Session, limit: int = 12) -> list[dict[str, Any]]:
                 "prep_link": {"entity": "interview_prep", "id": iv.id},
             }
         )
+    due = FollowUp.completed.is_(False), FollowUp.due_date <= today
+    # A few follow-ups by name; the rest as one line, so they don't push out the best jobs.
+    shown_followups = 3
     for f, contact, company in db.execute(
         select(FollowUp, Contact.name, Company.name)
         .outerjoin(Contact, FollowUp.contact_id == Contact.id)
         .outerjoin(Company, FollowUp.company_id == Company.id)
-        .where(FollowUp.completed.is_(False), FollowUp.due_date <= today)
+        .where(*due)
         .order_by(FollowUp.due_date)
-        .limit(10)
+        .limit(shown_followups)
     ).all():
         # "Follow up: Senior Developer" + "Acme · Priya", linked to the job when there is one.
         what = re.sub(r"^follow[ -]?up\s*[:\-—]\s*", "", f.title, flags=re.I) or f.title
@@ -434,6 +478,19 @@ def priorities(db: Session, limit: int = 12) -> list[dict[str, Any]]:
                 "overdue": f.due_date < today,
                 "link": {"entity": "job", "id": f.job_id} if f.job_id
                 else {"entity": "followup", "id": f.id},
+            }
+        )
+    more = _count(db, select(func.count()).select_from(FollowUp).where(*due)) - shown_followups
+    if more > 0:
+        items.append(
+            {
+                "type": "FOLLOW_UP",
+                "rank": 2,
+                "title": f"{more} more follow-up{'s' if more > 1 else ''} due",
+                "detail": "Open Follow-ups to send or reschedule them",
+                "due": None,  # sorts after the named ones
+                "overdue": True,
+                "link": {"entity": "followup", "id": None},
             }
         )
     for o, company in db.execute(
@@ -462,7 +519,7 @@ def priorities(db: Session, limit: int = 12) -> list[dict[str, Any]]:
         .join(Company, Job.company_id == Company.id)
         .where(
             Job.status.in_(UNAPPLIED),
-            Job.match_score >= 80,
+            Job.match_score >= 70,  # the "worth a look" line used across Today
             Job.score_stale.is_(False),
             Job.jd_status == "OK",
             no_app,

@@ -2,6 +2,7 @@ from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, or_, select
 
 from app.api.deps import DB
 from app.core.pagination import Page, PageParams, page_params
@@ -23,8 +24,30 @@ from app.services.application_service import ApplicationFilters
 router = APIRouter(tags=["applications"])
 
 
-def app_out(db: DB, a: Application) -> ApplicationOut:
+def next_follow_ups(db: DB, apps: list[Application]) -> dict[int, date]:
+    """Earliest open follow-up per application (one query): linked to it, or to its job."""
+    if not apps:
+        return {}
+    by_job = {a.job_id: a.id for a in apps}
+    rows = db.execute(
+        select(FollowUp.application_id, FollowUp.job_id, func.min(FollowUp.due_date))
+        .where(FollowUp.completed.is_(False),
+               or_(FollowUp.application_id.in_([a.id for a in apps]),
+                   FollowUp.job_id.in_(list(by_job))))
+        .group_by(FollowUp.application_id, FollowUp.job_id)
+    ).all()
+    out: dict[int, date] = {}
+    ids = {a.id for a in apps}
+    for app_id, job_id, due in rows:
+        key = app_id if app_id in ids else (by_job.get(job_id) if job_id is not None else None)
+        if key is not None and (key not in out or due < out[key]):
+            out[key] = due
+    return out
+
+
+def app_out(db: DB, a: Application, next_due: date | None = None) -> ApplicationOut:
     out = ApplicationOut.model_validate(a)
+    out.next_follow_up = next_due if next_due is not None else next_follow_ups(db, [a]).get(a.id)
     out.job_title = a.job.title
     out.match_score = a.job.match_score
     out.company_name = a.company.name
@@ -68,8 +91,10 @@ def list_apps(
         sort=sort,
     )
     items, total = svc.list_applications(db, params, f)
+    due = next_follow_ups(db, items)
     return Page(
-        items=[app_out(db, a) for a in items], total=total, page=params.page, size=params.size
+        items=[app_out(db, a, due.get(a.id)) for a in items], total=total, page=params.page,
+        size=params.size,
     )
 
 

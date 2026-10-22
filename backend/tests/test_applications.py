@@ -178,8 +178,8 @@ def test_applied_jobs_always_have_an_application(client: TestClient, db: Session
     real = str(date.today() - timedelta(days=5))
     fixed = client.patch(f"/api/v1/applications/{apps[0]['id']}", json={"applied_on": real})
     assert fixed.json()["applied_on"] == real and fixed.json()["origin"] == "manual"
-    # No follow-up flood for automatic records; the manual Apply form still plans one.
-    assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 0
+    # Marked applied by hand, just now: the first follow-up is planned (bulk changes plan none).
+    assert client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["total"] == 1
 
     # Imported as applied (e.g. a sheet row): the background refresher records it.
     rows = [{"title": "Magento Architect", "company": "Beta", "status": "applied",
@@ -214,3 +214,45 @@ def test_job_status_changes_carry_to_the_application(client: TestClient) -> None
     # On hold is about the job, not the application.
     client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "ON_HOLD"})
     assert client.get(f"/api/v1/applications/{app['id']}").json()["status"] == "REJECTED"
+
+
+def test_applications_show_the_next_open_follow_up(client: TestClient) -> None:
+    job, _ = setup(client)
+    app = client.post("/api/v1/applications", json={"job_id": job["id"]}).json()
+    for f in client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["items"]:
+        client.post(f"/api/v1/followups/{f['id']}/complete", json={"note": "-"})  # none open
+    soon, later = date.today() - timedelta(days=2), date.today() + timedelta(days=5)
+    first = client.post("/api/v1/followups", json={
+        "title": "Ping", "due_date": str(soon), "application_id": app["id"]}).json()
+    client.post("/api/v1/followups", json={
+        "title": "Ask again", "due_date": str(later), "job_id": job["id"]})
+
+    def listed() -> str | None:
+        items = client.get("/api/v1/applications").json()["items"]
+        out: str | None = next(a for a in items if a["id"] == app["id"])["next_follow_up"]
+        return out
+
+    assert listed() == str(soon)
+    assert client.get(f"/api/v1/applications/{app['id']}").json()["next_follow_up"] == str(soon)
+    client.post(f"/api/v1/followups/{first['id']}/complete", json={"note": "Sent"})
+    assert listed() == str(later)  # linked through the job
+
+
+def test_marking_applied_in_one_click_plans_a_follow_up(client: TestClient) -> None:
+    job, _ = setup(client)
+    client.post(f"/api/v1/jobs/{job['id']}/status", json={"status": "APPLIED"})
+    open_ = client.get("/api/v1/followups", params={"job_id": job["id"]}).json()["items"]
+    assert [f["due_date"] for f in open_] == [str(date.today() + timedelta(days=7))]
+    app = client.get("/api/v1/applications", params={"job_id": job["id"]}).json()["items"][0]
+    assert app["next_follow_up"] == str(date.today() + timedelta(days=7))
+
+
+def test_bulk_applied_plans_no_follow_ups(client: TestClient) -> None:
+    job, _ = setup(client)
+    other = client.post("/api/v1/jobs", json={"title": "PHP Lead", "company": "Gamma", "jd": JD})
+    ids = [job["id"], other.json()["job"]["id"]]
+    r = client.post("/api/v1/jobs/bulk", json={"job_ids": ids, "action": "status",
+                                               "status": "APPLIED"})
+    assert r.status_code == 200, r.text
+    assert client.get("/api/v1/applications").json()["total"] == 2
+    assert client.get("/api/v1/followups").json()["total"] == 0  # catching up: no flood

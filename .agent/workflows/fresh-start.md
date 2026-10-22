@@ -15,7 +15,7 @@ the browser; never invent profile data.
    **salary targets**. Don't fill these from guesses — confirm with the user.
 4. Companies: add the companies they want (`.agent/workflows/add-company-for-scanning.md`),
    or import a company sheet (`docs/google-sheets.md`).
-5. Job scanner: confirm the filters in Settings → Job scanner → What to keep match the target
+5. Job board search: confirm the filters in Settings → Job board search → What to keep match the target
    profile; suggest a 24-hour schedule.
 6. Get jobs: `.agent/workflows/find-jobs.md` (scan, sheets, optional Career-Ops), re-analyze
    stale scores, and show the top matches.

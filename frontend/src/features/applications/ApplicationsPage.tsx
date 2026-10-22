@@ -8,6 +8,20 @@ import { formatDate, formatDateTime, formatMoney, humanize } from "../../utils/f
 
 export const APP_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD", "CLOSED"];
 
+/** When to follow up next: the earliest open item in Follow-ups, else the date set on the application. */
+export const followUpDue = (a: Pick<Application, "follow_up_date" | "next_follow_up">) => a.next_follow_up ?? a.follow_up_date;
+
+const FINISHED_APPS = ["OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "CLOSED"];
+
+/** The next follow-up date; red when it's today or late (and the application is still open). */
+function FollowUpDate({ app }: { app: Application }) {
+  const due = followUpDue(app);
+  if (!due) return <span className="text-slate-400">—</span>;
+  const late = !FINISHED_APPS.includes(app.status) && due <= new Date().toLocaleDateString("en-CA");
+  return <Link to="/followups" className={late ? "font-medium text-rose-600 hover:underline" : "hover:text-indigo-700"}
+    title={late ? "Due — open Follow-ups" : "Open Follow-ups"}>{formatDate(due)}{late && " · due"}</Link>;
+}
+
 export function ApplicationsPage() {
   const [params] = useSearchParams();
   const [page, setPage] = useState(1);
@@ -40,7 +54,7 @@ export function ApplicationsPage() {
                   <td className="td text-xs">{humanize(a.method)}</td>
                   <td className="td text-xs">{a.cv_name ?? "—"}</td>
                   <td className="td"><ScoreBadge score={a.match_score} /></td>
-                  <td className="td text-xs">{formatDate(a.follow_up_date)}</td>
+                  <td className="td text-xs"><FollowUpDate app={a} /></td>
                   <td className="td"><StatusBadge value={a.status} /></td>
                 </tr>
               ))}
@@ -88,7 +102,7 @@ export function ApplicationDetailPage() {
             ["Method", humanize(a.method)], ["CV version", a.cv_name ?? "—"], ["Recruiter", a.recruiter_name ?? "—"],
             ["Referral", a.referral_name ?? "—"], ["Expected salary", formatMoney(a.expected_salary, a.salary_currency)],
             ["Notice period", a.notice_period_days !== null ? `${a.notice_period_days} days` : "—"],
-            ["Follow-up", formatDate(a.follow_up_date)], ["Origin", humanize(a.origin)],
+            ["Next follow-up", <FollowUpDate app={a} />], ["Origin", humanize(a.origin)],
           ]} />
           {a.notes && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-600">{a.notes}</p>}
         </Card>

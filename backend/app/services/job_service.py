@@ -848,7 +848,8 @@ STATUS_ACTIONS = {
 
 
 def set_status(
-    db: Session, job_id: int, status: JobStatus, note: str | None = None, commit: bool = True
+    db: Session, job_id: int, status: JobStatus, note: str | None = None, commit: bool = True,
+    plan_follow_up: bool = True,
 ) -> Job:
     job = get_job(db, job_id)
     if job.status == status.value:
@@ -866,17 +867,26 @@ def set_status(
     )
     if status == JobStatus.AWAITING_FEEDBACK:
         _plan_feedback_follow_up(db, job)
-    _record_application(db, job, status)
+    _record_application(db, job, status, plan_follow_up)
     _sync_application(db, job, status, note)
     if commit:
         db.commit()
     return job
 
 
-def _record_application(db: Session, job: Job, status: JobStatus) -> None:
-    """Marked as applied without the Apply form: record the application too."""
+def _record_application(db: Session, job: Job, status: JobStatus, plan_follow_up: bool) -> None:
+    """Marked as applied without the Apply form (✓ Applied, status menu, bulk): record the
+    application too. You did it just now, so the first follow-up is planned as the Apply form
+    does — except for bulk changes, which are usually catching up on old applications (imports
+    use `ensure_applications`, which plans none either)."""
+    from datetime import timedelta
+
     from app.models.application import Application
-    from app.services.application_service import APPLIED_JOB_STATUSES, AUTO_NOTE
+    from app.services.application_service import (
+        APPLIED_JOB_STATUSES,
+        AUTO_NOTE,
+        FIRST_FOLLOW_UP_DAYS,
+    )
 
     if status not in APPLIED_JOB_STATUSES:
         return
@@ -887,6 +897,8 @@ def _record_application(db: Session, job: Job, status: JobStatus) -> None:
 
     db.flush()
     create_application(db, job.id, {"status": ApplicationStatus(status.value), "method": "OTHER",
+                                    "follow_up_date": date.today() + timedelta(
+                                        days=FIRST_FOLLOW_UP_DAYS) if plan_follow_up else None,
                                     "notes": AUTO_NOTE.replace(" The applied date is approximate"
                                                                " — edit it if you know it.", "")},
                        origin="auto", commit=False)
@@ -1205,7 +1217,8 @@ def bulk_update(db: Session, job_ids: list[int], action: str,
             raise DomainValidationError("Pick a status")
         for job_id in ids:
             if job_id in found:
-                set_status(db, job_id, status, "bulk change", commit=False)
+                set_status(db, job_id, status, "bulk change", commit=False,
+                           plan_follow_up=False)
         db.commit()
         return {"updated": len(found), "missing": missing}
     deleted, skipped = 0, []

@@ -32,7 +32,7 @@ describe("settings", () => {
       "GET /career-ops/status": { configured: false },
     });
     renderAt(<SettingsPage />);
-    expect(await screen.findByText("152 companies scanned")).toBeInTheDocument();
+    expect(await screen.findByText("152 companies searched")).toBeInTheDocument();
     expect(await screen.findByText("1 saved · private sheets connected")).toBeInTheDocument();
     expect(await screen.findByText("Not set up (optional)")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add Job by hand/ })).toHaveAttribute("href", "/jobs/new");
@@ -94,6 +94,17 @@ describe("settings", () => {
     await userEvent.upload(screen.getByLabelText("Import file"), new File(["title,company\nLead,Acme"], "jobs.csv", { type: "text/csv" }));
     await userEvent.click(screen.getByRole("button", { name: "Import" }));
     expect(await screen.findByText("Imported: 3 new, 1 already in the app.")).toBeInTheDocument();
+  });
+
+  it("imports a company list (e.g. a Naukri export) into Companies", async () => {
+    const api = mockApi({ "POST /companies/import": { created: 2, merged: 5, skipped: 0, errors: [] } });
+    renderAt(<SettingsPage view="data" />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "What's in the file" }), "companies");
+    expect(screen.getByText(/A Naukri company-list export is read as it is/)).toBeInTheDocument();
+    await userEvent.upload(screen.getByLabelText("Import file"), new File(["Company Name\nAcme"], "naukri.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Imported: 2 new, 5 already in the app.")).toBeInTheDocument();
+    expect(api.calls.some((c) => c.method === "POST" && c.path === "/companies/import")).toBe(true);
   });
 
   it("about & AI: turns the Assistant and its AI on or off", async () => {

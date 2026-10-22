@@ -12,6 +12,7 @@ import { ChatLauncher } from "../features/chat/Chat";
 import { Toaster } from "../components/Toaster";
 import { prefs } from "../utils/storage";
 import { useTheme, type Theme } from "../utils/theme";
+import { ARCHIVE_TABS, JOB_TABS, defaultStatuses, tabHref } from "../features/jobs/jobTabs";
 
 type Tab = { to: string; label: string };
 type Section = { to: string; label: string; icon: string; hint: string; tabs: Tab[]; badge?: (s: Record<string, number>) => number | undefined };
@@ -23,9 +24,11 @@ type Section = { to: string; label: string; icon: string; hint: string; tabs: Ta
 export const SECTIONS: Section[] = [
   { to: "/", label: "Today", icon: "today", hint: "What to do today, and how your search is going",
     tabs: [{ to: "/", label: "Today" }, { to: "/analytics", label: "Insights" }] },
-  { to: "/jobs", label: "Jobs", icon: "jobs", hint: "Review new jobs, browse every job, companies you track",
-    tabs: [{ to: "/jobs", label: "All jobs" }, { to: "/companies", label: "Companies" }, { to: "/jobs/ai-search", label: "AI search" }, { to: "/jobs/review", label: "Review new" }],
+  { to: "/jobs", label: "Jobs", icon: "jobs", hint: "Review new jobs, browse every job, search job portals",
+    tabs: [{ to: "/jobs", label: "All jobs" }, { to: "/jobs/ai-search", label: "AI search" }, { to: "/jobs/review", label: "Review new" }],
     badge: (s) => s.new_jobs },
+  { to: "/companies", label: "Companies", icon: "companies", hint: "Companies you track, their job boards and verification",
+    tabs: [{ to: "/companies", label: "Companies" }] },
   { to: "/applications/board", label: "Pipeline", icon: "pipeline", hint: "Board of applications by stage, interviews, offers and recruiters",
     tabs: [{ to: "/applications/board", label: "Board" }, { to: "/applications", label: "Applications" }, { to: "/interviews", label: "Interviews" },
       { to: "/offers", label: "Offers" }, { to: "/recruiters", label: "Recruiters" }] },
@@ -69,6 +72,48 @@ function SectionTabs({ section, active }: { section: Section; active: Tab | unde
         );
       })}
     </nav>
+  );
+}
+
+/** The status tab a jobs address shows (plain /jobs opens New; with filters, All open). */
+export function jobTabFor(pathname: string, search: string): string | null {
+  if (pathname === "/jobs/closed") return "closed";
+  if (pathname !== "/jobs") return null;
+  const params = new URLSearchParams(search);
+  const tab = params.get("tab");
+  if (tab) return tab;
+  for (const k of ["tab", "page", "sort", "preview"]) params.delete(k);
+  return params.toString() ? "all" : "new";
+}
+
+/** Under Jobs in the menu: the status tabs with their counts. Each tab's own statuses (Pending →
+ * Reviewing, Shortlisted, Ready to apply, On hold) are chips on the Jobs page, not more menu levels. */
+function JobStatusMenu() {
+  const { pathname, search } = useLocation();
+  const active = jobTabFor(pathname, search);
+  const counts = useQuery({
+    queryKey: ["jobs", "status-counts", {}],
+    queryFn: () => api.get<Record<string, number>>("/jobs/status-counts"),
+    refetchInterval: 60_000,
+  }).data;
+  return (
+    <ul aria-label="Jobs by status" className="mb-1 ml-[1.35rem] space-y-px border-l border-sidebar-line pl-2 text-[13px]">
+      {JOB_TABS.map((t) => {
+        const n = counts ? defaultStatuses(t).reduce((sum, st) => sum + (counts[st] ?? 0), 0) : undefined;
+        const on = t.key === active;
+        return (
+          <li key={t.key} className={t.key === ARCHIVE_TABS[0] ? "mt-1.5" : ""}>
+            <Link to={tabHref(t.key)} aria-current={on ? "page" : undefined}
+              className={`flex items-center gap-2 rounded-lg px-2.5 py-1 transition ${on
+                ? "bg-sidebar-active font-semibold text-sidebar-active-text"
+                : `${ARCHIVE_TABS.includes(t.key) ? "text-sidebar-muted" : "text-sidebar-text"} hover:bg-sidebar-hover hover:text-sidebar-strong`}`}>
+              <span className="flex-1">{t.label}</span>
+              {n !== undefined && <span className="text-[11px] font-normal tabular-nums text-sidebar-muted">{n}</span>}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -146,7 +191,12 @@ export function AppLayout() {
   const group = (label: string, items: Section[]) => (
     <div className="space-y-0.5">
       <div className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-muted">{label}</div>
-      {items.map(item)}
+      {items.map((s) => (
+        <div key={s.to}>
+          {item(s)}
+          {s.to === "/jobs" && s === section && <JobStatusMenu />}
+        </div>
+      ))}
     </div>
   );
   const menu = (
@@ -180,7 +230,7 @@ export function AppLayout() {
   const sidebar = "flex flex-col overflow-y-auto bg-sidebar border-r border-sidebar-line";
   if (setup.data?.needs_setup) return <Navigate to="/welcome" replace />;
   return (
-    <div className="flex min-h-screen">
+    <div className="group/app flex min-h-screen" data-menu={hidden ? "hidden" : "shown"}>
       {!hidden && <aside className={`sticky top-0 hidden h-screen w-64 shrink-0 print:!hidden md:flex ${sidebar}`}>{brand}{menu}{footer}</aside>}
       {drawer && (
         <div className="fixed inset-0 z-40 md:hidden">

@@ -239,10 +239,10 @@ function CareerOpsPortals() {
 
 function DataSettings() {
   const qc = useQueryClient();
-  const [entity, setEntity] = useState<"jobs" | "recruiters">("jobs");
+  const [entity, setEntity] = useState<"jobs" | "recruiters" | "companies">("jobs");
   const [file, setFile] = useState<File | null>(null);
   const imp = useMutation({
-    mutationFn: () => { const fd = new FormData(); fd.append("file", file!); return api.post<Record<string, unknown>>(`/import/${entity}`, fd); },
+    mutationFn: () => { const fd = new FormData(); fd.append("file", file!); return api.post<Record<string, unknown>>(entity === "companies" ? "/companies/import" : `/import/${entity}`, fd); },
     onSuccess: () => qc.invalidateQueries(),
   });
   const entities = ["jobs", "companies", "applications", "recruiters", "interviews", "questions", "offers", "followups"];
@@ -259,15 +259,17 @@ function DataSettings() {
       </Card>
       <Card title="Import a file">
         <p className="mb-3 text-sm text-slate-600">
-          Add jobs or recruiters from a CSV or JSON file. Rows already in the app are merged, never duplicated.
+          Add jobs, recruiters or companies from a CSV or JSON file. Rows already in the app are merged, never duplicated.
           For Google Sheets use <Link className="link" to="/settings#sheets">Job sources → Google Sheets</Link>; for a single job use <Link className="link" to="/jobs/new">Add Job</Link>.
         </p>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="What's in the file"><select className="input" value={entity} onChange={(e) => setEntity(e.target.value as "jobs" | "recruiters")}><option value="jobs">Jobs</option><option value="recruiters">Recruiters</option></select></Field>
+          <Field label="What's in the file"><select className="input" value={entity} onChange={(e) => setEntity(e.target.value as "jobs" | "recruiters" | "companies")}><option value="jobs">Jobs</option><option value="recruiters">Recruiters</option><option value="companies">Companies</option></select></Field>
           <input className="input max-w-xs" type="file" accept=".csv,.json" aria-label="Import file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           <button className="btn-secondary" disabled={!file || imp.isPending} onClick={() => imp.mutate()}>{imp.isPending ? "Importing…" : "Import"}</button>
         </div>
-        <p className="mt-1 text-xs text-slate-500">Jobs need at least <b>title</b> and <b>company</b>; also read: url, jd, location, work_model, salary_min, salary_max, required_skills, status.</p>
+        {entity === "companies"
+          ? <p className="mt-1 text-xs text-slate-500">Companies need a <b>name</b> (or Company Name); also read: website, careers_url, linkedin_url, headquarters, industry, employee_range, india_locations, tier, notes, and <b>extra_link</b> / naukri_url / foundit_url / monster_url (job-portal company pages). A Naukri company-list export is read as it is. Companies already in the app get the new links instead of a duplicate.</p>
+          : <p className="mt-1 text-xs text-slate-500">Jobs need at least <b>title</b> and <b>company</b>; also read: url, jd, location, work_model, salary_min, salary_max, required_skills, status.</p>}
         {result && (
           <p className="mt-2 rounded bg-emerald-50 p-2 text-sm text-emerald-800">
             Imported: {result.created ?? 0} new, {result.merged ?? 0} already in the app{result.skipped ? `, ${result.skipped} skipped` : ""}{result.errors?.length ? `, ${result.errors.length} rows with errors` : ""}.
@@ -396,7 +398,7 @@ function SourcesOverview() {
   );
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5" aria-label="Job sources">
-      {row("#scanner", "Built-in job scanner", scanner ? `${scanner.scannable} companies scanned${scanner.search_all_companies ? " (all companies)" : ""}` : "…", scanner?.last_run?.started_at, !!scanner?.scannable)}
+      {row("#scanner", "Job board search (built-in)", scanner ? `${scanner.scannable} companies searched${scanner.search_all_companies ? " (all companies)" : ""}` : "…", scanner?.last_run?.started_at, !!scanner?.scannable)}
       {row("#sheets", "Google Sheets", sheets ? `${sheets.length} saved · ${access?.service_account ? "private sheets connected" : "only link-shared sheets"}` : "…", lastSheet, !!sheets?.length)}
       {row("#career-ops", "Career-Ops", co ? (co.configured ? "Set up" : "Not set up (optional)") : "…", co?.last_import?.started_at, !!co?.configured)}
       {row("#extension", "Chrome extension", collectorVersion() ? "Installed — click it on any job page" : "Not installed — download it below", false, !!collectorVersion())}

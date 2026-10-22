@@ -14,4 +14,4 @@ description: Run the built-in job-board scanner and report what it found
 // turbo
    `curl -s "http://127.0.0.1:8010/api/v1/scanner/runs?limit=1" | python3 -m json.tool`
 6. Report new / updated jobs, postings checked, companies scanned, and board errors.
-   Filters live in Settings → Job scanner → What to keep (app setting `scanner`).
+   Filters live in Settings → Job board search → What to keep (app setting `scanner`).

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { ReactNode } from "react";
-import { Badge, Card, ErrorBox, IconChip, Spinner, Stat, type Accent } from "../../components/ui";
+import { Badge, Card, ErrorBox, IconChip, Spinner, Stat, WeekChange, type Accent } from "../../components/ui";
 import { Icon } from "../../components/icons";
 import type { Priority } from "../../types/api";
 import { formatDate, formatDateTime } from "../../utils/format";
@@ -154,12 +154,16 @@ export function DashboardPage() {
       <section aria-label="Progress">
         <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Progress</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
-          <Stat label="Applied this week" value={s.applied_this_week ?? 0} to="/applications" icon="send" accent="indigo" />
-          <Stat label="Applications" value={s.applications} to="/applications" icon="inbox" accent="sky" />
-          <Stat label="Response rate" value={pct(s.responses ?? 0, s.applications)} to="/analytics" icon="trend" accent="violet" />
+          <Stat label="Applied this week" to="/applications" icon="send" accent="indigo"
+            value={<>{s.applied_this_week ?? 0}<WeekChange now={s.applied_this_week ?? 0} before={s.applied_last_week} /></>} />
+          <Stat label="New jobs this week" to="/jobs?sort=-created_at" icon="sparkles" accent="sky"
+            value={<>{s.new_this_week ?? 0}<WeekChange now={s.new_this_week ?? 0} before={s.new_last_week} /></>} />
+          <Stat label="Good jobs not applied (70+)" value={s.unapplied_70_plus ?? 0} tone="text-indigo-700"
+            to="/jobs?min_score=70&has_application=false" icon="star" accent="violet" />
+          <Stat label="Response rate" value={<>{pct(s.responses ?? 0, s.applications)}<span className="mt-0.5 block font-sans text-xs font-medium tracking-normal text-slate-400">of {s.applications} applications</span></>}
+            to="/analytics" icon="trend" accent="violet" />
           <Stat label="Interviews" value={s.interviews} to="/interviews?upcoming=false" icon="calendar" accent="emerald" />
           <Stat label="Offers" value={s.offers} tone="text-emerald-600" to="/offers" icon="trophy" accent="amber" />
-          <Stat label="Open jobs" value={s.total_jobs} to="/jobs" icon="jobs" accent="slate" />
         </div>
       </section>
       <div className="grid gap-4 lg:grid-cols-3">

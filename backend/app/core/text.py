@@ -27,6 +27,33 @@ def company_key(name: str) -> str:
     return key or re.sub(r"[^a-z0-9]", "", s)
 
 
+def company_key_strict(name: str) -> str:
+    """Like company_key but keeps generic words: "Aspire Systems" != "Aspire Software"."""
+    s = LEGAL_SUFFIXES.sub(" ", fold(name).lower().replace("&", " and "))
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
+def generic_words(name: str) -> set[str]:
+    """The generic words company_key drops: "Wissen Infotech" -> {"infotech"}."""
+    s = LEGAL_SUFFIXES.sub(" ", fold(name).lower().replace("&", " and "))
+    return {_SAME_WORD.get(w.lower(), w.lower()) for w in GENERIC_WORDS.findall(s)}
+
+
+# Singular and plural forms count as the same generic word ("Ingold Solution(s)").
+_SAME_WORD = {"technologies": "technology", "solutions": "solution", "services": "service",
+              "systems": "system"}
+
+
+def same_company_name(a: str, b: str) -> bool:
+    """Equal company_key alone is not enough: "Aspire Software Solutions" and "Aspire Systems"
+    differ only in generic words, but different ones. Same when one name's generic words are
+    a subset of the other's ("Kellton" / "Kellton Tech")."""
+    if company_key(a) != company_key(b):
+        return False
+    ga, gb = generic_words(a), generic_words(b)
+    return ga <= gb or gb <= ga
+
+
 def title_key(title: str) -> str:
     s = fold(title).lower()
     s = re.sub(r"\b(sr|snr)\b\.?", "senior", s)

@@ -22,7 +22,7 @@ function listUrls(fn: { mock: { calls: unknown[][] } }): URL[] {
 describe("status multi-select", () => {
   it("shows any combination of statuses", async () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
-    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=all" });
     await userEvent.click(await screen.findByRole("button", { name: "Status" }));
     const box = screen.getByRole("listbox", { name: "Job statuses" });
     expect(within(box).queryByLabelText("Closed")).not.toBeInTheDocument(); // closed has its own tab
@@ -57,7 +57,8 @@ describe("delete job", () => {
   it("asks first, then deletes", async () => {
     const api = mockApi({ "GET /jobs": page([JOB]), "DELETE /jobs/7": { deleted: 7 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    await userEvent.click(await screen.findByRole("button", { name: "Delete Magento Lead" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Magento Lead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete Magento Lead" }));
     expect(api.calls.some((c) => c.method === "DELETE")).toBe(false);
     const dialog = screen.getByRole("alertdialog", { name: "Confirm delete" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
@@ -72,7 +73,8 @@ describe("delete job", () => {
           { status: 409, headers: { "content-type": "application/json" } }),
     });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    await userEvent.click(await screen.findByRole("button", { name: "Delete Magento Lead" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions for Magento Lead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete Magento Lead" }));
     await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     expect(await screen.findByText(/This job has 1 application\. Deleting it deletes those too\. Delete anyway\?/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Delete all" }));
@@ -104,7 +106,7 @@ describe("added via", () => {
   it("shows how each job came in and filters by it", async () => {
     const api = mockApi({ "GET /jobs": page([{ ...JOB, added_via: ["scanner", "sheet"] }]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    expect(await screen.findByTitle("Added via Job scanner")).toHaveTextContent("Job scanner");
+    expect(await screen.findByTitle("Added via Job board search")).toHaveTextContent("Job board search");
     expect(screen.getByTitle("Added via Google Sheet")).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Added via" }), "career_ops");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("added_via")).toBe("career_ops");
@@ -134,7 +136,7 @@ describe("remembered sort and filters", () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     const first = renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     await screen.findByText("Magento Lead");
-    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-match_score");
+    expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-created_at"); // newest first
     await userEvent.click(screen.getByRole("button", { name: "Sort by posted" }));
     await userEvent.click(within(screen.getByRole("group", { name: "Score" })).getByRole("button", { name: "70+" }));
     await userEvent.click(within(screen.getByRole("group", { name: "Work" })).getByRole("button", { name: "Remote" }));
@@ -151,7 +153,7 @@ describe("remembered sort and filters", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
     last = listUrls(api.fn).at(-1)!;
-    expect(last.searchParams.get("sort")).toBe("-match_score");
+    expect(last.searchParams.get("sort")).toBe("-created_at");
     expect(last.searchParams.get("min_score")).toBeNull();
     expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
   });

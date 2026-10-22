@@ -87,6 +87,8 @@ class ApplicationOut(BaseModel):
     salary_currency: str | None
     notice_period_days: int | None
     follow_up_date: date | None
+    # Earliest follow-up still to do for this application (or its job), from the Follow-ups list.
+    next_follow_up: date | None = None
     notes: str | None
     origin: str
     created_at: datetime

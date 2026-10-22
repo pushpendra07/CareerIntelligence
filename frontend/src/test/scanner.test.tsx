@@ -16,7 +16,7 @@ const LAST = { id: 7, kind: "SCAN", trigger: "manual", status: "COMPLETED", star
 const STATUS = { supported_boards: ["GREENHOUSE"], job_search_enabled: 40, scannable: 33, by_provider: { GREENHOUSE: 20, LEVER: 13 },
   not_scannable: [{ id: 5, name: "Plain Co", careers_url: null }], running: null, last_run: LAST, settings: SETTINGS };
 
-describe("job scanner settings", () => {
+describe("job board search settings", () => {
   it("shows coverage and the last scan, starts a scan and saves filters", async () => {
     const api = mockApi({
       "GET /scanner/status": STATUS,
@@ -33,7 +33,7 @@ describe("job scanner settings", () => {
     expect(within(table).getByRole("link", { name: "Acme" })).toHaveAttribute("href", "/companies/1");
     expect(screen.getByText(/2000 title not relevant/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    await userEvent.click(screen.getByRole("button", { name: "Search now" }));
     expect(api.calls.some((c) => c.method === "POST" && c.path === "/scanner/run")).toBe(true);
 
     await userEvent.click(screen.getByText("What to keep (filters & schedule)"));

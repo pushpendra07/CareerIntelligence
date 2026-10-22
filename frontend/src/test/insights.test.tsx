@@ -34,6 +34,43 @@ describe("insights", () => {
   });
 });
 
+describe("insights: answers by score, companies, activity", () => {
+  it("compares answer rates above and below 80, links companies, hides unknown work models", async () => {
+    mockApi({
+      "GET /dashboard/analytics": {
+        scores: { average_component_factor: {}, by_recommendation: [], average_score: null, average_score_applied: null,
+          interview_rate_by_score: [
+            { label: "80-89", applications: 10, answers: 3, interviews: 1 },
+            { label: "60-69", applications: 20, answers: 1, interviews: 0 },
+          ] },
+        skill_gaps: [], top_requested_skills: [],
+      },
+      "GET /dashboard/funnels": { application: [{ stage: "Applied", value: 30 }] },
+      "GET /dashboard/charts": {
+        jobs_by_score: [], source_quality: [],
+        top_companies: [{ id: 9, label: "Acme", value: 3, jobs: 5, avg_score: 84, tier: "TIER_A" }],
+        jobs_by_work_model: [{ label: "REMOTE", value: 4 }, { label: "UNKNOWN", value: 7 }],
+      },
+      "GET /dashboard": { summary: { applications: 30, responses: 2, interviews: 1, offers: 0, due_followups: 4,
+        applied_this_week: 6, applied_last_week: 9, unapplied_70_plus: 12 } },
+      "GET /reports/overview": { charts: [
+        { id: "jobs", data: [{ label: "13 Oct", value: 5 }, { label: "20 Oct", value: 8 }] },
+        { id: "activity", data: [{ label: "13 Oct", Applications: 2 }, { label: "20 Oct", Applications: 4 }] },
+      ] },
+    });
+    renderAt(<AnalyticsPage />, { path: "/analytics", route: "/analytics" });
+    expect(await screen.findByText(/Jobs scored 80\+ got an answer 30% of the time \(3 of 10\); below 80, 5% \(1 of 20\)/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "4 follow-ups are due" })).toHaveAttribute("href", "/followups");
+    expect(screen.getByRole("link", { name: "Acme" })).toHaveAttribute("href", "/companies/9");
+    expect(screen.getByText("3 of 5 · avg 84")).toBeInTheDocument();
+    expect(screen.getByText("7 jobs don't say.")).toBeInTheDocument();
+    expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Applied this week: view results" })).toHaveTextContent("6▼ 3 vs last week");
+    expect(screen.getByRole("link", { name: "Good jobs not applied (70+): view results" })).toHaveAttribute("href", "/jobs?min_score=70&has_application=false");
+    expect(await screen.findByText("Last 12 weeks: jobs found and applications sent")).toBeInTheDocument();
+  });
+});
+
 describe("fetch missing descriptions", () => {
   it("starts a run and shows its progress, then the result", async () => {
     let state: unknown = { missing: 30, missing_70_plus: 6, running: null, last_run: null };

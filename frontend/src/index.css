@@ -201,6 +201,13 @@
 @utility btn-primary { @apply btn bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white shadow-[0_1px_2px_rgb(16_24_40/0.1),0_4px_12px_-4px_rgb(79_70_229/0.55),inset_0_1px_0_rgb(255_255_255/0.15)] hover:from-[#5b5ff0] hover:to-[#4338ca]; }
 @utility btn-secondary { @apply btn border border-slate-200 bg-surface text-slate-700 shadow-[0_1px_2px_rgb(16_24_40/0.05)] hover:border-slate-300 hover:bg-slate-50; }
 @utility btn-danger { @apply btn bg-[#e11d48] text-white shadow-sm hover:bg-[#be123c]; }
+/* Tinted buttons that say what a job action does: closed (grey), not relevant (rose), shortlist
+   (amber), applied (green), open the posting (sky). The shades are re-mapped in dark mode. */
+@utility btn-slate { @apply btn border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200; }
+@utility btn-rose { @apply btn border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100; }
+@utility btn-amber { @apply btn border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100; }
+@utility btn-emerald { @apply btn border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100; }
+@utility btn-sky { @apply btn border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100; }
 /* Dark mode tables: the header row and a hovered row are a shade lighter than the card
    (slate-50 is the page colour in dark mode, which looked like a black band). Opaque, so a
    sticky header hides the rows scrolling under it. */

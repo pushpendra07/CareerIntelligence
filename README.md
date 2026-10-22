@@ -19,7 +19,7 @@
 [Quick start](#-run-locally) ·
 [How matching works](#-how-the-0100-match-score-works) ·
 [Assistant](#-assistant-chat) ·
-[Job scanner](#-built-in-job-scanner) ·
+[Job board search](#-job-board-search-built-in-scanner) ·
 [LinkedIn & Naukri](#-linkedin-naukri--other-portals-ai-search--job-collector) ·
 [Career-Ops](#-career-ops-integration-optional) ·
 [Configuration](#%EF%B8%8F-configuration) ·
@@ -39,7 +39,7 @@ threads and notes. Career Intelligence brings it into one local web app:
 ```
 CV ─▶ Professional Profile ─▶ Target Profile
                                    │
-  Built-in job scanner · Career-Ops · Google Sheets · CSV / JSON · Add Job (URL + JD)
+  Job board search · Career-Ops · Google Sheets · CSV / JSON · Add Job (URL + JD)
   Job collector Chrome extension · AI search (Claude / Gemini on LinkedIn, Naukri…)
                                    │
            Normalize ─▶ Deduplicate ─▶ Parse JD ─▶ 0–100 Match Score
@@ -98,7 +98,7 @@ CV ─▶ Professional Profile ─▶ Target Profile
   missing and the description; Open posting / Shortlist / Not relevant / Skip with one key
   (O / S / N / K). Jobs lists, the job page and Today show **Open posting ↗** and **Copy link**
   (to share the job's portal link) before Shortlist.
-- **Built-in job scanner**: one click (or every N hours) searches the job boards of companies
+- **Job board search** (built-in): one click (or every N hours) searches the job boards of companies
   marked *Job search* and adds relevant jobs, with full descriptions, already scored.
 - **Add Job**: paste a URL and a JD and save. A **live preview** shows the detected source, skills,
   experience, salary and possible blockers.
@@ -255,6 +255,7 @@ Career Intelligence is running
 ```bash
 ./stop.sh             # stop web app, API and the dev database
 ./stop.sh --keep-db   # stop web app and API, keep the database running
+./stop.sh --force     # stop even while a scan is running (without it, stop.sh refuses so the scan isn't lost)
 ```
 
 `stop.sh` only stops processes that `start.sh` started; other apps on your machine are left alone.
@@ -279,7 +280,7 @@ Career Intelligence is running
 1. **CVs** → upload your CV → **Merge into profile**.
 2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
    scored as "unknown" until you do).
-3. **Settings → Job scanner → Scan now** to search the job boards of companies marked
+3. **Settings → Job board search → Search now** to search the job boards of companies marked
    *Job search* (and **Find job boards** to discover boards for companies that only have a careers page).
 4. **Settings → Job sources → Chrome extension → Download**, install it (Load unpacked), then click
    it on any LinkedIn / Naukri / careers-page job to add it. Or use **Add Job** (paste URL + description).
@@ -426,9 +427,9 @@ Technical Lead – Adobe Commerce                         93 / 100  HIGHLY RECOM
 
 ---
 
-## 🔎 Built-in job scanner
+## 🔎 Job board search (built-in scanner)
 
-**Settings → Job scanner → Scan now** searches the public job boards of every company with
+**Settings → Job board search → Search now** searches the public job boards of every company with
 **Job search** switched on. No API keys, no Node.js and no other project are needed.
 
 | Board | What it returns |
@@ -451,7 +452,7 @@ How a scan works:
 4. **Report.** Each run records, per company, how many postings were found, kept and new, and any board error.
 
 A company page also has **Scan jobs** for that one company. Scans can run automatically every N hours
-while the app is running (**Settings → Job scanner → What to keep → Scan automatically every**).
+while the app is running (**Settings → Job board search → What to keep → Scan automatically every**).
 
 ---
 

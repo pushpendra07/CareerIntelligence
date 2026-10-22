@@ -24,7 +24,8 @@ export function InterviewsPage() {
       </div>
       <Card actions={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={upcoming} onChange={(e) => { setUpcoming(e.target.checked); setPage(1); }} />Upcoming only</label>}>
         {list.isLoading && <Spinner />}
-        {list.data && (!list.data.items.length ? <Empty>No interviews {upcoming ? "coming up" : "yet"}.</Empty> : (
+        {list.data && (!list.data.items.length ? <Empty>No interviews {upcoming ? "coming up" : "yet"}.
+          {upcoming && <button type="button" className="link ml-1" onClick={() => { setUpcoming(false); setPage(1); }}>Show past rounds</button>}</Empty> : (
           <table className="min-w-full divide-y divide-slate-100">
             <thead><tr><th className="th">When</th><th className="th">Job</th><th className="th">Round</th><th className="th">Status</th><th className="th">Result</th><th className="th" /></tr></thead>
             <tbody className="divide-y divide-slate-50">

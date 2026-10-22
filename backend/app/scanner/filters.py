@@ -1,4 +1,4 @@
-"""Which scanned postings are worth keeping (configurable in Settings → Job scanner)."""
+"""Which scanned postings are worth keeping (configurable in Settings → Job board search)."""
 
 import re
 from dataclasses import dataclass, field

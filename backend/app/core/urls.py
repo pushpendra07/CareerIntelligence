@@ -134,6 +134,28 @@ def host_of(url: str) -> str | None:
     return host[4:] if host.startswith("www.") else host
 
 
+# Job portals whose company pages are kept as a company's "extra links".
+PORTALS = {
+    "naukri": "naukri",
+    "linkedin": "linkedin",
+    "monster": "monster",
+    "monsterindia": "monster",
+    "foundit": "foundit",
+    "indeed": "indeed",
+    "glassdoor": "glassdoor",
+    "ambitionbox": "ambitionbox",
+    "instahyre": "instahyre",
+    "wellfound": "wellfound",
+    "cutshort": "cutshort",
+}
+
+
+def portal_of(url: str) -> str:
+    """Portal name of a link (naukri.com/... -> "naukri"); other sites give their host."""
+    domain = registrable_domain(url) or ""
+    return PORTALS.get(domain.split(".")[0], host_of(url) or "link")
+
+
 def registrable_domain(url: str) -> str | None:
     """Best-effort registrable domain: "jobs.acme.co.in" -> "acme.co.in"."""
     host = host_of(url)

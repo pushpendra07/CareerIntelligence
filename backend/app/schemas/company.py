@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -30,6 +30,13 @@ class FieldSourceOut(BaseModel):
     created_at: datetime
 
 
+class ExtraLinkOut(BaseModel):
+    portal: str
+    url: str
+    source: str | None = None
+    added_at: datetime | None = None
+
+
 class CompanyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,6 +48,8 @@ class CompanyOut(BaseModel):
     domain: str | None
     careers_url: str | None
     linkedin_url: str | None
+    # Company pages on job portals: Naukri, LinkedIn, Monster, Foundit...
+    extra_links: list[ExtraLinkOut] = Field(default_factory=list)
     ats_provider: str | None
     ats_slug: str | None
     headquarters: str | None
@@ -54,6 +63,8 @@ class CompanyOut(BaseModel):
     hiring_status: str
     job_search_enabled: bool
     scan_excluded: bool = False
+    rating: float | None = None  # employee rating on a job portal (Naukri), 1-5
+    rating_reviews: int | None = None
     verification_status: str
     verification_override: str | None
     verification_score: int
@@ -94,7 +105,18 @@ class CompanyWrite(BaseModel):
     employee_range: str | None = None
     india_presence: bool | None = None
     india_locations: list[str] | None = None
+    extra_links: list[str] | None = None
     source_url: str | None = None
+
+    @field_validator("extra_links")
+    @classmethod
+    def _links(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        links = [ensure_scheme(x) for x in v if x.strip()]
+        if bad := [x for x in links if not is_http_url(x)]:
+            raise ValueError(f"extra_links must be http(s) URLs: {bad[0]}")
+        return links
 
     @field_validator("source_url")
     @classmethod
@@ -138,6 +160,15 @@ class EvidenceIn(BaseModel):
 
 class MergeIn(BaseModel):
     merge_id: int
+
+
+class CompanyIdsIn(BaseModel):
+    company_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class CompanyBulkIn(CompanyIdsIn):
+    action: Literal["job_search_on", "job_search_off", "tier", "delete"]
+    tier: Tier | None = None  # for "tier"; null clears it
 
 
 class ContactBase(BaseModel):

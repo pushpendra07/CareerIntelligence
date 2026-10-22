@@ -169,7 +169,7 @@ function FilterForm({ initial }: { initial: ScannerConfig }) {
         <Field label="Max jobs per company per scan">
           <input className="input" type="number" min={1} max={500} value={Number(form.max_new_per_company ?? 50)} onChange={(e) => set("max_new_per_company", Number(e.target.value))} />
         </Field>
-        <Field label="Scan automatically every (hours)" hint="0 = only when you click Scan now. Runs while the app is running.">
+        <Field label="Scan automatically every (hours)" hint="0 = only when you click Search now. Runs while the app is running.">
           <input className="input" type="number" min={0} max={168} value={Number(form.schedule_hours ?? 0)} onChange={(e) => set("schedule_hours", Number(e.target.value))} />
         </Field>
         <label className="flex items-center gap-2 self-end text-sm">
@@ -214,9 +214,9 @@ export function ScannerSettings() {
   const s = status.data;
   const [showRun, setShowRun] = useState(false);
   return (
-    <Card title="Job scanner" actions={<>
+    <Card title="Job board search" actions={<>
       <button className="btn-primary" disabled={!s || !!running || start.isPending || s.scannable === 0} onClick={() => start.mutate("run")}>
-        {running?.kind === "SCAN" ? "Scanning…" : "Scan now"}
+        {running?.kind === "SCAN" ? "Searching…" : "Search now"}
       </button>
       <button className="btn-secondary" disabled={!s || !!running || start.isPending} onClick={() => start.mutate("detect-boards")}
         title="Open each company's careers page and look for a Greenhouse, Lever, Workday… board">
@@ -233,11 +233,11 @@ export function ScannerSettings() {
             <b>{s.scannable}</b> of {s.job_search_enabled} {s.search_all_companies ? "companies" : "job-search companies"} have a supported board
             {Object.keys(s.by_provider).length > 0 && <>: {Object.entries(s.by_provider).map(([p, n]) => <Badge key={p}>{humanize(p)} {n}</Badge>)}</>}
           </p>
-          {running && <p className="rounded bg-indigo-50 p-2 text-indigo-800">{running.kind === "SCAN" ? "Scanning job boards" : "Looking for job boards"}… started {formatDateTime(running.started_at)}. You can keep using the app.</p>}
+          {running && <p className="rounded bg-indigo-50 p-2 text-indigo-800">{running.kind === "SCAN" ? "Searching job boards" : "Looking for job boards"}… started {formatDateTime(running.started_at)}. You can keep using the app.</p>}
           {s.last_run && !running && (
             <div>
               <p>
-                Last scan {formatDateTime(s.last_run.started_at)}{s.last_run.trigger === "schedule" ? " (scheduled)" : ""}:{" "}
+                Last search {formatDateTime(s.last_run.started_at)}{s.last_run.trigger === "schedule" ? " (scheduled)" : ""}:{" "}
                 <span className={s.last_run.status === "FAILED" ? "text-rose-600" : ""}>{runSummary(s.last_run)}</span>{" "}
                 {num(s.last_run.stats.new) > 0 && <Link className="link" to="/jobs?status=NEW&sort=-match_score">View new jobs</Link>}{" "}
                 <button className="link text-xs" onClick={() => setShowRun((v) => !v)}>{showRun ? "Hide details" : "Details"}</button>
@@ -275,5 +275,5 @@ function DetectResult() {
   const runs = useQuery({ queryKey: ["scanner", "runs"], queryFn: () => api.get<ScanRun[]>("/scanner/runs?limit=5") });
   const last = runs.data?.find((r) => r.kind === "DETECT");
   if (!last) return null;
-  return <p className="rounded bg-emerald-50 p-2 text-emerald-800">{runSummary(last)}. Companies with Job search on are now included in Scan now.</p>;
+  return <p className="rounded bg-emerald-50 p-2 text-emerald-800">{runSummary(last)}. Companies with Job search on are now included in Search now.</p>;
 }

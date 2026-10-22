@@ -24,7 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        # Optional "scan every N hours" (Settings -> Job scanner); idle when N is 0.
+        # Optional "scan every N hours" (Settings -> Job board search); idle when N is 0.
         # Scores and JD parses are also kept current in the background (services/freshness.py).
         stops = []
         if settings.environment != "test":

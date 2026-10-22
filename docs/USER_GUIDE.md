@@ -147,12 +147,32 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
 
 ## 5. Add companies
 
-**Jobs → Companies**.
+**Companies** (in the menu, below Jobs).
 
 - The list's **Jobs** column shows *open / total* jobs in the app per company; filter **Has jobs
   in the app** and sort by **Most jobs**.
-- **Add** a company with the name box at the top, or bulk-import from research files
+- **+ Add company** opens its own page (`/companies/new`): name, legal name, other names, website,
+  LinkedIn page, careers page / job board, job portal pages, industry, type, employees,
+  headquarters, India office and cities, the page where you found these details, and your tier,
+  priority, hiring status, Job search and notes. Only the name is required. While you type the
+  name it lists similar companies already in the app, so you don't add one twice.
+  Or bulk-import from research files
   (see README → *bulk-import companies*) or from a Google Sheet tab with a *Company Name* column.
+- **Company lists from job portals** (a Naukri company-list export; later LinkedIn, Monster,
+  Foundit): Settings → Backup & import → Import a file → *Companies*. Companies already in the app
+  are not duplicated — they get the portal link under **Extra links**. Naukri's rating, reviews,
+  founded year and jobs page show under the company's Overview.
+- **Extra links** (company page → Overview → Edit): the company's pages on job portals, one per
+  line. The list's **Added** column shows when each company was added; sort by **Recently added**.
+- The list filters by **industry**, **size**, **portal link** (e.g. *On Naukri*) and **Hiring**, shows
+  each company's portal **rating** and **size**, and sorts by **Best rated**. Tick companies to turn
+  job search on/off, set a tier or delete them (companies with jobs or recruiters are kept).
+- **Possible duplicates** (button next to the title): companies whose names match once words like
+  *Technologies* are left out, or that share a website. Pick the one to keep and **Merge**, or
+  **Not duplicates** so they aren't suggested again.
+- A company page shows its key facts and links at the top, **Find its page on** Naukri / LinkedIn /
+  Foundit / Monster for links it doesn't have yet, the imported research as labelled fields, and the
+  verification evidence folded away until you open it.
 - On a company page:
   - **Tier** (A/B/C) — how much you want to work there; it feeds the *Company* score component.
   - **Job search** checkbox — include this company in job scans.
@@ -165,7 +185,7 @@ and marks scores stale. Every job page shows the breakdown and the reasons.
 - A company is **scanned for jobs only if** *Job search* is on **and** its careers URL is a
   supported job board (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee,
   Pinpoint, Teamtailor). The company page shows **Job board: …** or *not detected*.
-  Settings → Job scanner → **Find job boards** finds boards automatically (careers links on the
+  Settings → Job board search → **Find job boards** finds boards automatically (careers links on the
   website, SuccessFactors/Oracle sites, job data on own careers pages, the name on job boards),
   then **Turn on job search for them** includes those companies in scans.
   Full list of scanned companies: [scan-coverage.md](scan-coverage.md).
@@ -184,7 +204,7 @@ Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to m
 
 | Way | Where | Best for |
 |---|---|---|
-| **Built-in job scanner** | Settings → Job scanner → **Scan now** (or company page → Scan jobs) | Companies on supported job boards — full descriptions, 1–3 min |
+| **Job board search** (built-in) | Settings → Job board search → **Search now** (or company page → Search its board) | Companies on supported job boards — full descriptions, 1–3 min |
 | **Job collector** (Chrome extension) | Install once: Settings → Job sources → **Chrome extension** → **Download extension (.zip)** → unzip → `chrome://extensions` → Developer mode → **Load unpacked**. On any job page click its icon → the job is added (or "Already in your list: #id") | LinkedIn, Naukri, Indeed, Foundit, Glassdoor, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, company careers pages |
 | **AI search** | Jobs → **AI search** → click a portal → pick the title and **Location** (one multi-select: Remote / Hybrid / Onsite and your cities; remote = anywhere in India, hybrid/onsite = each city) → **Job collector** (automatic, default) or **Claude** / **Gemini** (the portal opens with your search filled in and the prompt copied: open the assistant, paste, Enter) or **Job collector** (the extension reads up to N jobs and brings them back to be checked). Or pick portals → **Copy prompt** → give it to Claude (Chrome extension / Desktop) or Gemini; it searches in your browser and pastes the jobs into *Jobs from the assistant* → **Check** (shows new vs already saved) → **Add N new jobs**. Tagged *AI search* | LinkedIn, Naukri, Indeed, Foundit, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, Glassdoor |
 | **Add Job** | Jobs → **Add Job**: paste the URL and the description → live preview → **Save & analyze** | LinkedIn, Naukri, Indeed, referrals, recruiter emails |
@@ -192,7 +212,7 @@ Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to m
 | **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now**, or automatically (*Run automatically*: every N hours, and import as soon as Career-Ops finds something new) — set up once with `./scripts/setup-career-ops.sh` | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
 
-Job scanner setup (once): Settings → Job scanner → *What to keep*:
+Job board search setup (once): Settings → Job board search → *What to keep*:
 titles to keep (e.g. magento, adobe commerce, php), generic titles that need your stack in the
 description, titles to skip (intern, sales…), locations to keep (india, remote, your cities) and
 skip (other countries), maximum posting age, and **Scan automatically every N hours** (e.g. 24).
@@ -214,14 +234,35 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   location, work model and job type choices right under the job URL.
 - **Fastest way to triage: Jobs → Review new** (or the button on Today). It shows
   new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
-  description. **Shortlist** (`S`), **Not relevant** (`N`), **Skip for now** (`K`),
+  description. **Closed** (`C`), **Not relevant** (`N`), **Shortlist** (`S`), **Skip for now** (`K`),
   **Open posting** (`O`), **Undo** (`U`). Pick *Score 70+* to see only strong matches.
 - **Jobs → All jobs**. Tabs: **All open · New · Pending · Applied · Interview · Selected** and,
   on the right for finished jobs, **Rejected · Not pursuing · Closed**, each with a count.
-- Filters: search, status (multi-select inside a tab) and sort, then one-click buttons for
+  The page opens on **New** — jobs that just arrived, newest first (*Recently added*). Setting a
+  status moves the job to its tab (Shortlist → Pending, Applied → Applied, Not relevant → Not
+  pursuing, Closed → Closed). Links from Today and Insights that carry filters open **All open**.
+  On a computer the tabs, with counts, are under **Jobs** in the menu (on phones, or with the menu
+  hidden, they show as a row above the list).
+  A tab with several statuses shows a chip per status with its count (Pending: *Reviewing ·
+  Shortlisted · Ready to apply · On hold*; Applied: *Applied · Recruiter contacted · Screening*);
+  click one to see only that status, **All** for the whole tab.
+- Filters: search, status (All open: a multi-select) and sort, then one-click buttons for
   **Score** (60+ / 70+ / 80+), **Work** (remote / hybrid / on-site), **Posted** (last 7 / 14 /
   30 days) and **Added via**. **More filters** opens exact minimum score, recommendation,
   company tier, technology, location, source, your years and applied or not. 10 jobs per page.
+  **Quick views** (Top matches, Fresh this week, Not applied 70+, Remote 70+) set several filters
+  at once; every active filter shows as a chip you can remove with ×.
+- **In the list:** each row has **Closed** and **Not relevant** first, then the next step
+  (**★ Shortlist** / **Apply**, **✓ Applied**); open posting, copy link and delete are under **⋯**. **Click a row**
+  to preview the job on the right — score, why it fits, description and the same buttons — and
+  move through the rows with ↑ / ↓; Esc closes it.
+- **On a job page:** the bar under the top stays while you scroll, with **Back to jobs**, the
+  job, its score, the main buttons and **← n/N →** to move through the list you came from (keys
+  **J** / **K**). Links under *Next step* jump to Fit, Description, Email, Follow-ups and Comments.
+  Marking a job **Closed** or **Not relevant** takes you back to the list you came from.
+  **Edit job** (next to the status) edits the title, description and other details.
+  The **Company** card shows the company's facts, links (website, careers, Naukri…) and its other
+  open jobs. In the description, skills are marked: green = you have it, amber = related, red = missing.
 - **Email to HR** (job page) → **Draft email** writes an email from the job and your profile:
   who you are (current role, employer, years), the required skills you match exactly, your most
   relevant project highlight, a certification the job asks for, leadership for lead roles,
@@ -267,7 +308,7 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
 - **Next step** on every row: **★ Shortlist** / **✕** for new jobs, **Apply** for shortlisted
   ones, **Follow up** for jobs you applied to.
 - **Added via** tag on every job — how it came into the app: **Manual** (Add Job),
-  **Google Sheet**, **Job scanner**, **Career-Ops** or **File import**. A job found more than
+  **Google Sheet**, **Job board search**, **Career-Ops** or **File import**. A job found more than
   one way shows several tags. Filter with **Added via** in the filter row.
 - Columns: **ID**, Score, Job · Company, Location, Exp, Salary, **Posted** (date on the job
   site), **Added** (date it came into this app), Status, Next step. **Sort by clicking a column
@@ -297,9 +338,14 @@ pre-selected), **Method** (portal, email, referral…), **Expected CTC**, **Noti
 the date picker (future dates aren't allowed). That date is the application's applied date, and
 the first follow-up is due a week after it.
 This creates an **Application** (sidebar → Applications) and moves the job to *Applied*.
+**✓ Applied** (or the status menu) does the same in one click, with today's date and a first
+follow-up a week later; changing many jobs at once (bulk) records the applications without
+follow-ups, since that's usually catching up on old ones.
 
 On an application: update its status (Applied → Screening → Interview → Offer / Rejected /
-Withdrawn), see its **History**, and add **follow-ups** (reminders).
+Withdrawn), see its **History**, and add **follow-ups** (reminders). The Applications list's
+**Follow-up** column shows the next open follow-up from the Follow-ups list (red with "· due" when
+it's today or late; click it to open Follow-ups); the Board uses the same date.
 
 **Pipeline → Board** (the Pipeline menu opens it): every application as a card in its stage's
 column — Applied · Recruiter contacted · Screening · Interview · Interview done – no reply ·
@@ -331,14 +377,16 @@ accepted & rejected**; these choices are remembered in this browser.
 
 ## 10. Offers, follow-ups and recruiters
 
-- **Offers**: *Record an offer* for a **Job** (CTC, **Joining date**, **Offer expires**,
+- **Offers**: **+ Record an offer** (or **Record the offer** on a job in the Offer stage, which
+  opens the form with that job picked) for a **Job** (CTC, **Joining date**, **Offer expires**,
   **Work model**, **Benefits**); negotiate (**Counter CTC**, **Negotiation note**); accept or
   decline with **Decision notes**; and *Compare open offers* side by side.
 - **Follow-ups**: grouped into **Late · Today · This week · Later**. Each one links to its job
   and shows the job's status; **✓ Done**, or push it **+1 day / +3 days / +1 week**. If the job
-  is already rejected or closed, it says so and offers **Dismiss**. Applying plans a follow-up
-  for you; add more from the job page or **+ New reminder**.
-- **Recruiters** (Pipeline → Recruiters): contacts with company, role, email, **phone /
+  is already rejected or closed, it says so and offers **Dismiss**. When several are late,
+  **Move all N to today / tomorrow / +3 days / +1 week** reschedules them in one click. Applying
+  plans a follow-up for you; add more from the job page or **+ New reminder**.
+- **Recruiters** (Pipeline → Recruiters; **+ Add contact** opens the form): contacts with company, role, email, **phone /
   WhatsApp** (click to call or open WhatsApp), LinkedIn, status and next follow-up, plus the
   jobs they're the recruiter for.
   - Emails, phone numbers and LinkedIn profiles written in a job are saved as recruiters
@@ -362,8 +410,9 @@ accepted & rejected**; these choices are remembered in this browser.
     many score 70+), **Ready to apply** (shortlisted, not applied), **Follow-ups due**,
     **Interviews coming up**, and **Good jobs without a description** with
     **Fetch for 40 best jobs** (see below).
-  - **Progress** — applied this week, applications, **response rate** (applications that got any
-    answer), interviews, offers, open jobs.
+  - **Progress** — applied this week and new jobs this week (each with the change from last
+    week), **good jobs not applied** (70+), **response rate** (applications that got any
+    answer), interviews, offers.
   - **This week's goals** (right column) — Monday to Sunday: **applications sent**, **new jobs
     reviewed** (moved out of New), **follow-ups done**, **recruiters contacted** (set to
     Contacted). Each shows done / target, how many a day you still need, last week, and the
@@ -376,8 +425,10 @@ accepted & rejected**; these choices are remembered in this browser.
     or late (once a day each; one summary when there are more than 3) and interviews in the
     next 24 hours and again within the hour. Clicking a reminder opens the job / interview.
     The choice is per browser; **Turn off** stops them.
-  - **Today's priorities**, **Best new matches** (★ Shortlist / Not relevant in one click),
-    **Coming up**, **Job sources** (when each source last ran, **Scan now**), CV advice.
+  - **Today's priorities** — interviews in the next 3 days, the 3 oldest follow-ups due (plus one
+    "N more follow-ups due" line), offers about to expire, the best jobs scoring 70+ you haven't
+    applied to, then housekeeping. **Best new matches** (★ Shortlist / Not relevant in one click),
+    **Coming up**, **Job sources** (when each source last ran, **Search job boards**), CV advice.
 - **Fetch missing descriptions** — reads the description from each job's own link, best scores
   first: job-board APIs (Greenhouse, Lever, SmartRecruiters, Workday), the structured job data
   many career sites publish, and Career-Ops' fetcher when it's set up. LinkedIn, Indeed,
@@ -387,18 +438,23 @@ accepted & rejected**; these choices are remembered in this browser.
   LinkedIn / Indeed / Naukri, are marked and skipped next time; their job page says to paste it.
   Scores are recalculated as soon as a description arrives.
 - **Insights** (tab next to Today): every chart comes with a one-line takeaway.
-  - *How your search is going* — response and interview rate, the application funnel, and
-    whether higher scores get more interviews.
+  - *How your search is going* — applications, applied this week (vs last week), response and
+    interview rate, good jobs not applied; a **last 12 weeks** chart of jobs found and
+    applications sent; the application funnel (with a link to follow-ups due when few answer);
+    and **whether higher scores get more answers** (applications, answers and interviews per
+    score band, 80+ compared with below 80).
   - *Where good jobs come from* — every source with its job count, average score, jobs scoring
-    80+ and how many you applied to (click a source to see its jobs); best companies,
-    locations, work model.
+    80+ and how many you applied to (click a source to see its jobs); **companies with the most
+    good jobs** (70+, not applied; click to open the company); locations by city (Bangalore and
+    "Bengaluru, Karnataka, India" count as one); work model (jobs that don't say are noted
+    separately).
   - *Your matches* — score spread vs the jobs you applied to, and where scores are lost (with
     what to change).
   - *Skills* — the required skills you miss most, CV advice, most requested skills.
 
 - **Reports** (menu): one report per area — **Overview, Jobs found, Applications, Interviews,
   Offers, Companies, Job sources, Follow-ups, Skills, Scans & imports**.
-  - Pick a **Period** (last 7 / 30 / 90 days, this or last month, this year, last 12 months, or
+  - Pick a **Period** (today, last 7 / 30 / 90 days, this or last month, this year, last 12 months, or
     custom dates) and **Group by** (automatic, day, week, month). The choice stays in the
     address, so a report link can be bookmarked.
   - The top cards compare each number with the period of the same length just before
@@ -429,12 +485,12 @@ Settings has four tabs:
 
 | Tab | What's there |
 |---|---|
-| **Job sources** | An overview of every job source (set up? last run?), then: **Job scanner** — *Search every company* switch, Scan now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import, *Run automatically* (Scan + import every N hours; import when its files change), *What Career-Ops searches* (its companies and filters, read-only) |
+| **Job sources** | An overview of every job source (set up? last run?), then: **Job board search** — *Search every company* switch, Search now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import, *Run automatically* (Scan + import every N hours; import when its files change), *What Career-Ops searches* (its companies and filters, read-only) |
 | **Scoring** | What each part of the 0–100 score looks at, their weights (must total 100), the score each recommendation label needs, and (Advanced) company-tier points and deal-breakers. Save re-scores every job; Undo changes discards edits |
 | **Backup & import** | Download a full JSON backup or any list as CSV; import jobs or recruiters from a CSV/JSON file |
 | **About & AI** | Whether optional AI is on and how to turn it on; versions, Google account, Career-Ops path, storage |
 
-**Search every company** (Job sources → Job scanner): on = every company is scanned, including
+**Search every company** (Job sources → Job board search): on = every company is scanned, including
 ones added later, whatever its own *Job search* tick says; off = only ticked companies. The
 per-company ticks are kept, so turning it off restores them. Companies can only be scanned
 when their job board is known (**Find job boards**).
@@ -463,7 +519,7 @@ when their job board is known (**Find job boards**).
 ## 14. Daily routine
 
 1. Open the **Dashboard** → do **Today's Priorities**.
-2. If the scanner isn't scheduled: Settings → Job scanner → **Scan now**; import new sheet rows.
+2. If the scanner isn't scheduled: Settings → Job board search → **Search now**; import new sheet rows.
 3. **Review new jobs**: shortlist the strong ones, mark the rest *Not relevant* (keys `S` / `N`).
 4. Apply to shortlisted jobs with the recommended CV; add a follow-up reminder.
 5. Update application and interview statuses as things happen.

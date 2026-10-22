@@ -41,6 +41,7 @@ const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n
 
 /** Quick ranges. Each returns [from, to]. */
 export const RANGES: { key: string; label: string; dates: () => [string, string] }[] = [
+  { key: "today", label: "Today", dates: () => [iso(new Date()), iso(new Date())] },
   { key: "7d", label: "Last 7 days", dates: () => [daysAgo(6), iso(new Date())] },
   { key: "30d", label: "Last 30 days", dates: () => [daysAgo(29), iso(new Date())] },
   { key: "90d", label: "Last 90 days", dates: () => [daysAgo(89), iso(new Date())] },
@@ -255,7 +256,7 @@ export function ReportsPage() {
   const preset = params.get("range") ?? (params.get("from") ? "custom" : "90d");
   const [from, to] = preset === "custom"
     ? [params.get("from") ?? daysAgo(89), params.get("to") ?? iso(new Date())]
-    : (RANGES.find((r) => r.key === preset) ?? RANGES[2]).dates();
+    : (RANGES.find((r) => r.key === preset) ?? RANGES.find((r) => r.key === "90d")!).dates();
   const group = params.get("group") ?? "";
   const catalog = useQuery({ queryKey: ["reports"], queryFn: () => api.get<Catalog>("/reports"), staleTime: Infinity });
   const report = useQuery({

@@ -73,6 +73,11 @@ class Company(TimestampMixin, Base):
     domain: Mapped[str | None] = mapped_column(String(200), index=True)
     careers_url: Mapped[str | None] = mapped_column(String(500))
     linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    # Company pages on job portals (Naukri now; LinkedIn, Monster, Foundit...):
+    # [{"portal", "url", "source", "added_at"}], one entry per URL.
+    extra_links: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     ats_provider: Mapped[str | None] = mapped_column(String(40))
     ats_slug: Mapped[str | None] = mapped_column(String(200))
     headquarters: Mapped[str | None] = mapped_column(String(300))
@@ -113,6 +118,17 @@ class Company(TimestampMixin, Base):
     def scan_excluded(self) -> bool:
         """Left out of "Search every company" scans (unticked Job search on the company page)."""
         return bool((self.attributes or {}).get("scan_excluded"))
+
+    @property
+    def rating(self) -> float | None:
+        """Employee rating on a job portal (Naukri's 1-5), when a portal list was imported."""
+        value = ((self.attributes or {}).get("naukri") or {}).get("rating")
+        return float(value) if isinstance(value, int | float) else None
+
+    @property
+    def rating_reviews(self) -> int | None:
+        value = ((self.attributes or {}).get("naukri") or {}).get("reviews")
+        return int(value) if isinstance(value, int | float) else None
 
 
 class CompanyFieldSource(Base):

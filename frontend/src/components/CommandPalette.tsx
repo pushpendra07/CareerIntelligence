@@ -61,7 +61,7 @@ export function CommandPalette({ pages }: { pages: { to: string; label: string; 
     return [
       { id: "add-job", group: "Actions", label: "Add a job", hint: "paste a URL and description", keys: "C", run: go("/jobs/new") },
       { id: "review", group: "Actions", label: "Review new jobs", hint: "one at a time, best first", run: go("/jobs/review") },
-      { id: "scan", group: "Actions", label: "Scan company job boards now", hint: "find new jobs", run: () => scan.mutate() },
+      { id: "scan", group: "Actions", label: "Search company job boards now", hint: "find new jobs", run: () => scan.mutate() },
       { id: "followup", group: "Actions", label: "See follow-ups due", hint: "who to chase", run: go("/followups") },
       { id: "upload-cv", group: "Actions", label: "Upload a CV", hint: "resume", run: go("/cvs") },
       { id: "backup", group: "Actions", label: "Back up my data now", hint: "database, CVs", run: () => backup.mutate() },

@@ -12,11 +12,11 @@ const MIN_SCORES = [0, 60, 70, 80] as const;
 type Done = { id: number; title: string; from: string; to: string };
 
 /** Keyboard shortcuts, shown on the buttons and in the help line. */
-const KEYS = { shortlist: "s", notRelevant: "n", skip: "k", open: "o", undo: "u" } as const;
+const KEYS = { closed: "c", shortlist: "s", notRelevant: "n", skip: "k", open: "o", undo: "u" } as const;
 
 /**
  * Quick review: new jobs one at a time, best match first, with the facts needed to decide.
- * Shortlist or Not relevant moves the job out of "New"; Skip leaves it for later.
+ * Closed, Not relevant or Shortlist moves the job out of "New"; Skip leaves it for later.
  */
 export function ReviewPage() {
   const qc = useQueryClient();
@@ -72,6 +72,7 @@ export function ReviewPage() {
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       const k = e.key.toLowerCase();
       if (k === KEYS.shortlist) decide("SHORTLISTED");
+      else if (k === KEYS.closed) decide("CLOSED");
       else if (k === KEYS.notRelevant) decide("NOT_RELEVANT");
       else if (k === KEYS.skip || e.key === "ArrowRight") skip();
       else if (k === KEYS.open && postingLink) window.open(postingLink, "_blank", "noopener");
@@ -130,21 +131,24 @@ export function ReviewPage() {
           {setStatus.error && <p className="text-sm text-rose-600">{errorMessage(setStatus.error)}</p>}
           {!current ? <Spinner /> : <ReviewCard job={current} />}
           <div className="sticky bottom-0 -mx-2 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50/95 px-2 py-3 backdrop-blur">
-            {postingLink && (
-              <a className="btn-secondary" href={postingLink} target="_blank" rel="noopener noreferrer">
-                Open posting ↗ <kbd className="kbd">O</kbd>
-              </a>
-            )}
-            {postingLink && <CopyLinkButton url={postingLink} />}
-            <button className="btn-primary" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
-              ★ Shortlist <kbd className="kbd">S</kbd>
+            <button className="btn-slate" disabled={!current || busy} onClick={() => decide("CLOSED")} title="The posting is no longer open">
+              Closed <kbd className="kbd">C</kbd>
             </button>
-            <button className="btn-secondary" disabled={!current || busy} onClick={() => decide("NOT_RELEVANT")}>
+            <button className="btn-rose" disabled={!current || busy} onClick={() => decide("NOT_RELEVANT")}>
               Not relevant <kbd className="kbd">N</kbd>
+            </button>
+            <button className="btn-amber" disabled={!current || busy} onClick={() => decide("SHORTLISTED")}>
+              ★ Shortlist <kbd className="kbd">S</kbd>
             </button>
             <button className="btn-secondary" disabled={!current || busy} onClick={skip}>
               Skip for now <kbd className="kbd">K</kbd>
             </button>
+            {postingLink && (
+              <a className="btn-sky" href={postingLink} target="_blank" rel="noopener noreferrer">
+                Open posting ↗ <kbd className="kbd">O</kbd>
+              </a>
+            )}
+            {postingLink && <CopyLinkButton url={postingLink} />}
             <span className="flex-1" />
             {current && <Link className="btn-secondary" to={`/jobs/${current.id}`}>All details</Link>}
           </div>

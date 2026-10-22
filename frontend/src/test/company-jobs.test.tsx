@@ -30,7 +30,7 @@ describe("company jobs", () => {
     const onScan = vi.fn();
     mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 10 } });
     renderAt(<CompanyJobs companyId={3} companyName="Acme" total={0} open={0} onScan={onScan} scanning={false} />);
-    await userEvent.click(screen.getByRole("button", { name: "Scan its job board" }));
+    await userEvent.click(screen.getByRole("button", { name: "Search its job board" }));
     expect(onScan).toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "Add a job by hand" })).toHaveAttribute("href", "/jobs/new");
   });

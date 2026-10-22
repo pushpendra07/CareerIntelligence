@@ -82,4 +82,14 @@ describe("quick review", () => {
     expect(posts).toEqual([{ id: "2", status: "NOT_RELEVANT" }]);
     expect(screen.getByRole("button", { name: "Review skipped again" })).toBeInTheDocument();
   });
+
+  it("marks a closed posting with C", async () => {
+    const posts: { id: string; status: string }[] = [];
+    setup(posts);
+    renderAt(<ReviewPage />, { path: "/jobs/review", route: "/jobs/review" });
+    await screen.findByRole("heading", { name: "Magento Lead" });
+    await userEvent.keyboard("c");
+    expect(await screen.findByRole("heading", { name: "PHP Architect" })).toBeInTheDocument();
+    expect(posts[0].status).toBe("CLOSED");
+  });
 });

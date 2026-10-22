@@ -4,6 +4,7 @@ Guards: http(s) only, no private/loopback/link-local targets (re-checked on ever
 bounded redirects, timeout and response size.
 """
 
+import http.client
 import ipaddress
 import json
 import socket
@@ -12,7 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 USER_AGENT = "CareerIntelligence/0.1 (personal job-search verification; +local)"
 MAX_BYTES = 512 * 1024
@@ -31,6 +32,16 @@ class Fetcher(Protocol):
 
 class BlockedURLError(ValueError):
     pass
+
+
+class FetchError(OSError):
+    """The server broke the response (cut short, bad redirect…). An OSError, like a network
+    failure, so callers that handle those handle this too."""
+
+
+# Characters a URL may contain as they are; anything else (spaces in a redirect Location) is
+# percent-encoded, otherwise http.client refuses the request.
+_URL_SAFE = ":/?#[]@!$&'()*+,;=%~"
 
 
 def _check_host(url: str) -> None:
@@ -83,11 +94,13 @@ def safe_request(
                 return FetchResult(current, resp.status, body)
         except urllib.error.HTTPError as exc:
             if exc.code in (301, 302, 303, 307, 308) and exc.headers.get("Location"):
-                current = urljoin(current, exc.headers["Location"])
+                current = quote(urljoin(current, exc.headers["Location"]), safe=_URL_SAFE)
                 if exc.code == 303:
                     method, data = "GET", None
                 continue
             return FetchResult(current, exc.code, "")
+        except http.client.HTTPException as exc:  # IncompleteRead, InvalidURL, BadStatusLine…
+            raise FetchError(f"{type(exc).__name__} from {urlsplit(current).hostname}") from exc
     raise BlockedURLError("Too many redirects")
 
 

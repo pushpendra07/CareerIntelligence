@@ -7,11 +7,11 @@ curl -s http://127.0.0.1:8010/api/v1/scanner/status | python3 -m json.tool      
 curl -s http://127.0.0.1:8010/api/v1/career-ops/status | python3 -m json.tool    # Career-Ops
 ```
 
-**53 companies are in the curated list:** 49 by the built-in Job scanner (10 of them also by Career-Ops)
+**53 companies are in the curated list:** 49 by the built-in Job board search (10 of them also by Career-Ops)
 plus 4 only by Career-Ops. Across all companies in the app, 190+ boards are auto-scannable.
 Tracked companies without a supported board remain in "Not scannable" below.
 
-## Built-in Job scanner — 49 companies
+## Job board search (built-in) — 49 companies
 
 Scanned when the company has **Job search** ticked and its careers URL is a supported board.
 
@@ -124,7 +124,7 @@ The live list is `not_scannable` in `GET /api/v1/scanner/status`.
 For these: run **Find job boards** (may discover a linked board), add jobs from Google Sheets,
 or use **Add Job** with the posting URL + description. Don't invent board URLs.
 
-## How Find job boards works (Settings → Job scanner)
+## How Find job boards works (Settings → Job board search)
 
 For every company the scanner can't read yet, in this order (first match wins, each checked live):
 
@@ -162,3 +162,12 @@ no careers URL, still can't be scanned — use Add Job or Google Sheets.
 | SAP SuccessFactors | `*.successfactors.com/eu`, `*.jobs2web.com`, or own domain | `GET <base>/tile-search-results/?startrow=0` (older sites) or `POST <base>/services/recruiting/v1/jobs` (newer); descriptions from each job page's JobPosting data |
 | Oracle Cloud HCM | `<tenant>.fa.<region>.oraclecloud.com/hcmUI/CandidateExperience/<lang>/sites/<site>` | `GET https://<host>/hcmRestApi/resources/latest/recruitingCEJobRequisitions?...finder=findReqs;siteNumber=<site>` |
 | Own careers page | any page with schema.org `JobPosting` (on it or on its job pages) | the page itself |
+
+## Rate limits and broken responses
+
+Boards shared by many companies (Workable above all) answer **HTTP 429 Too Many Requests** when
+they're asked too fast. The scanner sends at most 2 requests at a time to one host and retries a
+429 after 3, 8 and 20 seconds (`polite` in `backend/app/scanner/service.py`); only a board that is
+still limited after that shows "HTTP 429" in the scan details. A response cut short or a broken
+redirect is reported for that company only (`FetchError` in `core/http.py`); it never stops the
+scan.

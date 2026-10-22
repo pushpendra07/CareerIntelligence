@@ -34,7 +34,7 @@ export function CompanyJobs({ companyId, companyName, total, open, onScan, scann
           <div className="text-sm text-slate-600">
             <p>No jobs for {companyName} in the app yet.</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <button className="btn-secondary" disabled={scanning} onClick={onScan}>{scanning ? "Scanning…" : "Scan its job board"}</button>
+              <button className="btn-secondary" disabled={scanning} onClick={onScan}>{scanning ? "Searching…" : "Search its job board"}</button>
               <Link className="btn-secondary" to="/jobs/new">Add a job by hand</Link>
             </div>
           </div>

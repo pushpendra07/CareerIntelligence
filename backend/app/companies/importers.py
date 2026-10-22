@@ -19,6 +19,7 @@ import yaml
 
 from app.companies.verification import Claim
 from app.core.text import clean, split_list
+from app.core.urls import ensure_scheme, is_http_url
 from app.models.company import HiringStatus, SourceKind, Tier, VerificationStatus
 
 VS = VerificationStatus
@@ -36,6 +37,8 @@ class CompanyRecord:
     job_search_enabled: bool | None = None
     notes: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
+    # Company pages on job portals (Naukri, LinkedIn, Monster, Foundit...).
+    extra_links: list[str] = field(default_factory=list)
 
     def claim(
         self,
@@ -329,11 +332,73 @@ GENERIC_FIELDS = (
 )
 
 
+# Columns holding company pages on job portals; any of them becomes an extra link.
+EXTRA_LINK_COLUMNS = ("extra_link", "extra_links", "naukri_url", "monster_url", "foundit_url")
+
+
+def _extra_links(row: dict[str, Any]) -> list[str]:
+    links = []
+    for col in EXTRA_LINK_COLUMNS:
+        value = row.get(col)
+        values = value if isinstance(value, list) else split_list(clean(value), r"[\s;|,]+")
+        links += [ensure_scheme(v) for v in values if is_http_url(ensure_scheme(v))]
+    return links
+
+
+def _number(value: object) -> float | None:
+    try:
+        return float(str(clean(value)))
+    except ValueError:
+        return None
+
+
+def _naukri_record(row: dict[str, Any], name: str) -> CompanyRecord:
+    """A row of a Naukri company-list export (Company ID, Company Page, Jobs Page, Rating...).
+
+    Naukri is an aggregator: its values are unverified hints that never beat checked data.
+    Its "Company Type" (Corporate, Startup, MNC) is not this app's company type (Magento
+    agency...), so it stays with the other Naukri details in attributes["naukri"].
+    """
+    rec = CompanyRecord(name=name, source_name="naukri")
+    page = clean(row.get("company_page"))
+    for f in ("industry", "headquarters"):
+        rec.claim(f, row.get(f), SourceKind.AGGREGATOR, VS.DISCOVERED, page)
+    rec.claim("employee_range", row.get("employees"), SourceKind.AGGREGATOR, VS.DISCOVERED, page)
+    if (clean(row.get("hiring_now")) or "").lower() in ("yes", "true", "1"):
+        rec.hiring_status = HiringStatus.HIRING
+    rec.extra_links = [page] if page else []
+    details: dict[str, Any] = {
+        "naukri_id": clean(row.get("company_id")),
+        "rating": _number(row.get("rating")),
+        "reviews": int(n) if (n := _number(row.get("reviews"))) is not None else None,
+        "company_type": clean(row.get("company_type")),
+        "founded": clean(row.get("founded")),
+        "business_nature": clean(row.get("business_nature")),
+        "offering_type": clean(row.get("offering_type")),
+        "ownership": clean(row.get("ownership")),
+        "employer_type": clean(row.get("employer_type")),
+        "highlight": clean(row.get("highlight")),
+        "awards": clean(row.get("awards")),
+        "jobs_page": clean(row.get("jobs_page")),
+        "logo": clean(row.get("logo")),
+        "first_seen": clean(row.get("first_seen")),
+    }
+    rec.attributes = {k: v for k, v in details.items() if v is not None}
+    return rec
+
+
+def is_naukri_export(row: dict[str, Any]) -> bool:
+    return "naukri.com" in (clean(row.get("company_page")) or "") and "company_id" in row
+
+
 def records_from_rows(rows: list[dict[str, Any]], source_name: str) -> Iterator[CompanyRecord]:
     for raw in rows:
         row = {re.sub(r"[^a-z0-9]+", "_", str(k).lower()).strip("_"): v for k, v in raw.items()}
         name = clean(row.get("name") or row.get("company_name") or row.get("company"))
         if not name or name.startswith("["):  # "[Additional 150+ companies ...]" placeholders
+            continue
+        if is_naukri_export(row):
+            yield _naukri_record(row, name)
             continue
         rec = CompanyRecord(name=name, source_name=source_name)
         url = clean(row.get("source_url"))
@@ -375,6 +440,7 @@ def records_from_rows(rows: list[dict[str, Any]], source_name: str) -> Iterator[
             rec.attributes = {k: v for k, v in extra.items() if v}
         if (enabled := clean(row.get("job_search_enabled"))) is not None:
             rec.job_search_enabled = enabled.lower() in ("1", "true", "yes", "y")
+        rec.extra_links = _extra_links(row)
         yield rec
 
 

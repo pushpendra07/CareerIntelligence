@@ -183,6 +183,24 @@ def test_scan_records_board_errors_and_keeps_going(db: Session) -> None:
     assert "404" in gone["error"]
 
 
+def test_a_broken_board_never_stops_the_scan(db: Session) -> None:
+    company(db, "Broken Co", "https://jobs.lever.co/broken")
+    company(db, "Acme Commerce", "https://job-boards.greenhouse.io/acme")
+    ok = FakeHttp({"https://boards-api.greenhouse.io/v1/boards/acme/": greenhouse_board(
+        {"title": "Magento Developer"})})
+
+    def http(method: str, url: str, json_body: object | None = None) -> FetchResult:
+        if "lever" in url:
+            raise RuntimeError("parser bug")  # anything at all, not just network errors
+        return ok(method, url, json_body)
+
+    run = service.run_scan(db, http=http)
+    assert run.status == "COMPLETED"
+    assert (run.stats["errors"], run.stats["new"]) == (1, 1)
+    broken = next(r for r in run.companies if r["company"] == "Broken Co")
+    assert "parser bug" in broken["error"]
+
+
 def test_scan_fetches_details_for_list_only_boards(db: Session) -> None:
     company(db, "Endava", "https://jobs.smartrecruiters.com/Endava")
     ref = "https://api.smartrecruiters.com/v1/companies/Endava/postings/7"
@@ -306,3 +324,17 @@ def test_a_company_can_opt_out_of_search_every_company(client: TestClient, db: S
     row = db.get(Company, skip)
     assert row is not None and "scan_excluded" not in row.attributes
     assert {c.id for c, _ in service.scan_targets(db, all_companies=True)} == {keep, skip}
+
+
+def test_rate_limited_requests_are_retried_after_a_pause() -> None:
+    answers = [429, 429, 200]
+    pauses: list[float] = []
+
+    def http(method: str, url: str, json_body: object | None = None) -> FetchResult:
+        return FetchResult(url, answers.pop(0), "{}")
+
+    res = service.polite(http, pauses=(1.0, 2.0, 3.0), sleep=pauses.append)("GET", "https://x.test/")
+    assert res.status == 200 and pauses == [1.0, 2.0]
+    answers[:] = [429, 429]
+    gave_up = service.polite(http, pauses=(1.0,), sleep=pauses.append)("GET", "https://x.test/")
+    assert gave_up.status == 429  # still limited after every retry: reported as before

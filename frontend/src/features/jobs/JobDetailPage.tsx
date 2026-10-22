@@ -3,11 +3,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { ScoreBreakdown } from "../../components/charts";
-import { BackButton, Badge, Card, Chips, CopyLinkButton, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
+import { Badge, Card, Chips, CopyLinkButton, ErrorBox, KeyValue, Spinner, StatusBadge, JobStatusBadge, AddedViaTags } from "../../components/ui";
 import type { Application, CV, FollowUp, Interview, JobDetail, Page } from "../../types/api";
 import { formatDate, formatDateTime, humanize } from "../../utils/format";
 import { FollowUpRow, QuickFollowUp, inDays } from "../followups/FollowUpParts";
-import { FitSummary, JobDescription, KeyFacts, postingUrl } from "./JobParts";
+import { FitSummary, JobDescription, KeyFacts, postingUrl, skillMarks } from "./JobParts";
+import { CompanyCard } from "./CompanyCard";
+import { JobPager, lastJobListUrl } from "./JobNav";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { PostingCheck } from "./PostingCheck";
 import { EmailDraft } from "./EmailDraft";
@@ -15,6 +17,7 @@ import { WebSearch, jobTopic } from "../../components/WebSearch";
 import { JobComments } from "./JobComments";
 import { EditJob } from "./EditJob";
 import { ContactLinks } from "../../components/ContactLinks";
+import { StickyBar, useScrolledPast } from "../../components/StickyBar";
 import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -108,22 +111,28 @@ function ApplyForm({ job, onDone }: { job: JobDetail; onDone: () => void }) {
 }
 
 /** The one thing to do next, depending on where the job is in your search. */
-function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: () => void; setStatus: (s: string) => void; busy: boolean }) {
+export function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: () => void; setStatus: (s: string) => void; busy: boolean }) {
   const url = postingUrl(job);
-  const posting = url && <><a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a><CopyLinkButton url={url} /></>;
+  const posting = url && <><a className="btn-sky" href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a><CopyLinkButton url={url} /></>;
+  const closed = <button className="btn-slate" disabled={busy} onClick={() => setStatus("CLOSED")}
+    title="The posting is no longer open">Closed</button>;
   let text: string;
   let actions: ReactNode;
   if (NEW_STATUSES.includes(job.status) || job.status === "REVIEWING") {
     text = "Is this worth applying to?";
     actions = <>
+      {closed}
+      <button className="btn-rose" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
+      <button className="btn-amber" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
+      <button className="btn-emerald" disabled={busy} onClick={() => setStatus("APPLIED")}
+        title="Already applied — records the application">✓ Applied</button>
       {posting}
-      <button className="btn-primary" disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>
-      <button className="btn-secondary" disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>
     </>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     text = job.recommended_cv ? `Ready to apply — send your “${job.recommended_cv.name}” CV.` : "Ready to apply.";
     actions = <>
-      {url && <a className="btn-secondary" href={url} target="_blank" rel="noopener noreferrer">1. Apply on the site ↗</a>}
+      {closed}
+      {url && <a className="btn-sky" href={url} target="_blank" rel="noopener noreferrer">1. Apply on the site ↗</a>}
       <button className="btn-primary" onClick={onApply}>{url ? "2. Record that I applied" : "Record application"}</button>
     </>;
   } else if (["APPLIED", "RECRUITER_CONTACTED", "SCREENING"].includes(job.status)) {
@@ -151,7 +160,10 @@ function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: 
     </>;
   } else if (["OFFER", "ACCEPTED"].includes(job.status)) {
     text = "You have an offer.";
-    actions = <Link className="btn-primary" to="/offers">Compare offers</Link>;
+    actions = <>
+      <Link className="btn-primary" to={`/offers?job_id=${job.id}`}>Record the offer</Link>
+      <Link className="btn-secondary" to="/offers">Compare offers</Link>
+    </>;
   } else {
     text = `This job is ${humanize(job.status).toLowerCase()}.`;
     actions = <button className="btn-secondary" disabled={busy} onClick={() => setStatus("REVIEWING")}>Look at it again</button>;
@@ -165,6 +177,28 @@ function NextStep({ job, onApply, setStatus, busy }: { job: JobDetail; onApply: 
   );
 }
 
+/** Statuses that end the decision: the page goes back to the list after setting one. */
+const DISMISSED = ["CLOSED", "NOT_RELEVANT"];
+
+const SECTIONS: [string, string][] = [["fit", "Fit"], ["description", "Description"], ["email", "Email to HR"], ["follow-ups", "Follow-ups"], ["comments", "Comments"]];
+
+/** The main decision buttons, small, for the sticky bar once the page has scrolled. */
+function QuickActions({ job, setStatus, busy }: { job: JobDetail; setStatus: (s: string) => void; busy: boolean }) {
+  const url = postingUrl(job);
+  const b = "px-2 py-1 text-xs";
+  const open = NEW_STATUSES.includes(job.status) || PENDING_STATUSES.includes(job.status);
+  const deciding = NEW_STATUSES.includes(job.status) || job.status === "REVIEWING";
+  return (
+    <span className="inline-flex items-center gap-1" data-testid="quick-actions">
+      {open && <button className={`btn-slate ${b}`} disabled={busy} onClick={() => setStatus("CLOSED")} title="The posting is no longer open">Closed</button>}
+      {deciding && <button className={`btn-rose ${b}`} disabled={busy} onClick={() => setStatus("NOT_RELEVANT")}>Not relevant</button>}
+      {deciding && <button className={`btn-amber ${b}`} disabled={busy} onClick={() => setStatus("SHORTLISTED")}>★ Shortlist</button>}
+      {open && <button className={`btn-emerald ${b}`} disabled={busy} onClick={() => setStatus("APPLIED")} title="Already applied — records the application">✓ Applied</button>}
+      {url && <a className={`btn-sky ${b}`} href={url} target="_blank" rel="noopener noreferrer">Open posting ↗</a>}
+    </span>
+  );
+}
+
 export function JobDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -173,13 +207,21 @@ export function JobDetailPage() {
   const qc = useQueryClient();
   const applying = search.get("apply") === "1";
   const [editing, setEditing] = useState(false);
+  // The sticky bar repeats title, company and score only once the heading has scrolled away.
+  const [heading, setHeading] = useState<HTMLElement | null>(null);
+  const headingGone = useScrolledPast(heading);
   const setApplying = (on: boolean) => { const n = new URLSearchParams(search); if (on) n.set("apply", "1"); else n.delete("apply"); setSearch(n, { replace: true }); };
   const job = useQuery({ queryKey: ["job", id], queryFn: () => api.get<JobDetail>(`/jobs/${id}`) });
   const apps = useQuery({ queryKey: ["applications", { job_id: id }], queryFn: () => api.get<Page<Application>>("/applications", { job_id: id }) });
   const ivs = useQuery({ queryKey: ["interviews", { job_id: id }], queryFn: () => api.get<Page<Interview>>("/interviews", { job_id: id }) });
   const followups = useQuery({ queryKey: ["followups", { job_id: id }], queryFn: () => api.get<Page<FollowUp>>("/followups", { job_id: id, completed: false }) });
   const refresh = () => qc.invalidateQueries();
-  const status = useMutation({ mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }), onSuccess: refresh,
+  const status = useMutation({ mutationFn: (s: string) => api.post(`/jobs/${id}/status`, { status: s }),
+    onSuccess: (_, s) => {
+      refresh();
+      // Closed or not relevant: nothing left to do here, back to the list it came from.
+      if (DISMISSED.includes(s)) navigate(lastJobListUrl());
+    },
     meta: { success: "Status updated", toastError: true } });
   const fetchJd = useMutation({ mutationFn: () => api.post(`/career-ops/jobs/${id}/fetch-jd`), onSuccess: refresh });
   // Arriving from "Follow up" in the list: jump to the follow-ups card.
@@ -194,12 +236,26 @@ export function JobDetailPage() {
   const applied = APPLIED_STATUSES.includes(j.status) || (apps.data?.items.length ?? 0) > 0;
   return (
     <div className="space-y-4">
-      <BackButton fallback="/jobs" label="Back to jobs" />
+      <StickyBar fallback="/jobs" label="Back to jobs">
+        <span className={`min-w-0 flex-1 truncate text-sm transition-opacity ${headingGone ? "" : "invisible opacity-0"}`}
+          data-testid="sticky-job" aria-hidden={!headingGone}>
+          <span className="font-semibold text-slate-900">{j.title}</span>
+          <span className="text-slate-500"> · {j.company.name}</span>
+        </span>
+        {headingGone && <span className="hidden shrink-0 lg:inline-flex"><QuickActions job={j} setStatus={(s) => status.mutate(s)} busy={status.isPending} /></span>}
+        {j.match_score !== null && (
+          <span className={`shrink-0 text-sm transition-opacity ${headingGone ? "" : "invisible opacity-0"}`}
+            aria-hidden={!headingGone} title="How well this job fits you, 0–100">
+            <span className="font-bold text-indigo-700">{j.match_score}</span><span className="text-slate-400">/100</span>
+          </span>
+        )}
+        <JobPager id={j.id} />
+      </StickyBar>
       {dup && <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">This job already existed — the new source was added to it (matched by {humanize((location.state as { matchedBy?: string }).matchedBy)}).</div>}
       <Card>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1>{j.title} <span className="text-base font-normal text-slate-400" title="Job ID">#{j.id}</span></h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 ref={setHeading}>{j.title} <span className="text-base font-normal text-slate-400" title="Job ID">#{j.id}</span></h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
               <Link className="link" to={`/companies/${j.company.id}`}>{j.company.name}</Link>
               {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
@@ -209,15 +265,12 @@ export function JobDetailPage() {
               <WebSearch label="Find on other portals with" topic={jobTopic({ title: j.title, company: j.company.name, location: j.location, url: postingUrl(j) })} />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="btn-secondary" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>{editing ? "Close edit" : "Edit"}</button>
-            {j.match_score !== null && (
-              <span className="text-right" title="How well this job fits you, 0–100">
-                <span className="text-3xl font-bold text-indigo-700">{j.match_score}</span><span className="text-slate-400">/100</span>
-                {j.match && <div><StatusBadge value={j.match.recommendation} /></div>}
-              </span>
-            )}
-          </div>
+          {j.match_score !== null && (
+            <div className="shrink-0 text-right" title="How well this job fits you, 0–100">
+              <span className="text-3xl font-bold text-indigo-700">{j.match_score}</span><span className="text-slate-400">/100</span>
+              {j.match && <div className="mt-1"><StatusBadge value={j.match.recommendation} /></div>}
+            </div>
+          )}
         </div>
         {editing
           ? <div className="mt-3 border-t border-slate-100 pt-3"><EditJob key={j.id} job={j} onDone={() => setEditing(false)} /></div>
@@ -229,6 +282,8 @@ export function JobDetailPage() {
             <JobStatusOptions />
           </select>
           {j.score_stale && <Badge tone="amber" title="Your profile changed; the score refreshes by itself shortly">score updating</Badge>}
+          <span className="flex-1" />
+          <button className="btn-secondary px-3 py-1 text-xs" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>{editing ? "Close edit" : "Edit job"}</button>
         </div>
         <div className="mt-3 border-t border-slate-100 pt-3">
           <PostingCheck job={j} onMarkClosed={() => status.mutate("CLOSED")} busy={status.isPending} />
@@ -236,9 +291,12 @@ export function JobDetailPage() {
       </Card>
       <NextStep job={j} onApply={() => setApplying(true)} setStatus={(s) => status.mutate(s)} busy={status.isPending} />
       {applying && <Card title="Record application"><ApplyForm job={j} onDone={() => { setApplying(false); refresh(); }} /></Card>}
+      <nav aria-label="Sections" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+        {SECTIONS.map(([hash, label]) => <a key={hash} className="hover:text-indigo-700" href={`#${hash}`}>{label}</a>)}
+      </nav>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
-          <Card title="Does it fit you?">
+          <Card title="Does it fit you?" id="fit" className="scroll-mt-32">
             {j.match && j.match.confidence !== "HIGH" && (
               <p className="mb-3 rounded bg-amber-50 p-2 text-xs text-amber-800">
                 {j.match.confidence === "LOW" ? "No job description, so this score is a rough guess from the title. Add the description for a reliable score." : "The job has limited detail, so the score is less certain."}
@@ -248,18 +306,19 @@ export function JobDetailPage() {
             {j.recommended_cv && <p className="mt-3 text-sm">Best CV for this job: <Link className="link" to={`/cvs/${j.recommended_cv.id}`}>{j.recommended_cv.name}</Link></p>}
             <div className="mt-3"><ScoreDetails job={j} /></div>
           </Card>
-          <EmailDraft key={j.id} job={j} />
-          <Card title="Job description" actions={j.jd_status !== "OK" && j.jd_status !== "PASTE_NEEDED" ? (
+          <div id="email" className="scroll-mt-32"><EmailDraft key={j.id} job={j} /></div>
+          <Card title="Job description" id="description" className="scroll-mt-32" actions={j.jd_status !== "OK" && j.jd_status !== "PASTE_NEEDED" ? (
             <button className="btn-secondary" onClick={() => fetchJd.mutate()} disabled={fetchJd.isPending} title="Download the description from the posting">
               {fetchJd.isPending ? "Fetching…" : "Fetch description"}</button>) : undefined}>
             {fetchJd.error && <ErrorBox error={new Error(errorMessage(fetchJd.error))} />}
-            <JobDescription text={j.original_jd} empty={j.jd_status === "PASTE_NEEDED"
-              ? "This job is only on LinkedIn, Indeed or Naukri, which the app doesn't read automatically. Open the posting, copy the description, then click Edit above and paste it — the score becomes reliable."
-              : "No description saved yet. Fetch it from the posting, or click Edit above to paste it."} />
+            <JobDescription text={j.original_jd} marks={skillMarks(j)} empty={j.jd_status === "PASTE_NEEDED"
+              ? "This job is only on LinkedIn, Indeed or Naukri, which the app doesn't read automatically. Open the posting, copy the description, then click Edit job and paste it — the score becomes reliable."
+              : "No description saved yet. Fetch it from the posting, or click Edit job to paste it."} />
           </Card>
         </div>
         <div className="min-w-0 space-y-4">
-          <div id="follow-ups" className="scroll-mt-16">
+          <CompanyCard companyId={j.company.id} jobId={j.id} />
+          <div id="follow-ups" className="scroll-mt-32">
             <Card title="Follow-ups">
               {followups.data?.items.length ? (
                 <ul className="mb-3 divide-y divide-slate-100">{followups.data.items.map((f) => <FollowUpRow key={f.id} f={f} showJob={false} />)}</ul>
@@ -281,7 +340,7 @@ export function JobDetailPage() {
               </ul>
             </Card>
           ) : null}
-          <JobComments jobId={j.id} comments={j.comments ?? []} />
+          <div id="comments" className="scroll-mt-32"><JobComments jobId={j.id} comments={j.comments ?? []} /></div>
           {j.recruiter && (
             <Card title="Recruiter">
               <div className="space-y-1 text-sm">

@@ -1,21 +1,41 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FollowupsPage } from "../features/followups/FollowupsPage";
 import { inDays, dueLabel } from "../features/followups/FollowUpParts";
 import { JobDetailPage } from "../features/jobs/JobDetailPage";
-import { AppLayout, locate } from "../layouts/AppLayout";
+import { AppLayout, jobTabFor, locate } from "../layouts/AppLayout";
 import { mockApi, renderAt } from "./utils";
 
 afterEach(() => vi.unstubAllGlobals());
 
+function ListPath() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="list">{pathname + search}</p>;
+}
+
 describe("menu", () => {
+  it("lists job statuses with counts under Jobs", async () => {
+    mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} }, "GET /jobs": { items: [], total: 0, page: 1, size: 50 },
+      "GET /jobs/status-counts": { NEW: 3, DISCOVERED: 2, SHORTLISTED: 4, NOT_RELEVANT: 7, CLOSED: 9 } });
+    renderAt(<AppLayout />, { path: "/jobs", route: "/jobs?tab=pending" });
+    const sub = screen.getByRole("list", { name: "Jobs by status" });
+    expect(await within(sub).findByRole("link", { name: /^New\s*5$/ })).toHaveAttribute("href", "/jobs?tab=new");
+    expect(within(sub).getByRole("link", { name: /^Pending\s*4$/ })).toHaveAttribute("aria-current", "page");
+    expect(within(sub).getByRole("link", { name: /^Not pursuing\s*7$/ })).toBeInTheDocument();
+    expect(within(sub).getByRole("link", { name: /^Closed\s*9$/ })).toHaveAttribute("href", "/jobs/closed");
+    expect(within(sub).queryByRole("link", { name: /On Hold/ })).not.toBeInTheDocument(); // statuses are chips on the page
+    expect(jobTabFor("/jobs", "")).toBe("new");
+    expect(jobTabFor("/jobs", "?min_score=70")).toBe("all");
+  });
+
   it("has one entry per area, with counts, and tabs for related pages", async () => {
     mockApi({ "GET /dashboard": { summary: { new_jobs: 12, due_followups: 3 }, priorities: [], funnels: {} } });
     renderAt(<AppLayout />, { path: "/interviews", route: "/interviews" });
     const menu = screen.getByRole("navigation", { name: "Main" });
     expect(within(menu).getAllByRole("link").map((l) => l.textContent?.replace(/\d+$/, ""))).toEqual(
-      ["Today", "Jobs", "Pipeline", "Follow-ups", "Reports", "My profile", "Settings"]);
+      ["Today", "Jobs", "Companies", "Pipeline", "Follow-ups", "Reports", "My profile", "Settings"]);
     expect(await within(menu).findByTitle("New jobs to review")).toHaveTextContent("12");
     expect(within(menu).getByTitle("Due today or overdue")).toHaveTextContent("3");
     expect(within(menu).getByRole("link", { name: "Pipeline" })).toHaveAttribute("aria-current", "page");
@@ -54,7 +74,7 @@ describe("menu", () => {
   it("finds the section and tab for any page", () => {
     expect(locate("/jobs/review").tab?.label).toBe("Review new");
     expect(locate("/jobs/42").tab?.label).toBe("All jobs");
-    expect(locate("/companies/3").section?.label).toBe("Jobs");
+    expect(locate("/companies/3").section?.label).toBe("Companies");
     expect(locate("/preferences").section?.label).toBe("My profile");
     expect(locate("/analytics").section?.label).toBe("Today");
     expect(locate("/").tab?.label).toBe("Today");
@@ -68,6 +88,19 @@ const fu = (id: number, title: string, due: string, extra: object = {}) => ({
 });
 
 describe("follow-ups", () => {
+  it("moves every late follow-up at once", async () => {
+    const api = mockApi({
+      "GET /followups": { items: [fu(1, "Ping Acme", inDays(-5)), fu(2, "Ping Beta", inDays(-2)), fu(3, "Later", inDays(9))], total: 3, page: 1, size: 200 },
+      "PATCH /followups/1": { ok: true }, "PATCH /followups/2": { ok: true },
+    });
+    renderAt(<FollowupsPage />, { path: "/followups", route: "/followups" });
+    const late = await screen.findByRole("region", { name: "Late" });
+    expect(late).toHaveTextContent("Move all 2 to");
+    await userEvent.click(within(late).getByRole("button", { name: "Move all late to +3 days" }));
+    await waitFor(() => expect(api.calls.filter((c) => c.method === "PATCH").map((c) => [c.path, c.body]))
+      .toEqual([["/followups/1", { due_date: inDays(3) }], ["/followups/2", { due_date: inDays(3) }]]));
+  });
+
   it("groups by urgency and acts in one click", async () => {
     const api = mockApi({
       "GET /followups": (url: URL) => url.searchParams.get("completed") === "true" ? { items: [], total: 0 } : {
@@ -141,6 +174,24 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "in a week" }));
     expect(api.calls.find((c) => c.path === "/followups" && c.method === "POST")?.body)
       .toMatchObject({ title: "Follow up: Magento Lead", job_id: 9, due_date: inDays(7) });
+  });
+
+  it("marks a new job as applied or closed in one click", async () => {
+    const api = mockApi({
+      "GET /jobs/9": JOB, "GET /applications": empty, "GET /interviews": empty, "GET /followups": empty,
+      "POST /jobs/9/status": { ok: true },
+    });
+    sessionStorage.setItem("jobs.listUrl.v1", "/jobs?tab=new&q=magento");
+    renderAt(<JobDetailPage />, { path: "/jobs/:id", route: "/jobs/9", others: { "/jobs": <ListPath /> } });
+    await userEvent.click(await screen.findByRole("button", { name: "✓ Applied" }));
+    expect(screen.getByRole("button", { name: "← Back to jobs" }).parentElement).toHaveClass("sticky");
+    expect(screen.getByTestId("sticky-job")).toHaveClass("invisible"); // the heading is still in view
+    // Closed (or Not relevant) ends it: back to the list the job was opened from.
+    await userEvent.click(screen.getByRole("button", { name: "Closed" }));
+    expect(await screen.findByTestId("list")).toHaveTextContent("/jobs?tab=new&q=magento");
+    expect(api.calls.filter((c) => c.path === "/jobs/9/status").map((c) => c.body))
+      .toEqual([{ status: "APPLIED" }, { status: "CLOSED" }]);
+    sessionStorage.clear();
   });
 
   it("opens the apply form from the list's Apply link", async () => {

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
@@ -13,6 +13,25 @@ const GROUPS: { key: string; title: string; tone: string; test: (due: string, to
   { key: "week", title: "This week", tone: "text-slate-700", test: (d, t, w) => d > t && d <= w },
   { key: "later", title: "Later", tone: "text-slate-500", test: (d, _t, w) => d > w },
 ];
+
+/** Move every late follow-up at once (a bad week happens): to today, or a few days on. */
+function MoveAllLate({ items }: { items: FollowUp[] }) {
+  const qc = useQueryClient();
+  const move = useMutation({
+    mutationFn: (days: number) => Promise.all(items.map((f) => api.patch(`/followups/${f.id}`, { due_date: inDays(days) }))),
+    onSuccess: () => qc.invalidateQueries(),
+    meta: { success: "Late follow-ups moved", toastError: true },
+  });
+  return (
+    <span className="ml-auto inline-flex flex-wrap items-center gap-1 text-xs font-normal text-slate-500">
+      Move all {items.length} to
+      {([[0, "today"], [1, "tomorrow"], [3, "+3 days"], [7, "+1 week"]] as [number, string][]).map(([d, label]) => (
+        <button key={d} type="button" className="btn-secondary px-2 py-0.5 text-xs" disabled={move.isPending}
+          aria-label={`Move all late to ${label}`} onClick={() => move.mutate(d)}>{label}</button>
+      ))}
+    </span>
+  );
+}
 
 export function FollowupsPage() {
   const [adding, setAdding] = useState(false);
@@ -55,7 +74,10 @@ export function FollowupsPage() {
         if (!list.length) return null;
         return (
           <section key={g.key} aria-label={g.title}>
-            <h2 className={`mb-1 text-sm font-semibold ${g.tone}`}>{g.title} <span className="font-normal text-slate-400">({list.length})</span></h2>
+            <h2 className={`mb-1 flex flex-wrap items-center gap-2 text-sm font-semibold ${g.tone}`}>
+              <span>{g.title} <span className="font-normal text-slate-400">({list.length})</span></span>
+              {g.key === "late" && list.length > 1 && <MoveAllLate items={list} />}
+            </h2>
             <Card><ul className="divide-y divide-slate-100">{list.map((f) => <FollowUpRow key={f.id} f={f} />)}</ul></Card>
           </section>
         );

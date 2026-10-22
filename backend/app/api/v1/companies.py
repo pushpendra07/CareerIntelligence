@@ -12,11 +12,13 @@ from app.companies.importers import parse_upload, records_from_rows
 from app.companies.verification import Claim
 from app.core.errors import DomainValidationError
 from app.core.pagination import Page, PageParams, page_params
-from app.models.company import Contact
+from app.models.company import Company, Contact
 from app.models.job import Job
 from app.schemas.company import (
+    CompanyBulkIn,
     CompanyCreate,
     CompanyDetail,
+    CompanyIdsIn,
     CompanyOut,
     CompanyWrite,
     ContactBase,
@@ -41,8 +43,12 @@ def list_companies(
     job_search_enabled: bool | None = None,
     hiring_status: str | None = None,
     has_jobs: bool | None = None,
+    portal: str | None = None,
+    industry: str | None = None,
+    company_size: Literal["1-50", "51-200", "201-1000", "1001-5000", "5001+"] | None = None,
     sort: Literal[
-        "name", "-verification_score", "tier", "-updated_at", "-jobs", "id", "-id"
+        "name", "-verification_score", "tier", "-updated_at", "-jobs", "id", "-id",
+        "-created_at", "-rating",
     ] = "name",
 ) -> Page[CompanyOut]:
     items, total = company_service.list_companies(
@@ -55,6 +61,9 @@ def list_companies(
         job_search_enabled=job_search_enabled,
         hiring_status=hiring_status,
         has_jobs=has_jobs,
+        portal=portal,
+        industry=industry,
+        company_size=company_size,
         sort=sort,
     )
     counts = company_service.job_counts(db, [c.id for c in items])
@@ -74,6 +83,42 @@ def list_companies(
 @router.get("/companies/stats")
 def stats(db: DB) -> dict[str, Any]:
     return company_service.company_stats(db)
+
+
+@router.get("/companies/facets")
+def facets(db: DB) -> dict[str, Any]:
+    return company_service.facets(db)
+
+
+@router.get("/companies/duplicates")
+def duplicates(db: DB) -> dict[str, Any]:
+    """Groups of companies that may be the same one, with each company's details."""
+    groups = company_service.possible_duplicates(db)
+    ids = sorted({i for g in groups for i in g["company_ids"]})
+    rows = {c.id: c for c in db.scalars(select(Company).where(Company.id.in_(ids)))}
+    counts = company_service.job_counts(db, ids)
+    out = []
+    for g in groups:
+        companies = []
+        for i in g["company_ids"]:
+            row = CompanyOut.model_validate(rows[i])
+            row.job_count, row.open_job_count = counts.get(i, (0, 0))
+            companies.append(row)
+        out.append({"reason": g["reason"], "companies": companies})
+    return {"groups": out, "total": len(out)}
+
+
+@router.post("/companies/duplicates/dismiss", status_code=204)
+def dismiss_duplicates(db: DB, body: CompanyIdsIn) -> Response:
+    company_service.dismiss_duplicates(db, body.company_ids)
+    return Response(status_code=204)
+
+
+@router.post("/companies/bulk")
+def bulk(db: DB, body: CompanyBulkIn) -> dict[str, Any]:
+    return company_service.bulk_update(
+        db, body.company_ids, body.action, body.tier.value if body.tier else None
+    )
 
 
 @router.get("/companies/export")

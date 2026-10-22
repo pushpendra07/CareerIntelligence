@@ -155,6 +155,8 @@ export interface Company {
   domain: string | null;
   careers_url: string | null;
   linkedin_url: string | null;
+  /** Company pages on job portals (Naukri, LinkedIn, Monster, Foundit…). */
+  extra_links?: ExtraLink[];
   ats_provider: string | null;
   headquarters: string | null;
   india_presence: boolean | null;
@@ -167,6 +169,9 @@ export interface Company {
   hiring_status: string;
   job_search_enabled: boolean;
   scan_excluded?: boolean;
+  /** Employee rating on a job portal (Naukri), 1–5. */
+  rating?: number | null;
+  rating_reviews?: number | null;
   job_count?: number;
   open_job_count?: number;
   verification_status: string;
@@ -174,6 +179,14 @@ export interface Company {
   verification_score: number;
   last_verified_at: string | null;
   notes: string | null;
+  created_at?: string;
+}
+
+export interface ExtraLink {
+  portal: string;
+  url: string;
+  source: string | null;
+  added_at: string | null;
 }
 
 export interface CompanyDetail extends Company {
@@ -302,6 +315,8 @@ export interface Application {
   salary_currency: string | null;
   notice_period_days: number | null;
   follow_up_date: string | null;
+  /** Earliest follow-up still to do (Follow-ups list), if any. */
+  next_follow_up?: string | null;
   notes: string | null;
   origin: string;
   updated_at?: string;

@@ -258,7 +258,7 @@ function CompaniesStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
               {r.error ? <><span className="text-rose-600">✕</span><span className="min-w-0 flex-1 truncate">{r.url}</span><span className="text-xs text-rose-700">{r.error}</span></>
                 : <><span className={r.board ? "text-emerald-600" : "text-amber-600"}>{r.board ? "✓" : "!"}</span>
                   <span className="font-medium">{r.name}</span>
-                  <span className="text-xs text-slate-500">{r.board ? `${nice(r.board.provider)} — jobs will be checked` : "saved; we can't read this site's jobs yet (Settings → Job scanner → Find job boards can look for one)"}</span></>}
+                  <span className="text-xs text-slate-500">{r.board ? `${nice(r.board.provider)} — jobs will be checked` : "saved; we can't read this site's jobs yet (Settings → Job board search → Find job boards can look for one)"}</span></>}
             </li>
           ))}
         </ul>
@@ -287,10 +287,10 @@ function JobsStep({ onBack, onFinish, finishing, scannable }: { onBack: () => vo
       <p className="mt-1 text-sm text-slate-600">Pick any way to start. New jobs are scored and waiting for you on Today.</p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 p-4">
-          <div className="font-medium text-slate-900">Scan job boards</div>
+          <div className="font-medium text-slate-900">Search job boards</div>
           <div className="mt-1 text-xs text-slate-500">{scannable ? `${scannable} compan${scannable === 1 ? "y" : "ies"} ready · 1–3 minutes` : "Add companies in the previous step first"}</div>
           <button className="btn-primary mt-3 w-full" disabled={!scannable || running || scan.isPending} onClick={() => scan.mutate()}>
-            {running ? "Scanning…" : started ? "Scan again" : "Scan now"}
+            {running ? "Searching…" : started ? "Search again" : "Search now"}
           </button>
           {running && <div className="mt-2 flex items-center gap-2 text-xs text-slate-500" role="status"><span className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />Looking for jobs…</div>}
           {result && <div className="mt-2 text-xs text-emerald-700" role="status">Done: {result.stats.new ?? 0} new jobs added.</div>}

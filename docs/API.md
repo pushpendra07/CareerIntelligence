@@ -47,7 +47,21 @@ Conventions:
 - `POST /api/v1/companies`
 - `GET /api/v1/companies/stats`
 - `GET /api/v1/companies/export`
-- `POST /api/v1/companies/import`
+- `POST /api/v1/companies/import` — CSV/JSON of companies (also a Naukri company-list export).
+  Matches existing companies by extra link, website domain, then name (names differing only in
+  *different* generic words — "Aspire Software Solutions" / "Aspire Systems" — stay separate).
+  Columns `extra_link`, `naukri_url`, `foundit_url`, `monster_url` add job-portal company pages.
+- Companies have `extra_links` (`[{portal, url, source, added_at}]`: Naukri, LinkedIn, Monster,
+  Foundit…) and `created_at`; `PATCH /companies/{id}` with `{"extra_links": [urls]}` replaces the
+  list. `GET /companies?sort=-created_at` lists the newest first.
+- `GET /api/v1/companies` also filters by `portal` (`naukri`, … or `any`), `industry` (contains),
+  `company_size` (`1-50`, `51-200`, `201-1000`, `1001-5000`, `5001+`) and sorts by `-rating`
+  (portal rating weighted by its number of reviews). Rows include `rating` and `rating_reviews`.
+- `GET /api/v1/companies/facets` — industries, company sizes and portals in use, with counts.
+- `GET /api/v1/companies/duplicates` — groups of companies that may be one (similar name or same
+  website); `POST /api/v1/companies/duplicates/dismiss {"company_ids": [...]}` stops suggesting a group.
+- `POST /api/v1/companies/bulk {"company_ids", "action": "job_search_on"|"job_search_off"|"tier"|"delete", "tier"?}`
+  — delete skips companies that jobs, recruiters or applications point at.
 - `GET /api/v1/companies/{company_id}`
 - `PATCH /api/v1/companies/{company_id}`
 - `POST /api/v1/companies/{company_id}/evidence`

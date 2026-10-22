@@ -36,7 +36,7 @@ const TONES: Record<string, string> = {
 
 export function Badge({ children, tone = "gray", title }: { children: ReactNode; tone?: keyof typeof TONES; title?: string }) {
   return (
-    <span title={title} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TONES[tone]}`}>
+    <span title={title} className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TONES[tone]}`}>
       {children}
     </span>
   );
@@ -94,7 +94,7 @@ export function JobStatusBadge({ value }: { value: string | null | undefined }) 
 export const ADDED_VIA: Record<string, { label: string; cls: string }> = {
   manual: { label: "Manual", cls: "bg-slate-100 text-slate-700 ring-slate-300" },
   sheet: { label: "Google Sheet", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-  scanner: { label: "Job scanner", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+  scanner: { label: "Job board search", cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   career_ops: { label: "Career-Ops", cls: "bg-violet-50 text-violet-700 ring-violet-200" },
   file: { label: "File import", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
   ai_search: { label: "AI search", cls: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200" },
@@ -316,13 +316,24 @@ export function Stat({ label, value, tone = "text-slate-900", to, icon, accent =
   );
 }
 
+/** "▲ 26 vs last week" — the change from the week before, green when up, red when down. */
+export function WeekChange({ now, before }: { now: number; before: number | undefined }) {
+  if (before === undefined) return null;
+  const diff = now - before;
+  return (
+    <span className={`mt-0.5 block font-sans text-xs font-medium tracking-normal ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-rose-600" : "text-slate-400"}`}>
+      {diff === 0 ? "same as last week" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)} vs last week`}
+    </span>
+  );
+}
+
 /** Goes back in history, or to a fallback page when opened directly (no history). */
-export function BackButton({ fallback, label = "Back" }: { fallback: string; label?: string }) {
+export function BackButton({ fallback, label = "Back", className = "mb-2" }: { fallback: string; label?: string; className?: string }) {
   const navigate = useNavigate();
   // The first page of a visit has key "default": there is nothing in-app to go back to.
   const hasHistory = useLocation().key !== "default";
   return (
-    <button type="button" className="btn-secondary mb-2"
+    <button type="button" className={`btn-secondary ${className}`}
       onClick={() => (hasHistory ? navigate(-1) : navigate(fallback))}>
       ← {label}
     </button>

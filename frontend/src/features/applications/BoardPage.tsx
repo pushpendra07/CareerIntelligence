@@ -6,7 +6,7 @@ import { ErrorBox, PageIntro, ScoreBadge, Spinner } from "../../components/ui";
 import { prefs } from "../../utils/storage";
 import type { Application, Page } from "../../types/api";
 import { formatDate, humanize } from "../../utils/format";
-import { APP_STATUSES } from "./ApplicationsPage";
+import { APP_STATUSES, followUpDue } from "./ApplicationsPage";
 
 /** The board's columns, in pipeline order. */
 export const BOARD_COLUMNS: { status: string; label: string; dot: string }[] = [
@@ -62,7 +62,7 @@ const reached = (a: BoardApp) => Math.max(RANK[a.status] ?? -1, ...(a.events ?? 
 
 function attention(a: BoardApp): "late" | "quiet" | null {
   if (FINISHED.includes(a.status)) return null;
-  if (a.follow_up_date && daysSince(a.follow_up_date) >= 0) return "late";
+  if (followUpDue(a) && daysSince(followUpDue(a)!) >= 0) return "late";
   if (a.updated_at && daysSince(a.updated_at) >= QUIET_DAYS) return "quiet";
   return null;
 }
@@ -70,7 +70,7 @@ function attention(a: BoardApp): "late" | "quiet" | null {
 function AppCard({ app, onMove, busy }: { app: BoardApp; onMove: (status: string) => void; busy: boolean }) {
   const open = !FINISHED.includes(app.status);
   const applied = daysSince(app.applied_on);
-  const followDue = open && app.follow_up_date ? daysSince(app.follow_up_date) : null;
+  const followDue = open && followUpDue(app) ? daysSince(followUpDue(app)!) : null;
   const quiet = open && app.updated_at ? daysSince(app.updated_at) >= QUIET_DAYS : false;
   const flag = attention(app);
   const next = NEXT[app.status];
@@ -94,7 +94,7 @@ function AppCard({ app, onMove, busy }: { app: BoardApp; onMove: (status: string
       </div>
       {followDue !== null && (
         <div className={`mt-0.5 text-xs ${followDue >= 0 ? "font-semibold text-rose-600" : "text-slate-500"}`}>
-          {followDue > 0 ? `Follow-up ${followDue} day${followDue === 1 ? "" : "s"} late` : followDue === 0 ? "Follow up today" : `Follow up ${formatDate(app.follow_up_date)}`}
+          {followDue > 0 ? `Follow-up ${followDue} day${followDue === 1 ? "" : "s"} late` : followDue === 0 ? "Follow up today" : `Follow up ${formatDate(followUpDue(app))}`}
         </div>
       )}
       {quiet && <div className="mt-0.5 text-xs text-amber-700">No update in {QUIET_DAYS}+ days</div>}

@@ -89,7 +89,7 @@ describe("dashboard", () => {
       "GET /dashboard": {
         summary: { total_jobs: 78, new_jobs: 73, jobs_scored: 78, jobs_90_plus: 1, jobs_80_plus: 3, stale_scores: 2,
           shortlisted: 0, applications: 1, interviews: 0, offers: 0, rejections: 0, pending_followups: 1,
-          overdue_followups: 0, companies: 541 },
+          overdue_followups: 0, companies: 541, applied_this_week: 5, applied_last_week: 2, unapplied_70_plus: 3 },
         priorities: [{ position: 1, type: "APPLY", title: "Apply — Technical Lead — 93/100", detail: "Codilar", due: null, link: { entity: "job", id: 5 } }],
         funnels: { application: [{ stage: "Applied", value: 1 }, { stage: "Interview", value: 0 }] },
       },
@@ -97,7 +97,8 @@ describe("dashboard", () => {
     });
     renderAt(<DashboardPage />);
     expect(await screen.findByText("Apply — Technical Lead — 93/100")).toHaveAttribute("href", "/jobs/5");
-    expect(screen.getByRole("link", { name: "Open jobs: view results" })).toHaveTextContent("78");
+    expect(screen.getByRole("link", { name: "Applied this week: view results" })).toHaveTextContent("5▲ 3 vs last week");
+    expect(screen.getByRole("link", { name: "Good jobs not applied (70+): view results" })).toHaveTextContent("3");
     expect(screen.getByRole("button", { name: "Update 2 scores now" })).toBeInTheDocument();
   });
 

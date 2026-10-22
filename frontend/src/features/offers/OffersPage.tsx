@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Pagination, Spinner, StatusBadge, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { Job, Offer, Page } from "../../types/api";
@@ -62,7 +62,10 @@ export function OffersPage() {
   const offers = useQuery({ queryKey: ["offers", page], queryFn: () => api.get<Page<Offer>>("/offers", { page, size: PAGE_SIZE }) });
   const compare = useQuery({ queryKey: ["offers", "compare"], queryFn: () => api.get<Comparison>("/offers/compare") });
   const jobs = useQuery({ queryKey: ["jobs", "offer-candidates"], queryFn: () => api.get<Page<Job>>("/jobs", { status: ["INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "SCREENING"], size: 100 }) });
-  const [form, setForm] = useState({ job_id: "", base_salary: "", variable_pay: "", bonus: "", equity: "", currency: "INR", joining_date: "", expiry_date: "", location: "", work_model: "", benefits: "" });
+  // From a job page ("Record the offer"): /offers?job_id=12 opens the form with that job picked.
+  const [params] = useSearchParams();
+  const [adding, setAdding] = useState(params.has("job_id"));
+  const [form, setForm] = useState({ job_id: params.get("job_id") ?? "", base_salary: "", variable_pay: "", bonus: "", equity: "", currency: "INR", joining_date: "", expiry_date: "", location: "", work_model: "", benefits: "" });
   const create = useMutation({
     mutationFn: () => api.post("/offers", {
       job_id: Number(form.job_id), currency: form.currency,
@@ -71,16 +74,20 @@ export function OffersPage() {
       location: form.location || null, work_model: form.work_model || null,
       benefits: form.benefits.split(",").map((b) => b.trim()).filter(Boolean),
     }),
-    onSuccess: () => { setForm({ ...form, job_id: "", base_salary: "", variable_pay: "", bonus: "", equity: "", benefits: "" }); qc.invalidateQueries(); },
+    onSuccess: () => { setForm({ ...form, job_id: "", base_salary: "", variable_pay: "", bonus: "", equity: "", benefits: "" }); setAdding(false); qc.invalidateQueries(); },
+    meta: { success: "Offer saved" },
   });
   return (
     <div className="space-y-4">
-      <div><h1>Offers</h1><PageIntro>Record offers you receive, note your counter-offer, and compare open offers side by side before you decide.</PageIntro></div>
-      <Card title="Record an offer">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h1>Offers</h1><PageIntro>Record offers you receive, note your counter-offer, and compare open offers side by side before you decide.</PageIntro></div>
+        <button className="btn-primary" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>{adding ? "Close" : "+ Record an offer"}</button>
+      </div>
+      {adding && <Card title="Record an offer">
         <div className="grid gap-2 sm:grid-cols-4">
           <div className="sm:col-span-2"><Field label="Job *">
             <select className="input" value={form.job_id} onChange={(e) => setForm({ ...form, job_id: e.target.value })}>
-              <option value="">Select a job in interview/offer stage</option>
+              <option value="">{jobs.data && !jobs.data.items.length ? "No job in interview or offer stage yet" : "Select a job in interview/offer stage"}</option>
               {jobs.data?.items.map((j) => <option key={j.id} value={j.id}>{j.title} — {j.company.name}</option>)}
             </select>
           </Field></div>
@@ -94,7 +101,7 @@ export function OffersPage() {
         </div>
         {create.error && <div className="mt-2"><ErrorBox error={new Error(errorMessage(create.error))} /></div>}
         <button className="btn-primary mt-3" disabled={!form.job_id || create.isPending} onClick={() => create.mutate()}>Save offer</button>
-      </Card>
+      </Card>}
       {compare.data && compare.data.offers.length > 1 && (
         <Card title="Compare open offers">
           <table className="min-w-full divide-y divide-slate-100 text-sm">

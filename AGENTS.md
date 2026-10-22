@@ -11,7 +11,7 @@ A self-hosted career command center for one person's job search:
 ```
 CV ─▶ Professional Profile ─▶ Target Profile
                                    │
-  Built-in job scanner · Add Job (URL + JD) · CSV/JSON · Google Sheets · Career-Ops import
+  Job board search · Add Job (URL + JD) · CSV/JSON · Google Sheets · Career-Ops import
                                    │
           ingest_job: normalize ─▶ deduplicate ─▶ parse JD ─▶ 0–100 match score
                                    │
@@ -37,6 +37,7 @@ Everything runs locally (no Docker needed): FastAPI + PostgreSQL backend, React 
 ./start.sh --no-open  # same, no browser
 ./stop.sh             # stop API, UI and dev DB
 ./stop.sh --keep-db   # stop API and UI, keep the DB running (use this to restart)
+./stop.sh --force     # also when a scan is running (stop.sh refuses otherwise: the scan would be lost)
 ```
 
 - App: http://127.0.0.1:5173 · API docs: http://127.0.0.1:8010/docs
@@ -195,22 +196,26 @@ merged, never duplicated; jobs the user deleted are skipped.
 | "already running" (409) | Wait for the current scan; it appears under `running` in the status |
 | Run stuck as RUNNING after a restart | Auto-closed as FAILED after 1 hour; start a new one |
 
-## Built-in job scanner (no Career-Ops needed)
+## Job board search — built-in scanner (no Career-Ops needed)
+
+Naming: in the UI this app's own scanner is **Job board search** (buttons "Search now", "Search its
+board"); **Career-Ops scan** / **Scan + import** always means the separate Career-Ops tool. Code and
+API keep the `scanner` name (`/api/v1/scanner/…`, `added_via=scanner`).
 
 Searches the public job boards of companies marked **Job search** in the Companies list
 (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Workable, Recruitee, Pinpoint,
 Teamtailor, SAP SuccessFactors, Oracle Cloud) and company careers pages that publish
 schema.org `JobPosting` data. Takes 1–3 minutes. No keys, no tokens.
 
-- **Scan now:** Settings → Job scanner → Scan now (or `POST /api/v1/scanner/run`, body `{}`).
-- **One company:** company page → **Scan jobs** (`POST /api/v1/scanner/companies/{id}/scan`).
-- **Find job boards:** Settings → Job scanner → Find job boards — for every company not yet
+- **Search now:** Settings → Job board search → Search now (or `POST /api/v1/scanner/run`, body `{}`).
+- **One company:** company page → **Search its board** (`POST /api/v1/scanner/companies/{id}/scan`).
+- **Find job boards:** Settings → Job board search → Find job boards — for every company not yet
   scannable: careers link from the website, Career-Ops' list, board links on the careers page,
   SuccessFactors on own domains, JobPosting data, and the name on job-board listings (verified).
   Methods and rules: `docs/scan-coverage.md`. Then **Turn on job search for them** for found boards.
 - **Which companies:** tick **Job search** on a company page. A company is scannable when its
   careers URL is (or links to) a supported board; the panel lists the ones that aren't.
-- **Filters:** Settings → Job scanner → *What to keep*: titles to keep, generic titles (kept
+- **Filters:** Settings → Job board search → *What to keep*: titles to keep, generic titles (kept
   only if the JD mentions a stack keyword), titles to skip, locations to keep/skip, max age,
   max jobs per company.
 - **Schedule:** *Scan automatically every N hours* (0 = manual). Runs while the app runs.
@@ -266,12 +271,24 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   writes this app's addresses into `settings.js`; the Docker image copies `browser-extension/`).
 - **Add Job** (button on Jobs / Dashboard): paste a job URL and description → live preview → Save & analyze.
   Use this for LinkedIn / Naukri / Indeed (they can't be scanned).
-- **CSV / JSON upload:** Settings → Backup & import → Import a file (`POST /api/v1/import/{jobs|recruiters}`).
+- **CSV / JSON upload:** Settings → Backup & import → Import a file (`POST /api/v1/import/{jobs|recruiters}`;
+  companies: `POST /api/v1/companies/import`, which also reads a Naukri company-list export).
+  Job-portal company pages (Naukri, LinkedIn, Monster, Foundit) go in `Company.extra_links`
+  (`add_extra_links` in `services/company_service.py`), never in `website`/`careers_url`.
+  Name matching for imports uses `same_company_name` (`core/text.py`): equal `company_key` **and**
+  one name's generic words a subset of the other's, so "Aspire Software Solutions" ≠ "Aspire Systems".
 - **Company research files (CLI):**
   ```bash
   cd backend && uv run python -m app.cli import-companies \
       --research-csv /path/master.csv --myjob-db /path/portal.sqlite --career-ops ../career-ops
   ```
+- **List & detail pages:** jobs list preview panel `features/jobs/JobPreview.tsx` (`?preview=<id>`),
+  row actions + `⋯` menu (`RowMenu` in `JobsPage.tsx`), job-page ←/→ through the last list
+  (`features/jobs/JobNav.tsx`, sessionStorage `jobs.list.v1`), company side card
+  (`features/jobs/CompanyCard.tsx`), skill marks in the JD (`Highlighted` in `JobParts.tsx`),
+  shared sticky back bar (`components/StickyBar.tsx`). Companies: `/companies/duplicates`
+  (`CompanyDuplicatesPage.tsx`, `GET /companies/duplicates`), bulk actions (`POST /companies/bulk`),
+  facets (`GET /companies/facets`).
 - **Export:** Settings → Backup & import → Back up your data (`GET /api/v1/export/{entity}`, `/export/all`).
 
 ## Packaging and first run
@@ -299,7 +316,7 @@ asks how to do something in the app, answer from it.
 
 1. **CVs** → upload CV → *Merge into profile*. Review **Profile** and **Target Profile**
    (titles, skills, locations, salary).
-2. Get jobs: **Scan now** (built-in), **Scan + import** (Career-Ops), Google Sheets, Add Job.
+2. Get jobs: **Search now** (Job board search), **Scan + import** (Career-Ops), Google Sheets, Add Job.
 3. **Dashboard** → Today's Priorities; cards open the matching filtered lists.
 4. **Jobs** → filter (multi-select status, score, source…), open a job, read the score
    breakdown, set status, **Apply** (creates an application), or **Delete**.
@@ -308,11 +325,11 @@ asks how to do something in the app, answer from it.
 6. After uploading a new CV or changing profile/preferences/scoring, scores become **stale** and
    are re-scored automatically in the background within a minute (`services/freshness.py`).
    To force it now: `POST /api/v1/matches/reanalyze` with `{"only_stale": true}`.
-7. **Review new jobs** (`/jobs/review`): new jobs one at a time, best first; keys S/N/K/O/U.
+7. **Review new jobs** (`/jobs/review`): new jobs one at a time, best first; keys C/N/S/K/O/U (Closed, Not relevant, Shortlist, Skip, Open, Undo).
 8. Missing descriptions: Today → **Fetch for 40 best jobs** (`POST /api/v1/jobs/fetch-descriptions`,
    `services/description_service.py`, readers in `jobs/jd_fetch.py`). Never fetches LinkedIn,
    Indeed, Glassdoor or Naukri. Search `q=#123` finds a job by ID.
-9. Menu: Today · Jobs · Pipeline · Follow-ups · Reports · My profile · Settings; related pages are tabs
+9. Menu: Today · Jobs · Companies · Pipeline · Follow-ups · Reports · My profile · Settings; related pages are tabs
    (`SECTIONS` in `layouts/AppLayout.tsx`). The Jobs list remembers sort/filters in
    localStorage (`jobs.sort.v1`, `jobs.filters.v1`) until Reset.
 
@@ -344,7 +361,9 @@ Check one company: `GET /api/v1/scanner/companies/{id}/board` (`null` = not scan
 To find careers pages / job boards for companies that can't be scanned yet (web research, then
 save via the API), use the ready prompt `docs/prompts/find-company-job-boards.md`. To research
 and update every company's details (verification evidence, India presence, careers URL, tier for
-untiered companies, then scan for jobs), use `docs/prompts/update-company-details.md`. To find
+untiered companies, then scan for jobs), use `docs/prompts/update-company-details.md`; its work
+queue and progress ledger (resumes across sessions) is `scripts/company_queue.py`
+(`next`, `log <ID> DONE|SKIPPED|NEEDS_USER "note"`, `status`; files in `scratch/`). To find
 companies (any country) that hire people in India — India office, remote from India or
 relocation — for the PHP / Magento / Adobe Commerce / Laravel / WordPress stack and add them
 without duplicates, use `docs/prompts/add-companies-hiring-in-india.md`.
@@ -432,9 +451,9 @@ in `main.py`) re-scores stale jobs every minute and re-parses JDs parsed by an o
 If you change engine logic, bump `ENGINE_VERSION`.
 
 **Job sources**
-- Built-in scanner (`scanner/`): scans job boards (Greenhouse, Lever, Ashby, SmartRecruiters,
+- Job board search, the built-in scanner (`scanner/`): scans job boards (Greenhouse, Lever, Ashby, SmartRecruiters,
   Workday, Workable, Recruitee, Pinpoint, Teamtailor) of companies with `job_search_enabled`.
-  Filters in Settings → Job scanner. Runs in a background thread, one at a time (advisory lock).
+  Filters in Settings → Job board search. Runs in a background thread, one at a time (advisory lock).
 - Career-Ops (`integrations/career_ops/`): **read-only** file adapter for an external
   Career-Ops checkout (`CAREER_OPS_PATH`). Optional "Scan + import" runs its `scan.mjs`
   (no AI, no tokens) in the background. Never write to the Career-Ops folder.
@@ -445,8 +464,10 @@ If you change engine logic, bump `ENGINE_VERSION`.
   Sheets, tabs, columns and row mappings for jobs **and** companies: `docs/google-sheets.md`.
 - CSV/JSON uploads and Add Job (manual).
 
-**Jobs UI**: status tabs with counts — All open (`/jobs`), New, Pending, Applied, Interview,
-Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). Tab → statuses:
+**Jobs UI**: status tabs with counts — All open, New, Pending, Applied, Interview,
+Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). Plain `/jobs` opens
+New (sorted `-created_at`); with filters in the link it opens All open. Closed / Not relevant on
+a job page returns to the last list (`lastJobListUrl` in `JobNav.tsx`). Tab → statuses:
 new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
 Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback · selected = Offer+Accepted · rejected ·
 not-pursuing = Withdrawn+Not relevant · closed (defined in `JOB_TABS`, `JobsPage.tsx`).

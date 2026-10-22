@@ -27,6 +27,8 @@ export const routes: RouteObject[] = [
       { path: "jobs/:id", ...page(() => import("../features/jobs/JobDetailPage"), (m) => m.JobDetailPage) },
       { path: "jobs/:id/prep", ...page(() => import("../features/interviews/PrepPage"), (m) => () => <m.PrepPage kind="job" />) },
       { path: "companies", ...page(() => import("../features/companies/CompaniesPage"), (m) => m.CompaniesPage) },
+      { path: "companies/new", ...page(() => import("../features/companies/AddCompanyPage"), (m) => m.AddCompanyPage) },
+      { path: "companies/duplicates", ...page(() => import("../features/companies/CompanyDuplicatesPage"), (m) => m.CompanyDuplicatesPage) },
       { path: "companies/:id", ...page(() => import("../features/companies/CompanyDetailPage"), (m) => m.CompanyDetailPage) },
       { path: "applications", ...page(() => import("../features/applications/ApplicationsPage"), (m) => m.ApplicationsPage) },
       { path: "applications/board", ...page(() => import("../features/applications/BoardPage"), (m) => m.BoardPage) },

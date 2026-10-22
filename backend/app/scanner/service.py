@@ -7,10 +7,14 @@ touches the database runs in the caller's session, one company at a time. Jobs g
 
 import logging
 import re
+import threading
+import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -42,8 +46,40 @@ MAX_DETAIL_FETCHES = 40
 WORKERS = 6
 
 
-def default_http(method: str, url: str, json_body: object | None = None) -> FetchResult:
+# Job boards (Workable above all) answer "429 Too Many Requests" when several companies on the
+# same board are scanned at once. So: at most PER_HOST requests to one host at a time, and a
+# 429 is retried after a pause instead of failing that company.
+PER_HOST = 2
+RETRY_PAUSES = (3.0, 8.0, 20.0)
+_host_slots: dict[str, threading.BoundedSemaphore] = {}
+_host_lock = threading.Lock()
+
+
+def _slot(url: str) -> threading.BoundedSemaphore:
+    host = urlsplit(url).hostname or ""
+    with _host_lock:
+        return _host_slots.setdefault(host, threading.BoundedSemaphore(PER_HOST))
+
+
+def polite(http: Http, pauses: tuple[float, ...] = RETRY_PAUSES,
+           sleep: Callable[[float], None] = time.sleep) -> Http:
+    """`http` with the per-host limit and 429 retries."""
+    def call(method: str, url: str, json_body: object | None = None) -> FetchResult:
+        for pause in (*pauses, None):
+            with _slot(url):
+                res = http(method, url, json_body)
+            if res.status != 429 or pause is None:
+                return res
+            sleep(pause)
+        return res  # pragma: no cover - the loop always returns
+    return call
+
+
+def _plain_http(method: str, url: str, json_body: object | None = None) -> FetchResult:
     return safe_request(method, url, json_body=json_body, timeout=25, max_bytes=12 * 1024 * 1024)
+
+
+default_http = polite(_plain_http)
 
 
 def scanner_settings(db: Session) -> dict[str, Any]:
@@ -104,6 +140,10 @@ def _fetch(company_id: int, board: Board, filters: ScanFilters, http: Http,
         jobs = PROVIDERS[board.provider](board, http)
     except (ProviderError, BlockedURLError, OSError, ValueError, KeyError) as exc:
         out.error = str(exc)[:300]
+        return out
+    except Exception as exc:  # noqa: BLE001 - one company's board must not stop the scan
+        logger.warning("job board failed", extra={"url": board.url, "error": repr(exc)})
+        out.error = f"Unexpected error: {exc!r}"[:300]
         return out
     out.found = len(jobs)
     kept = []
@@ -199,7 +239,7 @@ def _run_scan(db: Session, company_ids: list[int] | None, trigger: str, http: Ht
                         title=job.title, company_name=company.name, url=job.url,
                         source=JobSource(res.board.provider)
                         if res.board.provider in JobSource.__members__ else JobSource.OTHER_ATS,
-                        source_detail=f"Built-in scanner · {res.board.provider.title()}",
+                        source_detail=f"Job board search · {res.board.provider.title()}",
                         external_id=job.external_id, location=job.location,
                         work_model="REMOTE" if job.remote else None,
                         employment_type=job.employment_type, posting_date=job.posted,

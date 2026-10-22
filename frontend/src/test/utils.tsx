@@ -6,12 +6,16 @@ import { vi } from "vitest";
 import { createQueryClient } from "../api/queryClient";
 
 /** Render a page inside the providers it needs, at a given route. */
-export function renderAt(ui: ReactElement, { path = "/", route = "/" }: { path?: string; route?: string } = {}) {
+export function renderAt(ui: ReactElement, { path = "/", route = "/", others = {} }:
+  { path?: string; route?: string; others?: Record<string, ReactElement> } = {}) {
   const client = createQueryClient({ queries: { retry: false, staleTime: 0, refetchOnWindowFocus: false }, mutations: { retry: false } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[route]}>
-        <Routes><Route path={path} element={ui} /></Routes>
+        <Routes>
+          <Route path={path} element={ui} />
+          {Object.entries(others).map(([p, el]) => <Route key={p} path={p} element={el} />)}
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );

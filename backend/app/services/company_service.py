@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Select, String, cast, func, or_, select
+from sqlalchemy import Float, Integer, Select, String, cast, func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.companies.importers import CompanyRecord
 from app.companies.verification import Claim, add_claim, recompute
 from app.core.errors import ConflictError, DomainValidationError, NotFoundError
 from app.core.pagination import PageParams, paginate
-from app.core.text import company_key
-from app.core.urls import registrable_domain
+from app.core.text import company_key, company_key_strict, same_company_name
+from app.core.urls import normalize_url, portal_of, registrable_domain
 from app.models.company import (
     Company,
     CompanyFieldSource,
@@ -34,31 +34,60 @@ VS = VerificationStatus
 
 
 class CompanyIndex:
-    """In-memory lookup by name key, alias key and website domain (for bulk imports)."""
+    """In-memory lookup by name, alias, website domain and portal link (for bulk imports)."""
 
     def __init__(self, companies: Iterable[Company]) -> None:
-        self.by_key: dict[str, Company] = {}
+        # name key -> (name or alias that gave it, company)
+        self.by_key: dict[str, list[tuple[str, Company]]] = {}
         self.by_domain: dict[str, list[Company]] = {}
+        self.by_link: dict[str, Company] = {}
+        self.used_keys: set[str] = set()
         for c in companies:
             self.add(c)
 
     def add(self, company: Company) -> None:
-        self.by_key.setdefault(company.name_key, company)
-        for alias in company.aliases:
-            self.by_key.setdefault(company_key(alias), company)
+        if company.name_key:
+            self.used_keys.add(company.name_key)
+        for name in (company.name, *company.aliases):
+            entries = self.by_key.setdefault(company_key(name), [])
+            if (name, company) not in entries:
+                entries.append((name, company))
         if company.domain:
             bucket = self.by_domain.setdefault(company.domain, [])
             if company not in bucket:
                 bucket.append(company)
+        for link in company.extra_links or []:
+            self.by_link.setdefault(normalize_url(link["url"]), company)
 
-    def find(self, name: str, website: str | None, aliases: Iterable[str] = ()) -> Company | None:
+    def find(
+        self,
+        name: str,
+        website: str | None,
+        aliases: Iterable[str] = (),
+        links: Iterable[str] = (),
+    ) -> Company | None:
+        for link in links:
+            if found := self.by_link.get(normalize_url(link)):
+                return found
         domain = registrable_domain(website) if website else None
         if domain and len(self.by_domain.get(domain, [])) == 1:
             return self.by_domain[domain][0]
-        for key in (company_key(name), *(company_key(a) for a in aliases)):
-            if key and key in self.by_key:
-                return self.by_key[key]
+        for candidate in (name, *aliases):
+            for known, company in self.by_key.get(company_key(candidate), []):
+                if same_company_name(candidate, known):
+                    return company
         return None
+
+    def free_key(self, name: str) -> str:
+        """A unique name_key for a new company. "Aspire Software Solutions" gets
+        "aspiresoftwaresolutions" when "Aspire Systems" already holds "aspire"."""
+        for key in (company_key(name), company_key_strict(name)):
+            if key and key not in self.used_keys:
+                return key
+        base, n = company_key_strict(name), 2
+        while f"{base}{n}" in self.used_keys:
+            n += 1
+        return f"{base}{n}"
 
 
 def load_index(db: Session) -> CompanyIndex:
@@ -102,8 +131,30 @@ def _apply_record(company: Company, rec: CompanyRecord) -> int:
             ) + f"[{rec.source_name}] {rec.notes}"
     if rec.attributes:
         company.attributes = {**company.attributes, rec.source_name: rec.attributes}
+    add_extra_links(company, rec.extra_links, rec.source_name)
     recompute(company)
     return invalid
+
+
+def add_extra_links(company: Company, urls: Iterable[str], source: str) -> None:
+    """Adds job-portal company pages, once per URL (compared without tracking parameters)."""
+    links = list(company.extra_links or [])
+    known = {normalize_url(link["url"]) for link in links}
+    for url in urls:
+        if normalize_url(url) not in known:
+            known.add(normalize_url(url))
+            links.append({"portal": portal_of(url), "url": url, "source": source,
+                          "added_at": datetime.now(UTC).isoformat()})
+    if links != company.extra_links:
+        company.extra_links = links
+
+
+def set_extra_links(company: Company, urls: list[str]) -> None:
+    """Replaces the list (edited by hand); links kept keep their source and date."""
+    current = {normalize_url(link["url"]): link for link in company.extra_links or []}
+    wanted = [normalize_url(u) for u in urls]
+    company.extra_links = [current[k] for k in dict.fromkeys(wanted) if k in current]
+    add_extra_links(company, [u for u in urls if normalize_url(u) not in current], "manual")
 
 
 def import_records(db: Session, records: Iterable[CompanyRecord], source: str) -> ImportSummary:
@@ -112,9 +163,9 @@ def import_records(db: Session, records: Iterable[CompanyRecord], source: str) -
     for rec in records:
         summary.read += 1
         website = next((c.value for c in rec.claims if c.field == "website"), None)
-        company = index.find(rec.name, website, rec.aliases)
+        company = index.find(rec.name, website, rec.aliases, rec.extra_links)
         if company is None:
-            key = company_key(rec.name)
+            key = index.free_key(rec.name) if company_key(rec.name) else ""
             if not key:
                 summary.skipped += 1
                 continue
@@ -123,6 +174,7 @@ def import_records(db: Session, records: Iterable[CompanyRecord], source: str) -
                 name_key=key,
                 aliases=[],
                 india_locations=[],
+                extra_links=[],
                 attributes={},
                 hiring_status=HiringStatus.UNKNOWN.value,
                 job_search_enabled=False,
@@ -173,6 +225,20 @@ def job_counts(db: Session, company_ids: list[int]) -> dict[int, tuple[int, int]
     return {cid: (int(total), int(op)) for cid, total, op in rows}
 
 
+# "Best rated" weighs the rating by its number of reviews (a Bayesian average pulled towards
+# 3.5 with the weight of 20 reviews), so one 5-star review doesn't beat 4.3 from 2,000.
+_STARS = cast(Company.attributes["naukri"]["rating"].astext, Float)
+_REVIEWS = func.coalesce(cast(Company.attributes["naukri"]["reviews"].astext, Float), 0)
+_RATING = (_STARS * _REVIEWS + 3.5 * 20) / (_REVIEWS + 20)
+# Smallest number in the employee range ("1,001-5,000" -> 1001); sizes are written many ways.
+_SIZE_LOW = cast(
+    func.substring(func.regexp_replace(Company.employee_range, ",", "", "g"), "([0-9]+)"), Integer
+)
+SIZE_BANDS: dict[str, tuple[int, int]] = {
+    "1-50": (0, 50), "51-200": (51, 200), "201-1000": (201, 1000),
+    "1001-5000": (1001, 5000), "5001+": (5001, 10**9),
+}
+
 SORTS: dict[str, Any] = {
     "name": Company.name.asc(),
     "-verification_score": Company.verification_score.desc(),
@@ -180,6 +246,7 @@ SORTS: dict[str, Any] = {
     "-updated_at": Company.updated_at.desc(),
     "id": Company.id.asc(),
     "-id": Company.id.desc(),
+    "-created_at": Company.created_at.desc(),
 }
 
 
@@ -194,9 +261,21 @@ def list_companies(
     job_search_enabled: bool | None = None,
     hiring_status: str | None = None,
     has_jobs: bool | None = None,
+    portal: str | None = None,
+    industry: str | None = None,
+    company_size: str | None = None,
     sort: str = "name",
 ) -> tuple[list[Company], int]:
     stmt: Select[Any] = select(Company)
+    if portal == "any":
+        stmt = stmt.where(func.jsonb_array_length(Company.extra_links) > 0)
+    elif portal:
+        stmt = stmt.where(Company.extra_links.contains([{"portal": portal}]))
+    if industry:
+        stmt = stmt.where(Company.industry.ilike(f"%{industry.strip()}%"))
+    if company_size in SIZE_BANDS:
+        low, high = SIZE_BANDS[company_size]
+        stmt = stmt.where(_SIZE_LOW.between(low, high))
     if has_jobs is not None:
         stmt = stmt.where(_job_count() > 0 if has_jobs else _job_count() == 0)
     if q:
@@ -218,7 +297,9 @@ def list_companies(
         stmt = stmt.where(Company.job_search_enabled.is_(job_search_enabled))
     if hiring_status:
         stmt = stmt.where(Company.hiring_status == hiring_status)
-    order = _job_count().desc() if sort == "-jobs" else SORTS.get(sort, SORTS["name"])
+    order = (_job_count().desc() if sort == "-jobs"
+             else _RATING.desc().nulls_last() if sort == "-rating"
+             else SORTS.get(sort, SORTS["name"]))
     stmt = stmt.order_by(order, Company.name.asc(), Company.id)
     return paginate(db, stmt, params)
 
@@ -237,7 +318,11 @@ def find_or_create_by_name(db: Session, name: str) -> Company:
     key = company_key(name)
     if not key:
         raise DomainValidationError("Company name is required")
-    company = db.scalar(select(Company).where(Company.name_key == key))
+    # The strict key first: a company saved under it ("aspiresoftwaresolutions") is a closer
+    # match than the one holding the shared key ("aspire" = Aspire Systems).
+    company = db.scalar(select(Company).where(Company.name_key == company_key_strict(name)))
+    if company is None:
+        company = db.scalar(select(Company).where(Company.name_key == key))
     if company is None:
         index = load_index(db)
         company = index.find(name, None)
@@ -315,6 +400,8 @@ def create_company(db: Session, data: dict[str, Any]) -> Company:
 def _apply_changes(company: Company, data: dict[str, Any]) -> None:
     source_url = data.pop("source_url", None)
     excluded = data.pop("scan_excluded", None)
+    if (links := data.pop("extra_links", None)) is not None:
+        set_extra_links(company, links)
     if excluded is not None:  # kept in attributes: no column needed
         rest = {k: v for k, v in (company.attributes or {}).items() if k != "scan_excluded"}
         company.attributes = {**rest, "scan_excluded": True} if excluded else rest
@@ -415,6 +502,11 @@ def merge_companies(db: Session, keep_id: int, merge_id: int) -> Company:
         )
     keep.aliases = list(dict.fromkeys([*keep.aliases, other.name, *other.aliases]))
     keep.attributes = {**other.attributes, **keep.attributes}
+    known = {normalize_url(link["url"]) for link in keep.extra_links}
+    keep.extra_links = [
+        *keep.extra_links,
+        *(link for link in other.extra_links if normalize_url(link["url"]) not in known),
+    ]
     keep.tier = keep.tier or other.tier
     keep.priority = keep.priority or other.priority
     keep.job_search_enabled = keep.job_search_enabled or other.job_search_enabled
@@ -445,6 +537,119 @@ def _repoint_references(db: Session, old_id: int, new_id: int) -> None:
                     db.execute(table.update().where(column == old_id).values({column.name: new_id}))
 
 
+def facets(db: Session) -> dict[str, Any]:
+    """Values to filter the list by: industries and sizes in use, portals with links."""
+    industries = db.execute(
+        select(Company.industry, func.count()).where(Company.industry.is_not(None))
+        .group_by(Company.industry).order_by(func.count().desc()).limit(40)
+    ).all()
+    sizes = {
+        band: db.scalar(select(func.count()).where(_SIZE_LOW.between(low, high))) or 0
+        for band, (low, high) in SIZE_BANDS.items()
+    }
+    portals = db.execute(text(
+        "SELECT link->>'portal', count(DISTINCT c.id) FROM companies c,"
+        " jsonb_array_elements(c.extra_links) AS link GROUP BY 1"
+    )).all()
+    return {
+        "industries": [{"value": v, "count": n} for v, n in industries],
+        "company_sizes": [{"value": band, "count": n} for band, n in sizes.items()],
+        "portals": [{"value": v, "count": n} for v, n in sorted(portals, key=lambda r: -r[1])],
+    }
+
+
+# --- possible duplicates -----------------------------------------------------------------------
+
+
+def possible_duplicates(db: Session) -> list[dict[str, Any]]:
+    """Groups of companies that may be one company: names equal once generic words
+    (Technologies, Solutions, Global...) are dropped, or the same website domain. Groups the
+    user marked "not duplicates" are left out."""
+    companies = list(db.scalars(select(Company).order_by(Company.id)))
+    by_key: dict[str, list[Company]] = {}
+    by_domain: dict[str, list[Company]] = {}
+    for c in companies:
+        if c.name_key:
+            by_key.setdefault(company_key(c.name), []).append(c)
+        if c.domain:
+            by_domain.setdefault(c.domain, []).append(c)
+    groups: list[tuple[str, list[Company]]] = [
+        *(("same website", cs) for cs in by_domain.values() if len(cs) > 1),
+        *(("similar name", cs) for cs in by_key.values() if len(cs) > 1),
+    ]
+    seen: set[tuple[int, ...]] = set()
+    out = []
+    for reason, cs in groups:
+        ids = tuple(c.id for c in cs)
+        if ids in seen or _dismissed(cs):
+            continue
+        seen.add(ids)
+        out.append({"reason": reason, "company_ids": list(ids)})
+    return out
+
+
+def _dismissed(companies: list[Company]) -> bool:
+    return all(
+        {o.id for o in companies if o.id != c.id} <= set(c.attributes.get("not_duplicates", []))
+        for c in companies
+    )
+
+
+def dismiss_duplicates(db: Session, company_ids: list[int]) -> None:
+    """Remember that these companies are different, so they are not suggested again."""
+    companies = [get_company(db, i) for i in dict.fromkeys(company_ids)]
+    for c in companies:
+        others = {o.id for o in companies if o.id != c.id}
+        known = set(c.attributes.get("not_duplicates", []))
+        c.attributes = {**c.attributes, "not_duplicates": sorted(known | others)}
+    db.commit()
+
+
+# --- bulk actions ------------------------------------------------------------------------------
+
+
+def _references(db: Session, company_id: int) -> int:
+    """Rows elsewhere (jobs, recruiters, applications...) that point at this company."""
+    total = 0
+    for table in Company.metadata.sorted_tables:
+        if table.name == "company_field_sources":
+            continue
+        for column in table.columns:
+            if any(fk.column.table.name == "companies" for fk in column.foreign_keys):
+                total += db.scalar(
+                    select(func.count()).select_from(table).where(column == company_id)
+                ) or 0
+    return total
+
+
+def bulk_update(
+    db: Session, company_ids: list[int], action: str, tier: str | None = None
+) -> dict[str, Any]:
+    """Job search on/off, set tier, or delete for many companies. Companies that jobs,
+    recruiters or applications point at are never deleted (merge them instead)."""
+    companies = list(db.scalars(select(Company).where(Company.id.in_(company_ids))))
+    updated, deleted, skipped = 0, 0, []
+    for c in companies:
+        if action == "delete":
+            if _references(db, c.id):
+                skipped.append({"id": c.id, "name": c.name,
+                                "reason": "has jobs, recruiters or applications"})
+                continue
+            db.delete(c)
+            deleted += 1
+            continue
+        if action in ("job_search_on", "job_search_off"):
+            c.job_search_enabled = action == "job_search_on"
+        elif action == "tier":
+            c.tier = Tier(tier).value if tier else None
+        updated += 1
+    record_activity(db, f"companies.bulk_{action}", "company", None,
+                    f"{action} for {len(companies)} companies",
+                    {"updated": updated, "deleted": deleted, "skipped": len(skipped)})
+    db.commit()
+    return {"updated": updated, "deleted": deleted, "skipped": skipped}
+
+
 # --- export ----------------------------------------------------------------------------------
 
 EXPORT_COLUMNS = [
@@ -454,6 +659,7 @@ EXPORT_COLUMNS = [
     "website",
     "careers_url",
     "linkedin_url",
+    "extra_links",
     "ats_provider",
     "headquarters",
     "india_presence",
@@ -469,6 +675,7 @@ EXPORT_COLUMNS = [
     "verification_score",
     "last_verified_at",
     "notes",
+    "created_at",
 ]
 
 
@@ -479,6 +686,8 @@ def export_rows(db: Session) -> list[dict[str, Any]]:
         row["aliases"] = "; ".join(c.aliases)
         row["india_locations"] = "; ".join(c.india_locations)
         row["last_verified_at"] = c.last_verified_at.isoformat() if c.last_verified_at else None
+        row["extra_links"] = "; ".join(link["url"] for link in c.extra_links)
+        row["created_at"] = c.created_at.isoformat() if c.created_at else None
         rows.append(row)
     return rows
 

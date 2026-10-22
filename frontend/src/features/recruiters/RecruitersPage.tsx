@@ -19,9 +19,11 @@ export function RecruitersPage() {
   const [status, setStatus] = useState("");
   const list = useQuery({ queryKey: ["recruiters", q, status, page], queryFn: () => api.get<Page<Contact>>("/recruiters", { q, status, page, size: PAGE_SIZE }) });
   const [form, setForm] = useState(EMPTY);
+  const [adding, setAdding] = useState(false);
   const create = useMutation({
     mutationFn: () => api.post("/recruiters", Object.fromEntries(Object.entries(form).filter(([, v]) => v))),
-    onSuccess: () => { setForm(EMPTY); qc.invalidateQueries({ queryKey: ["recruiters"] }); },
+    onSuccess: () => { setForm(EMPTY); setAdding(false); qc.invalidateQueries({ queryKey: ["recruiters"] }); },
+    meta: { success: "Contact saved" },
   });
   const find = useMutation({
     mutationFn: () => api.post<FindResult>("/recruiters/find-in-jobs"),
@@ -36,6 +38,7 @@ export function RecruitersPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1>Recruiters & contacts</h1><PageIntro>People you're talking to about jobs — recruiters, hiring managers and referrers — with their company and how to reach them.</PageIntro></div>
         <div className="text-right">
+          <button className="btn-primary mr-2" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>{adding ? "Close" : "+ Add contact"}</button>
           <button className="btn-secondary" onClick={() => find.mutate()} disabled={find.isPending}
             title="Look for emails, phone / WhatsApp numbers and LinkedIn profiles in your jobs' notes, comments and descriptions">
             {find.isPending ? "Looking…" : "Find contacts in jobs"}
@@ -48,7 +51,7 @@ export function RecruitersPage() {
           {find.error && <ErrorBox error={new Error(errorMessage(find.error))} />}
         </div>
       </div>
-      <Card title="Add contact">
+      {adding && <Card title="Add contact">
         <p className="mb-2 text-xs text-slate-500">Only store publicly available professional information.</p>
         <div className="grid gap-2 sm:grid-cols-4">
           {(Object.keys(EMPTY) as (keyof typeof EMPTY)[]).map((k) => (
@@ -59,7 +62,7 @@ export function RecruitersPage() {
         </div>
         {create.error && <div className="mt-2"><ErrorBox error={new Error(errorMessage(create.error))} /></div>}
         <button className="btn-primary mt-3" disabled={!form.name || create.isPending} onClick={() => create.mutate()}>Save contact</button>
-      </Card>
+      </Card>}
       <Card>
         <div className="mb-3 flex gap-2">
           <input className="input max-w-xs" placeholder="Search name, email, title" aria-label="Search recruiters" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />

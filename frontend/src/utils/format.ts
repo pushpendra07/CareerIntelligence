@@ -21,12 +21,21 @@ export function formatDate(value: string | null | undefined): string {
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-export function formatDateTime(value: string | null | undefined): string {
+/** "Oct 20" this year, "Oct 20, 2025" otherwise: for narrow table columns. */
+export function formatShortDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const d = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return value;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(!sameYear && { year: "numeric" }) });
+}
+
+export function formatDateTime(value: string | null | undefined, withYear = false): string {
   if (!value) return "—";
   const d = new Date(value);
   return Number.isNaN(d.getTime())
     ? value
-    : d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    : d.toLocaleString(undefined, { day: "numeric", month: "short", ...(withYear && { year: "numeric" }), hour: "2-digit", minute: "2-digit" });
 }
 
 /** INR amounts read better in lakhs ("35 L"); other currencies use compact notation. */

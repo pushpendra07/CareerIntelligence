@@ -4,6 +4,7 @@ const PATHS: Record<string, string> = {
   today: "M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10",
   jobs: "M9 6V5a2 2 0 012-2h2a2 2 0 012 2v1m-11 0h16a1 1 0 011 1v11a2 2 0 01-2 2H5a2 2 0 01-2-2V7a1 1 0 011-1zm-1 6h18",
   pipeline: "M4 5h16M7 12h10M10 19h4",
+  companies: "M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16M15 9h4a1 1 0 011 1v11M3 21h18M8 8h3m-3 4h3m-3 4h3",
   reports: "M4 20h16M7 16v-5m5 5V6m5 10v-8",
   followups: "M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z",
   profile: "M16 8a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0",

@@ -62,6 +62,18 @@ describe("ReportsPage", () => {
     expect(screen.getByRole("link", { name: "Applications" })).toHaveAttribute("href", "/reports/applications?from=2026-01-01&to=2026-03-31&group=month");
   });
 
+  it("Today asks for today's date only; the default stays the last 90 days", async () => {
+    const urls: string[] = [];
+    mockApi({ "GET /reports": CATALOG, "GET /reports/overview": (u: URL) => { urls.push(u.search); return { ...REPORT, report: "overview" }; } });
+    renderAt(<ReportsPage />, { path: "/reports", route: "/reports" });
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    await waitFor(() => expect(urls[0]).toContain(`to=${today}`));
+    expect(urls[0]).not.toContain(`from=${today}`);
+    fireEvent.change(screen.getByLabelText("Period"), { target: { value: "today" } });
+    await waitFor(() => expect(urls.at(-1)).toContain(`from=${today}&to=${today}`));
+  });
+
   it("lists the jobs behind the numbers under the report", async () => {
     mockApi({ "GET /reports": CATALOG, "GET /reports/applications": REPORT });
     renderAt(<ReportsPage />, { path: "/reports/:name", route: "/reports/applications" });

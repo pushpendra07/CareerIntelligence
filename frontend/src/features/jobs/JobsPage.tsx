@@ -1,21 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Badge, Card, CopyLinkButton, Empty, ErrorBox, JobStatusBadge, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
+import { JobPreview } from "./JobPreview";
+import { rememberJobList } from "./JobNav";
 import { StatusMultiSelect } from "./StatusMultiSelect";
-import { experienceRange, formatDate, humanize, salaryRange } from "../../utils/format";
+import { experienceRange, formatDate, formatShortDate, humanize, salaryRange } from "../../utils/format";
 import { prefs } from "../../utils/storage";
 import { usePhone } from "../../utils/media";
+import { ARCHIVE_TABS, JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses, tabHref } from "./jobTabs";
+export { JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, HIDDEN_BY_DEFAULT, defaultStatuses } from "./jobTabs";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
   "source", "status", "posted_after", "posted_within", "experience", "sort", "stale", "has_application", "added_via", "company_id"] as const;
 
-export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
-  "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
-  "CLOSED", "NOT_RELEVANT"];
 /** Shown first until there's a history of status changes (most people use these most). */
 const DEFAULT_MOST_USED = ["APPLIED", "NOT_RELEVANT", "CLOSED", "REJECTED", "INTERVIEW"];
 
@@ -43,25 +44,6 @@ const SOURCES = ["CAREER_OPS", "LINKEDIN", "NAUKRI", "INDEED", "GLASSDOOR", "GRE
   "SMARTRECRUITERS", "SUCCESSFACTORS", "ASHBY", "COMPANY_CAREERS", "REFERRAL", "RECRUITER_EMAIL", "WHATSAPP",
   "TELEGRAM", "DIRECT", "OTHER"];
 
-const OPEN_STATUSES = JOB_STATUSES.filter((s) => s !== "CLOSED");
-export const NEW_STATUSES = ["NEW", "DISCOVERED"];
-export const PENDING_STATUSES = ["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"];
-export const APPLIED_STATUSES = ["APPLIED", "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK"];
-
-/** Status tabs: every job is in exactly one tab (plus "All open"). */
-export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
-  { key: "all", label: "All open", statuses: OPEN_STATUSES },
-  { key: "new", label: "New", statuses: NEW_STATUSES },
-  { key: "pending", label: "Pending", statuses: PENDING_STATUSES },
-  { key: "applied", label: "Applied", statuses: ["APPLIED", "RECRUITER_CONTACTED", "SCREENING"] },
-  { key: "interview", label: "Interview", statuses: ["INTERVIEW", "AWAITING_FEEDBACK"] },
-  { key: "selected", label: "Selected", statuses: ["OFFER", "ACCEPTED"] },
-  { key: "rejected", label: "Rejected", statuses: ["REJECTED"] },
-  { key: "not-pursuing", label: "Not pursuing", statuses: ["WITHDRAWN", "NOT_RELEVANT"] },
-  { key: "closed", label: "Closed", statuses: ["CLOSED"] },
-];
-/** Tabs for finished jobs, shown apart from the active ones. */
-const ARCHIVE_TABS = ["rejected", "not-pursuing", "closed"];
 
 export const SORT_OPTIONS: [string, string][] = [
   ["-match_score", "Best match first"], ["match_score", "Lowest score"],
@@ -72,13 +54,14 @@ export const SORT_OPTIONS: [string, string][] = [
   ["-salary", "Highest salary"], ["salary", "Lowest salary"], ["status", "Status (pipeline order)"],
   ["-status", "Status (reverse)"], ["-id", "Job ID (newest first)"], ["id", "Job ID (oldest first)"],
 ];
-const DEFAULT_SORT = "-match_score";
+/** Newest jobs first, so jobs that just arrived are at the top. */
+const DEFAULT_SORT = "-created_at";
 
 /** Remembered in this browser until the user changes them or presses Reset. */
 const SORT_KEY = "jobs.sort.v1";
 const VIEW_KEY = "jobs.filters.v1";
 /** Not remembered: they belong to one visit (tab, page) or one tab (status). */
-const NOT_REMEMBERED = ["tab", "page", "status", "sort"];
+const NOT_REMEMBERED = ["tab", "page", "status", "sort", "preview"];
 
 const SCORE_CHIPS: [string, string][] = [["", "Any"], ["60", "60+"], ["70", "70+"], ["80", "80+"]];
 const WORK_CHIPS: [string, string][] = [["", "Any"], ["REMOTE", "Remote"], ["HYBRID", "Hybrid"], ["ONSITE", "On-site"]];
@@ -126,15 +109,6 @@ function SortHeader({ extra, extraField, ...props }: SortProps & { extra?: React
   );
 }
 
-/** Shown only when picked in the Status filter (or in their own tab), like Closed jobs. */
-export const HIDDEN_BY_DEFAULT = ["APPLIED", "REJECTED", "NOT_RELEVANT"];
-
-/** The statuses a tab lists when no status is picked. */
-export const defaultStatuses = (tab: { key: string; statuses: string[] }) =>
-  tab.key === "all" ? tab.statuses.filter((s) => !HIDDEN_BY_DEFAULT.includes(s)) : tab.statuses;
-
-const tabHref = (key: string) => (key === "closed" ? "/jobs/closed" : key === "all" ? "/jobs" : `/jobs?tab=${key}`);
-
 /** Tabs with counts; search and filters (except status) carry over between tabs. */
 function StatusTabs({ active, query }: { active: string; query: Record<string, string | string[]> }) {
   const [params] = useSearchParams();
@@ -150,7 +124,9 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
     return extra ? `${href}${href.includes("?") ? "&" : "?"}${extra}` : href;
   };
   return (
-    <div role="tablist" aria-label="Job status" className="tabs-scroll flex gap-1 border-b border-slate-200">
+    // On a desktop the tabs are in the menu (under Jobs); this row is for phones and a hidden menu.
+    <div role="tablist" aria-label="Job status"
+      className="tabs-scroll flex gap-1 border-b border-slate-200 md:hidden md:group-data-[menu=hidden]/app:flex">
       {JOB_TABS.map((t) => {
         const on = t.key === active;
         const n = counts ? defaultStatuses(t).reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
@@ -166,7 +142,62 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
   );
 }
 
-/** The one thing to do next with a job, right in the list. */
+/** Inside a tab with several statuses: one chip per status with its count (Pending → Reviewing,
+ * Shortlisted, Ready to apply, On hold). Picking one shows only that status. */
+function StatusChips({ tab, query, picked, onPick }: { tab: { key: string; statuses: string[] };
+  query: Record<string, string | string[]>; picked: string[]; onPick: (values: string[]) => void }) {
+  const shared = Object.fromEntries(Object.entries(query).filter(([k]) => k !== "status"));
+  const counts = useQuery({
+    queryKey: ["jobs", "status-counts", shared],
+    queryFn: () => api.get<Record<string, number>>("/jobs/status-counts", shared),
+  }).data;
+  const n = (statuses: string[]) => (counts ? statuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined);
+  const chip = (label: string, on: boolean, count: number | undefined, onClick: () => void) => (
+    <button key={label} type="button" aria-pressed={on} onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${on
+        ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:text-slate-900"}`}>
+      {label}{count !== undefined && <span className={`tabular-nums ${on ? "text-indigo-500" : "text-slate-400"}`}>{count}</span>}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Status" className="flex flex-wrap items-center gap-1.5">
+      {chip("All", !picked.length, n(tab.statuses), () => onPick([]))}
+      {tab.statuses.map((s) => chip(humanize(s), picked.length === 1 && picked[0] === s, n([s]), () => onPick([s])))}
+    </div>
+  );
+}
+
+/** Less-used actions for a row, behind "⋯": posting link, copy, delete. */
+function RowMenu({ job }: { job: Job }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const item = "block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-100 dark:hover:bg-white/10";
+  return (
+    <span ref={ref} className="relative inline-block">
+      <button type="button" className="btn-secondary px-2 py-1 text-xs" aria-haspopup="menu" aria-expanded={open}
+        aria-label={`More actions for ${job.title}`} title="More actions" onClick={() => setOpen((v) => !v)}>⋯</button>
+      {open && (
+        <span role="menu" className="absolute right-0 top-full z-30 mt-1 flex w-52 flex-col gap-0.5 whitespace-normal rounded-md border border-slate-200 bg-surface p-1 shadow-lg">
+          {job.source_url && <a role="menuitem" className={item} href={job.source_url} target="_blank" rel="noopener noreferrer"
+            aria-label={`Open posting: ${job.title}`}>Open posting ↗</a>}
+          {job.source_url && <CopyLinkButton url={job.source_url} className={`${item} inline-flex items-center gap-1`} />}
+          <span className="px-1 py-0.5"><DeleteJobButton jobId={job.id} title={job.title} /></span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The one thing to do next with a job, right in the list: Closed and Not relevant first, then
+ * the step forward. The rest is under "⋯". */
 function NextStep({ job }: { job: Job }) {
   const qc = useQueryClient();
   const status = useMutation({
@@ -174,28 +205,40 @@ function NextStep({ job }: { job: Job }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
     meta: { toastError: true },
   });
+  const b = "whitespace-nowrap px-2 py-1 text-xs";
+  const applied = (
+    <button className={`btn-emerald ${b}`} disabled={status.isPending} aria-label={`Applied: ${job.title}`}
+      title="Already applied — records the application" onClick={() => status.mutate("APPLIED")}>✓ Applied</button>
+  );
+  const dismiss = <>
+    <button className={`btn-slate ${b}`} disabled={status.isPending} aria-label={`Closed: ${job.title}`}
+      title="The posting is no longer open" onClick={() => status.mutate("CLOSED")}>Closed</button>
+    <button className={`btn-rose ${b}`} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
+      title="Not a fit — hides it from the open lists" onClick={() => status.mutate("NOT_RELEVANT")}>Not relevant</button>
+  </>;
+  let main: ReactNode = null;
   if (NEW_STATUSES.includes(job.status)) {
-    return (
-      <span className="inline-flex gap-1">
-        {job.source_url && (
-          <a className="btn-secondary px-2 py-1 text-xs" href={job.source_url} target="_blank" rel="noopener noreferrer"
-            aria-label={`Open posting: ${job.title}`} title="Open the job posting">↗</a>
-        )}
-        {job.source_url && <CopyLinkButton url={job.source_url} compact />}
-        <button className="btn-secondary px-2 py-1 text-xs" disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
-          title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>★ Shortlist</button>
-        <button className="btn-secondary px-2 py-1 text-xs" disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
-          title="Not relevant — hide it" onClick={() => status.mutate("NOT_RELEVANT")}>✕</button>
-      </span>
-    );
+    main = <>
+      {dismiss}
+      <button className={`btn-amber ${b}`} disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
+        title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>★ Shortlist</button>
+      {applied}
+    </>;
+  } else if (PENDING_STATUSES.includes(job.status)) {
+    main = <>
+      {dismiss}
+      <Link className={`btn-primary ${b}`} to={`/jobs/${job.id}?apply=1`} aria-label={`Apply to ${job.title}`}>Apply</Link>
+      {applied}
+    </>;
+  } else if (APPLIED_STATUSES.includes(job.status)) {
+    main = <Link className={`btn-secondary ${b}`} to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
   }
-  if (PENDING_STATUSES.includes(job.status)) {
-    return <Link className="btn-primary px-2 py-1 text-xs" to={`/jobs/${job.id}?apply=1`} aria-label={`Apply to ${job.title}`}>Apply</Link>;
-  }
-  if (APPLIED_STATUSES.includes(job.status)) {
-    return <Link className="btn-secondary px-2 py-1 text-xs" to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
-  }
-  return null;
+  return (
+    <span className="inline-flex max-w-[15rem] flex-wrap items-center gap-1">
+      {main}
+      <RowMenu job={job} />
+    </span>
+  );
 }
 
 /** Phones: one card per job instead of an 11-column table. */
@@ -222,7 +265,7 @@ function JobCards({ jobs, selected, toggle }: { jobs: Job[]; selected: Set<numbe
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <JobStatusBadge value={j.status} /><AddedViaTags values={j.added_via} />
-              <span className="ml-auto inline-flex items-center gap-2"><NextStep job={j} /><DeleteJobButton jobId={j.id} title={j.title} compact /></span>
+              <span className="ml-auto"><NextStep job={j} /></span>
             </div>
           </div>
         </li>
@@ -251,9 +294,9 @@ function BulkBar({ ids, onDone }: { ids: number[]; onDone: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-sm dark:bg-indigo-950" role="region" aria-label="Selected jobs">
       <b>{ids.length} selected</b>
-      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("SHORTLISTED")}>★ Shortlist</button>
-      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("NOT_RELEVANT")}>Not relevant</button>
-      <button className="btn-secondary px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("CLOSED")}>Closed</button>
+      <button className="btn-slate px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("CLOSED")}>Closed</button>
+      <button className="btn-rose px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("NOT_RELEVANT")}>Not relevant</button>
+      <button className="btn-amber px-2 py-1 text-xs" disabled={run.isPending} onClick={() => set("SHORTLISTED")}>★ Shortlist</button>
       <select className="input w-auto py-1 text-xs" aria-label="Set status of selected jobs" value="" disabled={run.isPending}
         onChange={(e) => e.target.value && set(e.target.value)}>
         <option value="">Set status…</option>
@@ -281,7 +324,10 @@ const daysAgo = (days: number) => {
 
 export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const [params, setParams] = useSearchParams();
-  const tabKey = view === "closed" ? "closed" : params.get("tab") ?? "all";
+  // Plain /jobs opens on New: jobs that just arrived and haven't been decided yet. Setting a
+  // status moves a job to its own tab. Links with filters (Today, Insights) search all open jobs.
+  const filtered = FILTERS.some((f) => f !== "sort" && params.has(f));
+  const tabKey = view === "closed" ? "closed" : params.get("tab") ?? (filtered ? "all" : "new");
   const tab = JOB_TABS.find((t) => t.key === tabKey) ?? JOB_TABS[0];
   const closed = tab.key === "closed";
   const page = Number(params.get("page") ?? 1);
@@ -294,9 +340,9 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     const saved = prefs.get(VIEW_KEY);
     if (!saved || FILTERS.some((f) => f !== "sort" && params.has(f))) return;
     const next = new URLSearchParams(saved);
-    for (const k of ["tab"]) if (params.get(k)) next.set(k, params.get(k)!);
+    if (view !== "closed") next.set("tab", params.get("tab") ?? "new");
     setParams(next, { replace: true });
-  }, [restored, params, setParams]);
+  }, [restored, params, setParams, view]);
 
   const sort = params.get("sort") ?? prefs.get(SORT_KEY) ?? DEFAULT_SORT;
   const query: Record<string, string | string[]> = {};
@@ -336,6 +382,24 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const stickyHead = sticky && fits;
   const listKey = JSON.stringify([listQuery, page, size]);
   useEffect(() => setSelected(new Set()), [listKey]);
+  // The job page's ← → (and J / K) follow this list.
+  const listParams = new URLSearchParams(params);
+  listParams.delete("preview");
+  const here = `${closed ? "/jobs/closed" : "/jobs"}${listParams.toString() ? `?${listParams}` : ""}`;
+  useEffect(() => { if (data) rememberJobList(data.items.map((j) => j.id), here); }, [data, here]);
+  // A job opened beside the list; kept in the URL so Back closes it.
+  const previewParam = Number(params.get("preview") ?? 0);
+  const preview = previewParam || null;
+  const setPreview = (id: number | null) => {
+    const n = new URLSearchParams(params);
+    if (id) n.set("preview", String(id)); else n.delete("preview");
+    setParams(n, { replace: preview !== null && id !== null });
+  };
+  const openPreview = (e: ReactMouseEvent, id: number) => {
+    // Links, buttons and checkboxes in the row keep their own job.
+    if ((e.target as HTMLElement).closest("a,button,input,select,label") || phone) return;
+    setPreview(preview === id ? null : id);
+  };
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const setPage = (p: number) => {
     const n = new URLSearchParams(params);
@@ -377,7 +441,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const reset = () => {
     prefs.set(SORT_KEY, null);
     prefs.set(VIEW_KEY, null);
-    setParams(tab.key === "all" || closed ? new URLSearchParams() : new URLSearchParams({ tab: tab.key }));
+    setParams(closed ? new URLSearchParams() : new URLSearchParams({ tab: tab.key }));
   };
   const MORE_KEYS = ["recommendation", "tier", "technology", "location", "source", "posted_after", "experience", "has_application", "stale"];
   const moreActive = MORE_KEYS.filter((k) => params.get(k)).length;
@@ -392,13 +456,14 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1>{tab.key === "all" ? "Jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
+        <h1>{tab.key === "all" ? "All open jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
         <div className="flex items-center gap-2">
           <DuplicatesLink />
           <Link className="btn-primary sm:hidden" to="/jobs/new">Add Job</Link>
         </div>
       </div>
       <StatusTabs active={tab.key} query={query} />
+      {tab.key !== "all" && tab.statuses.length > 1 && <StatusChips tab={tab} query={query} picked={picked} onPick={setStatuses} />}
       {/* Like Magento's admin grid: search, sort, paging and bulk actions stay under the top bar
           while the list scrolls; the filter panel below scrolls away (not on phones). */}
       <div ref={toolbarRef} data-testid="jobs-toolbar" style={sticky ? { top: stickyTop } : undefined}
@@ -408,8 +473,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <input className="input min-w-56 flex-1" placeholder="Search title, company, location or job ID (#123)" aria-label="Search jobs"
             key={params.get("q") ?? ""} defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
-          {tab.statuses.length > 1 && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
-            emptyLabel={tab.key === "all" ? "All except applied, rejected, not relevant" : "All statuses"} /></div>}
+          {tab.key === "all" && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
+            emptyLabel="All except applied, rejected, not relevant" /></div>}
           <select className="input w-auto" aria-label="Sort" value={sort} onChange={(e) => sortBy(e.target.value)} title="Remembered until you change it or press Reset">
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -419,6 +484,15 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
       </section>
       </div>
       <Card>
+        <QuickViews params={params} onApply={(view) => {
+          const next = new URLSearchParams(tab.key === "all" || closed ? "" : `tab=${tab.key}`);
+          if (params.get("sort")) next.set("sort", params.get("sort")!);
+          for (const [k, v] of Object.entries(view)) next.set(k, v);
+          update(next);
+        }} />
+        <ActiveFilters params={params} tab={tab} onRemove={(key, value) => {
+          if (key === "status") setStatuses(picked.filter((x) => x !== value)); else set(key, "");
+        }} />
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Chips label="Score" options={SCORE_CHIPS} value={params.get("min_score") ?? ""} onChange={(v) => set("min_score", v)} />
           <Chips label="Work" options={WORK_CHIPS} value={params.get("work_model") ?? ""} onChange={(v) => set("work_model", v)} />
@@ -467,7 +541,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             {/* Wide screens: no inner scroll box, so the column headers can stick to the page. */}
             <div ref={tableWrapRef} className={stickyHead ? "" : "overflow-x-auto"}>
               {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} /> : <>
-              <p className="mb-2 text-xs text-slate-500"><b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
+              <p className="mb-2 text-xs text-slate-500"><b>Click a row</b> to preview it here (↑ ↓ move, Esc closes) · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100 [&_td]:px-2 [&_th]:px-2">
                 <thead className={stickyHead ? "sticky z-10" : ""} style={stickyHead ? { top: headerBottom } : undefined}><tr>
                   <th className="th w-8">
@@ -481,37 +555,43 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                   <SortHeader label="Job" field="title" first="asc" sort={sort} onSort={sortBy}
                     extraField="company" extra={<SortButton label="Company" field="company" first="asc" sort={sort} onSort={sortBy} />} />
                   <SortHeader label="Location" field="location" first="asc" sort={sort} onSort={sortBy} />
-                  <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy} />
-                  <SortHeader label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />
+                  <SortHeader label="Exp" field="experience" first="asc" sort={sort} onSort={sortBy}
+                    extraField="salary" extra={<SortButton label="Salary" field="salary" first="desc" sort={sort} onSort={sortBy} />} />
                   <SortHeader label="Posted" field="posting_date" first="desc" sort={sort} onSort={sortBy}
                     extraField="created_at" extra={<SortButton label="Added" field="created_at" first="desc" sort={sort} onSort={sortBy} />} />
-                  <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy} />
-                  <th className="th">Next step</th>
+                  <SortHeader label="Status" field="status" first="asc" sort={sort} onSort={sortBy}
+                    extra={<span className="font-medium uppercase tracking-wide">Next step</span>} />
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
-                    <tr key={j.id} className={selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}>
+                    <tr key={j.id} onClick={(e) => openPreview(e, j.id)}
+                      className={`cursor-pointer ${preview === j.id ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300" : selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}`}>
                       <td className="td w-8"><input type="checkbox" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
-                      <td className="td max-w-md [overflow-wrap:anywhere]">
-                        <Link to={`/jobs/${j.id}`} className="font-medium text-slate-800 hover:text-indigo-700">{j.title}</Link>
-                        <div className="text-xs text-slate-500">
-                          {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
+                      <td className="td min-w-56 max-w-md [overflow-wrap:anywhere]">
+                        <Link to={`/jobs/${j.id}`} className="line-clamp-2 font-medium text-slate-800 hover:text-indigo-700" title={j.title}>{j.title}</Link>
+                        <div className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                          <span>{j.company.name}</span> {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
                           {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
+                          <AddedViaTags values={j.added_via} />
                         </div>
-                        <div className="mt-0.5"><AddedViaTags values={j.added_via} /></div>
                       </td>
-                      <td className="td max-w-40 text-xs [overflow-wrap:anywhere]">{j.location ?? "—"}{j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}</td>
-                      <td className="td text-xs">{experienceRange(j.experience_min, j.experience_max)}</td>
-                      <td className="td text-xs">{j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</td>
+                      <td className="td max-w-32 text-xs" title={[j.location, j.work_model !== "UNKNOWN" ? humanize(j.work_model) : ""].filter(Boolean).join(" · ")}>
+                        <div className="truncate">{j.location ?? "—"}</div>
+                        {j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}
+                      </td>
+                      <td className="td max-w-32 text-xs" title={j.salary_text ?? undefined}>
+                        <div className="whitespace-nowrap">{experienceRange(j.experience_min, j.experience_max)}</div>
+                        <div className="truncate text-slate-500">{j.salary_text ?? salaryRange(j.salary_min, j.salary_max, j.salary_currency)}</div>
+                      </td>
                       <td className="td whitespace-nowrap text-xs">
-                        <div title="Date the job was posted on the job site">{formatDate(j.posting_date)}</div>
-                        <div className="text-slate-500" title="Date the job was added to this app">added {formatDate(j.created_at)}</div>
+                        <div title={`Posted on the job site: ${formatDate(j.posting_date)}`}>{formatShortDate(j.posting_date)}</div>
+                        <div className="text-slate-500" title={`Added to this app: ${formatDate(j.created_at)}`}>added {formatShortDate(j.created_at)}</div>
                       </td>
-                      <td className="td"><JobStatusBadge value={j.status} /></td>
-                      <td className="td whitespace-nowrap">
-                        <span className="inline-flex items-center gap-2"><NextStep job={j} /><DeleteJobButton jobId={j.id} title={j.title} compact /></span>
+                      <td className="td min-w-[15rem]">
+                        <JobStatusBadge value={j.status} />
+                        <div className="mt-1"><NextStep job={j} /></div>
                       </td>
                     </tr>
                   ))}
@@ -524,6 +604,78 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
             onSize={(n) => { setSize(n); setPage(1); }} noun={data.total === 1 ? "job" : "jobs"} />
         </section>
       )}
+      {preview !== null && !phone && data && (
+        <JobPreview id={preview} ids={data.items.map((j) => j.id)} top={stickyTop ?? 0}
+          onOpen={setPreview} onClose={() => setPreview(null)} />
+      )}
+    </div>
+  );
+}
+
+/** One-click views: each sets a few filters at once (the tab and sort stay). */
+const QUICK_VIEWS: { label: string; title: string; view: Record<string, string> }[] = [
+  { label: "Top matches", title: "Score 80 or more", view: { min_score: "80" } },
+  { label: "Fresh this week", title: "Posted in the last 7 days", view: { posted_within: "7" } },
+  { label: "Not applied, 70+", title: "Score 70+ and no application yet", view: { min_score: "70", has_application: "false" } },
+  { label: "Remote 70+", title: "Remote jobs scoring 70+", view: { work_model: "REMOTE", min_score: "70" } },
+];
+
+function QuickViews({ params, onApply }: { params: URLSearchParams; onApply: (view: Record<string, string>) => void }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick views">
+      <span className="text-xs font-medium text-slate-500">Quick views</span>
+      {QUICK_VIEWS.map((q) => {
+        const on = Object.entries(q.view).every(([k, v]) => params.get(k) === v);
+        return (
+          <button key={q.label} type="button" title={q.title} aria-pressed={on} onClick={() => onApply(q.view)}
+            className={`rounded-full border px-2.5 py-0.5 text-xs ${on ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700"}`}>
+            {q.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Each active filter as a chip; × removes just that one. */
+function ActiveFilters({ params, tab, onRemove }: {
+  params: URLSearchParams; tab: { statuses: string[] }; onRemove: (key: string, value: string) => void;
+}) {
+  const label = (k: string, v: string): string | null => {
+    switch (k) {
+      case "q": return `“${v}”`;
+      case "min_score": return `Score ${v}+`;
+      case "posted_within": return `Posted ≤ ${v} days`;
+      case "posted_after": return `Posted after ${formatDate(v)}`;
+      case "experience": return `Fits ${v} yrs`;
+      case "stale": return "Scores updating";
+      case "has_application": return v === "true" ? "Already applied" : "Not applied yet";
+      case "added_via": return `Added via ${ADDED_VIA[v]?.label ?? v}`;
+      case "company_id": return `Company #${v}`;
+      case "technology": case "location": return `${humanize(k)}: ${v}`;
+      case "recommendation": case "tier": case "work_model": case "source": return humanize(v);
+      default: return null;
+    }
+  };
+  const chips: [string, string, string][] = [];
+  for (const k of FILTERS) {
+    if (k === "sort") continue;
+    for (const v of params.getAll(k).filter(Boolean)) {
+      if (k === "status") { if (tab.statuses.includes(v)) chips.push([k, v, humanize(v)]); continue; }
+      const text = label(k, v);
+      if (text) chips.push([k, v, text]);
+    }
+  }
+  if (!chips.length) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+      <span className="text-xs font-medium text-slate-500">Filtered by</span>
+      {chips.map(([k, v, text]) => (
+        <span key={`${k}=${v}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+          {text}
+          <button type="button" className="rounded-full px-1 hover:bg-indigo-100 dark:hover:bg-indigo-900" aria-label={`Remove filter ${text}`} onClick={() => onRemove(k, v)}>×</button>
+        </span>
+      ))}
     </div>
   );
 }

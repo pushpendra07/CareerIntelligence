@@ -32,9 +32,9 @@ export function GettingStarted({ totalJobs }: { totalJobs: number }) {
       detail: "Target job titles, skills and locations.", to: "/preferences" },
     { done: !!(prefs.data.target_salary || prefs.data.min_salary), title: "Set your salary target",
       detail: "Until you do, salary fit is scored as unknown.", to: "/preferences" },
-    { done: scanner.data.scannable > 0, title: "Pick companies to scan",
+    { done: scanner.data.scannable > 0, title: "Pick companies to search",
       detail: "Tick Job search on companies whose job boards we can read.", to: "/companies" },
-    { done: totalJobs > 0, title: "Get your first jobs", detail: "Scan now, import a Google Sheet, or add a job by hand.", to: "/settings" },
+    { done: totalJobs > 0, title: "Get your first jobs", detail: "Search job boards, import a Google Sheet, or add a job by hand.", to: "/settings" },
   ];
   const left = steps.filter((s) => !s.done).length;
   if (left === 0) return null;
@@ -174,11 +174,11 @@ export function JobSources({ newThisWeek }: { newThisWeek: number }) {
   return (
     <Card title="Job sources" actions={
       <button className="btn-primary px-2 py-1 text-xs" disabled={!s || !!s.running || scan.isPending || s.scannable === 0} onClick={() => scan.mutate()}>
-        {s?.running ? "Scanning…" : "Scan now"}
+        {s?.running ? "Searching…" : "Search job boards"}
       </button>}>
       <p className="mb-1 text-sm"><b className="text-lg text-slate-900">{newThisWeek}</b> <span className="text-slate-500">new jobs in the last 7 days</span></p>
       <ul className="divide-y divide-slate-100">
-        {row("Job scanner", !s ? "…" : s.running ? "scanning now…" : s.last_run
+        {row("Job board search", !s ? "…" : s.running ? "searching now…" : s.last_run
           ? `${formatDateTime(s.last_run.started_at)} · ${num(s.last_run.stats.new)} new · ${s.scannable} companies`
           : `never run · ${s.scannable} companies ready`, "/settings")}
         {row("Google Sheets", lastSheet ? `${formatDateTime(lastSheet.last_imported_at!)} · ${lastSheet.last_result?.created ?? 0} new` : "not imported yet", "/settings")}

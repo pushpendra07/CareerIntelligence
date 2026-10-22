@@ -48,7 +48,7 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     follow = next(p for p in d["priorities"] if p["type"] == "FOLLOW_UP")
     assert follow["title"] == "Follow up: Ping recruiter" and follow["overdue"]
     assert d["priorities"][0]["title"].startswith("Interview tomorrow — Acme")
-    if other["match_score"] >= 80:
+    if other["match_score"] >= 70:
         assert any(p["type"] == "APPLY" and p["link"]["id"] == other["id"] for p in d["priorities"])
     assert not any(
         p["type"] == "APPLY" and p["link"]["id"] == job["id"] for p in d["priorities"]
@@ -76,3 +76,43 @@ def test_dashboard_priorities_funnels_and_search(client: TestClient) -> None:
     skills = client.get("/api/v1/search", params={"q": "graph"}).json()["skills"]
     assert [x["title"] for x in skills] == ["GraphQL"]
     assert client.get("/api/v1/search", params={"q": "a"}).status_code == 422
+
+
+def test_city_names_are_merged() -> None:
+    from app.services.dashboard_service import city
+
+    assert city("Bengaluru, Karnataka, India") == "Bengaluru"
+    assert city("Bangalore") == "Bengaluru"
+    assert city("Gurgaon, Haryana") == "Gurugram"
+    assert city("United States (Remote)") == "United States (Remote)"
+
+
+def test_score_bands_and_follow_up_summary(client: TestClient) -> None:
+    job, _ = setup(client)
+    client.post("/api/v1/applications", json={"job_id": job["id"]})
+    for n in range(5):
+        client.post(
+            "/api/v1/followups",
+            json={"title": f"Ping {n}", "kind": "RECRUITER",
+                  "due_date": str(date.today() - timedelta(days=n + 1))},
+        )
+    bands = client.get("/api/v1/dashboard/analytics").json()["scores"]["interview_rate_by_score"]
+    assert [b["label"] for b in bands] == [
+        b for b in ["90-100", "80-89", "70-79", "60-69", "0-59"] if b in {x["label"] for x in bands}
+    ]
+    assert sum(b["applications"] for b in bands) == 1
+    assert set(bands[0]) == {"label", "applications", "answers", "interviews"}
+
+    d = client.get("/api/v1/dashboard").json()
+    follow = [p for p in d["priorities"] if p["type"] == "FOLLOW_UP"]
+    # Five due: three by name, then one line for the rest (application follow-up isn't due yet).
+    assert [p["title"] for p in follow[:3]] == ["Follow up: Ping 4", "Follow up: Ping 3",
+                                                 "Follow up: Ping 2"]
+    assert follow[3]["title"] == "2 more follow-ups due"
+    assert follow[3]["link"] == {"entity": "followup", "id": None} and follow[3]["due"] is None
+    s = d["summary"]
+    assert s["applied_last_week"] == 0 and s["new_last_week"] == 0
+    assert "unapplied_70_plus" in s
+
+    charts = client.get("/api/v1/dashboard/charts").json()
+    assert all(c["value"] >= 1 and "id" in c for c in charts["top_companies"])
