@@ -11,7 +11,7 @@ import { StatusMultiSelect } from "./StatusMultiSelect";
 import { experienceRange, formatDate, formatShortDate, humanize, salaryRange } from "../../utils/format";
 import { prefs } from "../../utils/storage";
 import { usePhone } from "../../utils/media";
-import { ARCHIVE_TABS, JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses, tabHref } from "./jobTabs";
+import { ARCHIVE_TABS, JOB_STATUSES, JOB_TABS, JOB_TAB_GROUPS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, defaultStatuses, tabHref } from "./jobTabs";
 export { JOB_STATUSES, JOB_TABS, NEW_STATUSES, PENDING_STATUSES, APPLIED_STATUSES, HIDDEN_BY_DEFAULT, defaultStatuses } from "./jobTabs";
 
 const FILTERS = ["q", "min_score", "recommendation", "tier", "technology", "location", "work_model",
@@ -123,21 +123,27 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
     const extra = carry.toString();
     return extra ? `${href}${href.includes("?") ? "&" : "?"}${extra}` : href;
   };
+  const link = (t: (typeof JOB_TABS)[number]) => {
+    const on = t.key === active;
+    const n = counts ? defaultStatuses(t).reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
+    return (
+      <Link key={t.key} to={withFilters(tabHref(t.key))} role="tab" aria-selected={on}
+        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${on
+          ? "bg-indigo-50 text-indigo-700 shadow-[inset_0_0_0_1px_var(--color-indigo-200)]"
+          : `${ARCHIVE_TABS.includes(t.key) ? "text-slate-400" : "text-slate-600"} hover:bg-slate-100 hover:text-slate-900`}`}>
+        {t.label}{n !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/70 text-indigo-600" : "bg-slate-100 text-slate-500"}`}>{n}</span>}
+      </Link>
+    );
+  };
+  // One row, grouped by stage: what's left to review, what's in progress, what's finished.
   return (
-    // On a desktop the tabs are in the menu (under Jobs); this row is for phones and a hidden menu.
-    <div role="tablist" aria-label="Job status"
-      className="tabs-scroll flex gap-1 border-b border-slate-200 md:hidden md:group-data-[menu=hidden]/app:flex">
-      {JOB_TABS.map((t) => {
-        const on = t.key === active;
-        const n = counts ? defaultStatuses(t).reduce((sum, s) => sum + (counts[s] ?? 0), 0) : undefined;
-        const archive = ARCHIVE_TABS.includes(t.key);
-        return (
-          <Link key={t.key} to={withFilters(tabHref(t.key))} role="tab" aria-selected={on}
-            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${t.key === ARCHIVE_TABS[0] ? "ml-auto" : ""} ${on ? "border-indigo-600 text-indigo-700" : `border-transparent ${archive ? "text-slate-400" : "text-slate-500"} hover:text-slate-700`}`}>
-            {t.label}{n !== undefined && <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${on ? "bg-indigo-50" : "bg-slate-100"}`}>{n}</span>}
-          </Link>
-        );
-      })}
+    <div role="tablist" aria-label="Job status" className="tabs-scroll card flex items-stretch gap-0 p-1.5!">
+      {JOB_TAB_GROUPS.map((g, i) => (
+        <div key={g.label} className={`flex shrink-0 flex-col gap-0.5 px-2 ${i ? "border-l border-slate-200" : ""} ${g.label === "Finished" ? "ml-auto" : ""}`}>
+          <span aria-hidden className="px-3 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{g.label}</span>
+          <div className="flex gap-0.5">{g.keys.map((k) => link(JOB_TABS.find((t) => t.key === k)!))}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -242,8 +248,37 @@ function NextStep({ job }: { job: Job }) {
   );
 }
 
+/** The job's skills under its title: required first, then preferred (lighter), the rest as "+N".
+ * With onPick, each skill is a button that filters the list by it (again: clears the filter). */
+export function JobSkills({ job, max = 6, active, onPick }: { job: Pick<Job, "required_skills" | "preferred_skills">;
+  max?: number; active?: string | null; onPick?: (skill: string) => void }) {
+  const all = [...(job.required_skills ?? []).map((s) => ({ s, req: true })),
+    ...(job.preferred_skills ?? []).filter((s) => !job.required_skills?.includes(s)).map((s) => ({ s, req: false }))];
+  if (!all.length) return null;
+  const rest = all.slice(max);
+  const isActive = (s: string) => !!active && s.toLowerCase() === active.toLowerCase();
+  const look = (s: string, req: boolean) => `rounded-md px-1.5 py-px text-[11px] leading-4 ${isActive(s)
+    ? "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300"
+    : req ? "bg-slate-100 text-slate-700" : "border border-dashed border-slate-200 text-slate-500"}`;
+  return (
+    <ul aria-label="Skills" className="mt-1 flex flex-wrap gap-1">
+      {all.slice(0, max).map(({ s, req }) => (
+        <li key={s}>
+          {onPick
+            ? <button type="button" aria-pressed={isActive(s)} onClick={() => onPick(isActive(s) ? "" : s)}
+                title={`${req ? "Required" : "Preferred"} · ${isActive(s) ? "click to show all jobs" : `show only jobs with ${s}`}`}
+                className={`${look(s, req)} transition hover:bg-indigo-50 hover:text-indigo-700`}>{s}</button>
+            : <span title={req ? "Required" : "Preferred"} className={`inline-block ${look(s, req)}`}>{s}</span>}
+        </li>
+      ))}
+      {rest.length > 0 && <li className="px-1 text-[11px] leading-4 text-slate-400" title={rest.map((r) => r.s).join(", ")}>+{rest.length}</li>}
+    </ul>
+  );
+}
+
 /** Phones: one card per job instead of an 11-column table. */
-function JobCards({ jobs, selected, toggle }: { jobs: Job[]; selected: Set<number>; toggle: (id: number) => void }) {
+function JobCards({ jobs, selected, toggle, skill, onSkill }: { jobs: Job[]; selected: Set<number>; toggle: (id: number) => void;
+  skill: string | null; onSkill: (skill: string) => void }) {
   return (
     <ul className="divide-y divide-slate-100">
       {jobs.map((j) => (
@@ -258,6 +293,7 @@ function JobCards({ jobs, selected, toggle }: { jobs: Job[]; selected: Set<numbe
               {j.company.name} {j.company.tier && <Badge>{j.company.tier.replace("TIER_", "Tier ")}</Badge>}
               {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
             </div>
+            <JobSkills job={j} max={4} active={skill} onPick={onSkill} />
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600">
               <span>{j.location ?? "Location unknown"}{j.work_model !== "UNKNOWN" && ` · ${humanize(j.work_model)}`}</span>
               {(j.experience_min != null || j.experience_max != null) && <span>{experienceRange(j.experience_min, j.experience_max)}</span>}
@@ -541,7 +577,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (<>
             {/* Wide screens: no inner scroll box, so the column headers can stick to the page. */}
             <div ref={tableWrapRef} className={stickyHead ? "" : "overflow-x-auto"}>
-              {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} /> : <>
+              {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} skill={params.get("technology")} onSkill={(v) => set("technology", v)} /> : <>
               <p className="mb-2 text-xs text-slate-500"><b>Click a row</b> to preview it here (↑ ↓ move, Esc closes) · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
               <table className="min-w-full divide-y divide-slate-100 [&_td]:px-2 [&_th]:px-2">
                 <thead className={stickyHead ? "sticky z-10" : ""} style={stickyHead ? { top: headerBottom } : undefined}><tr>
@@ -578,6 +614,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                           <AddedViaTags values={j.added_via} />
                         </div>
                       </td>
+                        <JobSkills job={j} active={params.get("technology")} onPick={(v) => set("technology", v)} />
                       <td className="td max-w-32 text-xs" title={[j.location, j.work_model !== "UNKNOWN" ? humanize(j.work_model) : ""].filter(Boolean).join(" · ")}>
                         <div className="truncate">{j.location ?? "—"}</div>
                         {j.work_model !== "UNKNOWN" && <div className="text-slate-500">{humanize(j.work_model)}</div>}

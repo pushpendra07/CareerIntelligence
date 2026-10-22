@@ -1,4 +1,4 @@
-/** Job statuses and the status tabs, shared by the Jobs page and the sidebar menu. */
+/** Job statuses and the status tabs, shown as grouped tabs on the Jobs page. */
 
 export const JOB_STATUSES = ["DISCOVERED", "NEW", "REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "APPLIED",
   "RECRUITER_CONTACTED", "SCREENING", "INTERVIEW", "AWAITING_FEEDBACK", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN", "ON_HOLD",
@@ -23,6 +23,14 @@ export const JOB_TABS: { key: string; label: string; statuses: string[] }[] = [
 ];
 /** Tabs for finished jobs, shown apart from the active ones. */
 export const ARCHIVE_TABS = ["rejected", "not-pursuing", "closed"];
+
+/** The status tabs grouped by stage, as the Jobs page shows them. */
+export const JOB_TAB_GROUPS: { label: string; keys: string[] }[] = [
+  { label: "Everything", keys: ["all"] },
+  { label: "To review", keys: ["new", "pending"] },
+  { label: "In progress", keys: ["applied", "interview", "selected"] },
+  { label: "Finished", keys: ARCHIVE_TABS },
+];
 
 /** Shown only when picked in the Status filter (or in their own tab), like Closed jobs. */
 export const HIDDEN_BY_DEFAULT = ["APPLIED", "REJECTED", "NOT_RELEVANT"];

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FollowupsPage } from "../features/followups/FollowupsPage";
 import { inDays, dueLabel } from "../features/followups/FollowUpParts";
 import { JobDetailPage } from "../features/jobs/JobDetailPage";
-import { AppLayout, jobTabFor, locate } from "../layouts/AppLayout";
+import { AppLayout, locate } from "../layouts/AppLayout";
 import { mockApi, renderAt } from "./utils";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -16,18 +16,11 @@ function ListPath() {
 }
 
 describe("menu", () => {
-  it("lists job statuses with counts under Jobs", async () => {
-    mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} }, "GET /jobs": { items: [], total: 0, page: 1, size: 50 },
-      "GET /jobs/status-counts": { NEW: 3, DISCOVERED: 2, SHORTLISTED: 4, NOT_RELEVANT: 7, CLOSED: 9 } });
+  it("has no job status sub-menu: statuses are tabs on the Jobs page", () => {
+    mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} } });
     renderAt(<AppLayout />, { path: "/jobs", route: "/jobs?tab=pending" });
-    const sub = screen.getByRole("list", { name: "Jobs by status" });
-    expect(await within(sub).findByRole("link", { name: /^New\s*5$/ })).toHaveAttribute("href", "/jobs?tab=new");
-    expect(within(sub).getByRole("link", { name: /^Pending\s*4$/ })).toHaveAttribute("aria-current", "page");
-    expect(within(sub).getByRole("link", { name: /^Not pursuing\s*7$/ })).toBeInTheDocument();
-    expect(within(sub).getByRole("link", { name: /^Closed\s*9$/ })).toHaveAttribute("href", "/jobs/closed");
-    expect(within(sub).queryByRole("link", { name: /On Hold/ })).not.toBeInTheDocument(); // statuses are chips on the page
-    expect(jobTabFor("/jobs", "")).toBe("new");
-    expect(jobTabFor("/jobs", "?min_score=70")).toBe("all");
+    expect(screen.queryByRole("list", { name: "Jobs by status" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Jobs" })).toHaveAttribute("aria-current", "page");
   });
 
   it("has one entry per area, with counts, and tabs for related pages", async () => {

@@ -104,6 +104,8 @@ describe("job status tabs", () => {
     expect(await tab(/Rejected\s*4/)).toBeInTheDocument();
     expect(await tab(/Not pursuing\s*5/)).toBeInTheDocument();
     expect(await tab(/Closed\s*9/)).toHaveAttribute("aria-selected", "true");
+    const bar = screen.getByRole("tablist", { name: "Job status" }); // grouped by stage
+    for (const g of ["Everything", "To review", "In progress", "Finished"]) expect(bar).toHaveTextContent(g);
     const label = await screen.findByText("Closed", { selector: "span" });
     expect(label.className).toContain("bg-zinc-200");
     expect(screen.queryByRole("button", { name: "Status" })).not.toBeInTheDocument(); // one status only
