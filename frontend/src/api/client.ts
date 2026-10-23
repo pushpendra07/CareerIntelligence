@@ -47,7 +47,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
       /* non-JSON error body */
     }
     // Logged out (APP_PASSWORD set, session expired): the login screen takes over.
-    if (res.status === 401 && !path.startsWith("/auth/")) window.dispatchEvent(new Event("auth-required"));
+    if (res.status === 401 && !["/auth/login", "/auth/status"].includes(path)) window.dispatchEvent(new Event("auth-required"));
     throw new ApiError(res.status, code, message, details);
   }
   if (res.status === 204) return undefined as T;

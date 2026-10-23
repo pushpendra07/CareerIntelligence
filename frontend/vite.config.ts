@@ -10,7 +10,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     // ../browser-extension: its page reader is tested here (src/test/extension-extract.test.ts).
-    server: { port: 5173, proxy: { "/api": target }, fs: { allow: [".", "../browser-extension"] } },
+    // allowedHosts: reach the dev server through a Cloudflare Quick Tunnel (phone, other networks).
+    server: { port: 5173, proxy: { "/api": target }, fs: { allow: [".", "../browser-extension"] },
+      allowedHosts: [".trycloudflare.com"] },
     preview: { port: 4173, proxy: { "/api": target } },
     test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], css: false, globals: true,
       include: ["src/**/*.test.{ts,tsx}"] }, // e2e/ is Playwright (npm run e2e)

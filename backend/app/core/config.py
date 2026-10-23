@@ -44,8 +44,11 @@ class Settings(BaseSettings):
     storage_path: Path = Path("storage")
     # Automatic backups (zip files: database dump, JSON copy, uploaded CVs). Git-ignored.
     backup_path: Path = Path("backups")
-    # Optional: require this password to use the app (empty = no login).
+    # Optional: the first login password (username "admin") when no login account exists yet.
+    # After that the account in login_file is used (Settings -> Login changes it).
     app_password: SecretStr | None = None
+    # The login account: username, password hash, session key (0600; git-ignored).
+    login_file: Path = Path("secrets/login.json")
     # Built web UI (frontend/dist) to serve from this API on one port, as the Docker image and
     # `scripts/install.sh` do. Empty = the UI runs separately (Vite dev server, port 5173).
     static_dir: Path | None = None

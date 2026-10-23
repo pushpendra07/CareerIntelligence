@@ -82,11 +82,22 @@ def db(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def settings(database_url: str) -> Settings:
-    # _env_file=None: tests must not depend on the developer's backend/.env.
+def settings(database_url: str, tmp_path: Path) -> Settings:
+    # _env_file=None: tests must not depend on the developer's backend/.env, nor its login.
     return Settings(  # type: ignore[call-arg]
-        _env_file=None, environment="test", database_url=database_url, log_format="text"
+        _env_file=None, environment="test", database_url=database_url, log_format="text",
+        login_file=tmp_path / "secrets" / "login.json",
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_login_lockout() -> Iterator[None]:
+    """Wrong-password counts are per process; every test starts with none."""
+    from app.core import auth
+
+    auth._failures.clear()
+    yield
+    auth._failures.clear()
 
 
 @pytest.fixture

@@ -42,7 +42,7 @@ export const SECTIONS: Section[] = [
   { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
     tabs: [{ to: "/settings", label: "Job sources" }, { to: "/settings/import-rules", label: "Import rules" },
       { to: "/settings/scoring", label: "Scoring" },
-      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" },
+      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" }, { to: "/settings/login", label: "Login" },
       { to: "/settings/about", label: "About & AI" }] },
 ];
 

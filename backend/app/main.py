@@ -54,11 +54,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def require_login(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # Optional password (APP_PASSWORD). Uses the settings the app was created with, or the
+        # Optional login (core/auth.py). Uses the settings the app was created with, or the
         # test override, so tests can switch it on.
         active = app.dependency_overrides.get(get_settings, lambda: settings)()
-        if (auth.required(active) and not auth.is_open(request.url.path)
-                and not auth.valid_token(active, request.cookies.get(auth.COOKIE))):
+        if auth.is_open(request.url.path):
+            return await call_next(request)
+        account = auth.load_account(active)
+        if account is not None and not auth.valid_token(account, request.cookies.get(auth.COOKIE)):
             return JSONResponse(
                 {"error": {"code": "unauthorized", "message": "Log in first", "details": None}},
                 status_code=401)

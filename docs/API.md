@@ -203,9 +203,16 @@ Conventions:
 - `GET /api/v1/backups` — settings, folder, pg_dump available, last / next, backups (newest
   first). `POST /api/v1/backups` — back up now. `GET /api/v1/backups/{name}` — download a zip.
   Schedule: `PATCH /api/v1/settings/app {"backups": {"enabled", "every_hours", "keep"}}`.
-- `GET /api/v1/auth/status` → `{required, authenticated}`; `POST /api/v1/auth/login
-  {"password"}` sets the session cookie; `POST /api/v1/auth/logout`. With `APP_PASSWORD` set,
-  every other endpoint (except `/health`) answers 401 until logged in.
+- `GET /api/v1/auth/status` → `{required, authenticated, username}`; `POST /api/v1/auth/login
+  {"username", "password"}` sets the session cookie (401 wrong; 429 after 5 wrong tries from one
+  client for 15 min); `POST /api/v1/auth/logout`. Once a login exists, every other endpoint
+  (except `/health`) answers 401 until logged in.
+- `GET /api/v1/auth/account` → `{enabled, username, min_password}`. `POST /api/v1/auth/account
+  {"username", "password"}` creates the login (409 if one exists). `PUT /api/v1/auth/account
+  {"current_password", "username"?, "new_password"?}` changes it (422 wrong current password); a
+  new password logs out every other browser. `POST /api/v1/auth/logout-others`. The account is
+  `LOGIN_FILE` (`backend/secrets/login.json`, scrypt hash, 0600); `APP_PASSWORD` only creates the
+  first one (username `admin`).
 
 ### setup (first run)
 - `GET /api/v1/setup` → `{needs_setup, completed_at, steps: {cv, targets, companies, jobs},

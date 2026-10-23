@@ -41,6 +41,16 @@ class DomainValidationError(AppError):
     code = "validation_error"
 
 
+class UnauthorizedError(AppError):
+    status_code = 401
+    code = "unauthorized"
+
+
+class TooManyAttemptsError(AppError):
+    status_code = 429
+    code = "too_many_attempts"
+
+
 def _body(code: str, message: str, details: Any = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": jsonable_encoder(details)}}
 

@@ -29,6 +29,7 @@ RUN apt-get update \
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH="/app/.venv/bin:$PATH" \
     STATIC_DIR=/app/ui STORAGE_PATH=/data/storage BACKUP_PATH=/data/backups \
+    LOGIN_FILE=/data/secrets/login.json \
     LOG_FORMAT=json PYTHONUNBUFFERED=1
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project

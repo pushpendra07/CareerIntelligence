@@ -79,7 +79,7 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | — | Only when an AI provider is set (costs tokens) |
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
 | `BACKUP_PATH` | `backups` | Automatic backup zips (database dump, data.json, CVs; git-ignored). Restore: `scripts/restore-backup.sh` |
-| `APP_PASSWORD` | — | Optional: require this password to open the app (login cookie, 30 days) |
+| `APP_PASSWORD` | — | Optional: first login password (username `admin`) while no login exists; then Settings → Login (`LOGIN_FILE`, default `secrets/login.json`, hashed) |
 | `STATIC_DIR` | — | Built UI (`frontend/dist`) to serve from the API on one port (the Docker image sets it) |
 | `POSTGRES_PASSWORD` / `APP_PORT` / `APP_BIND` | — / `8010` / `127.0.0.1` | Docker only (`docker-compose.yml`; `./install.sh` writes a random password) |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | `secrets/google-service-account.json` if present | Google service-account key for importing private Google Sheets |
@@ -323,6 +323,14 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   `index.html`; never for `/api`), plus `pg_dump` 16 for backups. Services `db` + `app`; volumes
   `pgdata` and `appdata` (`/data/storage`, `/data/backups`). CI job `docker` runs
   `./install.sh --docker` and checks it. Career-Ops scanning is native-only.
+- **Login** (`core/auth.py`, `api/v1/auth.py`, UI `components/AuthGate.tsx` + Settings → Login
+  `features/settings/LoginSettings.tsx`): one account (username, scrypt hash, session key) in
+  `LOGIN_FILE` (`backend/secrets/login.json`, 0600; never in the database, backups or API output).
+  No file = no login, unless `APP_PASSWORD` is set (then it becomes `admin` / that password).
+  Cookie = expiry + HMAC with the session key; a new password or *Log out other devices* rotates
+  the key. 5 wrong passwords per client (`CF-Connecting-IP` behind a Cloudflare tunnel) → 15-min
+  lockout. Phone / other networks: `cloudflared tunnel --url http://localhost:5173`
+  (`vite.config.ts` allows `.trycloudflare.com`).
 - **Notifications & reminders:** the bell (`components/Reminders.tsx`, data from `GET /reminders`
   + `GET /reminder-events`; read state per browser) also sets the tab-title count. Scheduled
   reminders: `services/reminder_service.py` (cron parser, scheduler thread started in `main.py`,

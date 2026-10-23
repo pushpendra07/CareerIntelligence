@@ -575,7 +575,8 @@ Never commit it.
 | `AI_MODEL` / `AI_API_KEY` / `AI_BASE_URL` | — | Optional AI settings. OmniRoute defaults to `http://localhost:20128/v1` (key only if it requires one); Ollama to `http://localhost:11434/v1` |
 | `STORAGE_PATH` | `storage` | Where original CV files are stored |
 | `BACKUP_PATH` | `backups` | Automatic backups (Settings → Backup & import); restore with `scripts/restore-backup.sh` |
-| `APP_PASSWORD` | — | Optional login password (empty = no login) |
+| `APP_PASSWORD` | — | Optional first login password (username `admin`), used while no login exists; change it in Settings → Login |
+| `LOGIN_FILE` | `secrets/login.json` | The login: username, hashed password, session key (git-ignored) |
 | `MAX_UPLOAD_BYTES` | `10485760` | Upload size limit |
 | `CORS_ORIGINS` | `localhost:5173` | Allowed browser origins |
 | `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Structured logging |

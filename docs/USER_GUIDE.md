@@ -601,9 +601,17 @@ when their job board is known (**Find job boards**).
 - **Export**: Settings → Backup & import → Download your data → jobs, companies,
   applications… as CSV/JSON, or everything as one JSON file.
 - Your data lives in `backend/.devdb/` (database) and `storage/` (CV files).
-- **Password (optional)**: set `APP_PASSWORD=…` in `backend/.env` and restart — the app then
-  asks for it (stays logged in 30 days per browser; **Log out** at the top). Changing it logs
-  every browser out. Leave it empty for no login.
+- **Login (optional)**: Settings → **Login** → *Turn on login* (username + password, at least 8
+  characters). The app then asks for them (stays logged in 30 days per browser; **Log out** at
+  the top). Change the username or password there (needs the current password; a new password
+  logs out every other browser and phone), or *Log out other devices*. Five wrong passwords lock
+  that visitor out for 15 minutes. Alternatively set `APP_PASSWORD=…` in `backend/.env` before
+  the first start: it becomes the login with username **admin**.
+  **Forgot the password?** Delete `backend/secrets/login.json` and restart: with `APP_PASSWORD`
+  set the login is admin / that password again, otherwise the app is open until you create one.
+- **Use it from your phone or another network**: turn on the login first, then run
+  `cloudflared tunnel --url http://localhost:5173` (`brew install cloudflared`) and open the
+  `https://….trycloudflare.com` link it prints. The link changes every time the tunnel starts.
 - **Start completely fresh** (deletes all your data!): `./stop.sh`, then delete
   `backend/.devdb/` and `storage/`, then `./start.sh`. The app creates an empty database.
   Export first if you may want anything back.

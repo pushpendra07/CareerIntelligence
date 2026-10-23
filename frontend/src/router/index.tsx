@@ -55,6 +55,7 @@ export const routes: RouteObject[] = [
       { path: "settings/import-rules", ...page(() => import("../features/settings/ImportRulesSettings"), (m) => m.ImportRulesSettings) },
       { path: "settings/reminders", ...page(() => import("../features/settings/ReminderSettings"), (m) => m.ReminderSettings) },
       { path: "settings/email", ...page(() => import("../features/email/EmailUpdates"), (m) => m.EmailSettings) },
+      { path: "settings/login", ...page(() => import("../features/settings/LoginSettings"), (m) => m.LoginSettings) },
       { path: "settings/about", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="about" />) },
       { path: "*", element: <NotFoundPage /> },
     ],
