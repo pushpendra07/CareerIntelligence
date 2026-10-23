@@ -7,7 +7,13 @@ const load = (): Extract => {
   return (globalThis as unknown as { ciExtract: Extract }).ciExtract;
 };
 
-afterEach(() => { document.head.innerHTML = ""; document.body.innerHTML = ""; });
+/** The reader as it runs on a portal page: `location` is that page's address. */
+const loadAt = (url: string): Extract => {
+  new Function("location", source)(new URL(url));
+  return (globalThis as unknown as { ciExtract: Extract }).ciExtract;
+};
+
+afterEach(() => { document.head.innerHTML = ""; document.body.innerHTML = ""; document.title = ""; });
 
 describe("Job collector: reading job pages", () => {
   it("reads schema.org JobPosting data (Naukri, Glassdoor, company sites)", () => {
@@ -37,5 +43,47 @@ describe("Job collector: reading job pages", () => {
     document.body.innerHTML = "<main><h1>Sr. Software Engineer</h1>\n<p>Full stack. React, PHP, Go.</p></main>";
     expect(load().detail()).toMatchObject({ title: "Sr. Software Engineer", company: "Sureify" });
     document.title = "";
+  });
+});
+
+describe("Job collector: portals without filling anything in", () => {
+  it("reads LinkedIn from the tab title, company link and 'About the job' when the layout changed", () => {
+    document.title = "(3) Senior PHP Developer | Acme Commerce | LinkedIn";
+    document.body.innerHTML = `<div class="x1"><a href="https://www.linkedin.com/company/acme-commerce/life">Acme Commerce</a>
+      <div><h2>About the job</h2><div>${"Build Magento 2 and Laravel services for our stores. ".repeat(10)} 5-8 years experience.</div></div></div>`;
+    const job = loadAt("https://www.linkedin.com/jobs/search/?keywords=php&currentJobId=4012345678&trk=abc").detail();
+    expect(job).toMatchObject({ title: "Senior PHP Developer", company: "Acme Commerce", portal: "LinkedIn",
+      url: "https://www.linkedin.com/jobs/view/4012345678/", experience: "5-8 years", listing: false });
+    expect(job.description).toContain("Magento 2 and Laravel");
+  });
+
+  it("reads Shine and drops the tracking query from a link with the posting ID", () => {
+    document.body.innerHTML = `<h1 class="jobDetail_title">Magento Developer</h1><div class="jobDetail_companyName">Beta Retail Pvt Ltd</div>
+      <div class="jobDetail_location">Jaipur</div><div class="jobDetail_experience">3 to 6 Yrs</div>
+      <div class="jobDetail_jobDescription">Adobe Commerce, PHP, MySQL.</div>`;
+    const job = loadAt("https://www.shine.com/jobs/magento-developer/beta-retail-pvt-ltd/17654321?sid=9&utm_source=x").detail();
+    expect(job).toMatchObject({ title: "Magento Developer", company: "Beta Retail Pvt Ltd", location: "Jaipur",
+      experience: "3 to 6 Yrs", portal: "Shine", url: "https://www.shine.com/jobs/magento-developer/beta-retail-pvt-ltd/17654321" });
+  });
+
+  it("reads Naukri's tab title when its selectors miss", () => {
+    document.title = "PHP Lead - Gamma Tech Solutions - 6 to 10 years of experience - Naukri.com";
+    const job = loadAt("https://www.naukri.com/job-listings-php-lead-gamma-tech-solutions-pune-6-to-10-years-231024500123?src=jobsearchDesk&sid=1&xp=2").detail();
+    expect(job).toMatchObject({ title: "PHP Lead", company: "Gamma Tech Solutions", portal: "Naukri", listing: false,
+      url: "https://www.naukri.com/job-listings-php-lead-gamma-tech-solutions-pune-6-to-10-years-231024500123" });
+  });
+
+  it("flags a search results page with no job open, instead of saving it as a job", () => {
+    document.title = "Php Developer Jobs in Pune - Foundit";
+    document.body.innerHTML = '<h1>245 Php Developer Jobs in Pune</h1><a href="/job/php-developer-acme-pune-31234567">PHP Developer</a>';
+    const ex = loadAt("https://www.foundit.in/srp/results?query=php&locations=Pune");
+    expect(ex.detail().listing).toBe(true);
+    expect(ex.searchLinks()).toEqual(["https://www.foundit.in/job/php-developer-acme-pune-31234567"]);
+  });
+
+  it("lists Shine job links on its search page", () => {
+    document.body.innerHTML = '<a href="/jobs/php-developer/acme/17654321?sid=1">PHP</a><a href="/jobs/companies">x</a>';
+    expect(loadAt("https://www.shine.com/job-search/php-developer-jobs-in-pune").searchLinks())
+      .toEqual(["https://www.shine.com/jobs/php-developer/acme/17654321"]);
   });
 });

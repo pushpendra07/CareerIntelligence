@@ -5,6 +5,7 @@ import { api, errorMessage } from "../../api/client";
 import { Badge, Card, Empty, ErrorBox, Field, JobStatusBadge, PageIntro, Spinner } from "../../components/ui";
 import { formatDateTime, humanize } from "../../utils/format";
 import { JOB_STATUSES } from "../jobs/jobTabs";
+import type { Job, Page } from "../../types/api";
 
 type JobRef = { id: number; title: string; status: string; company: string | null };
 export type EmailUpdate = {
@@ -81,18 +82,50 @@ function lastCheckText(c: LastCheck | null | undefined): string {
   return `Last checked ${formatDateTime(c.at)}: ${c.messages ?? 0} new messages, ${found}${c.more ? " (more next time)" : ""}`;
 }
 
+/** Which job an email is about: the suggested ones, or any job found by title, company or #ID. */
+function JobPicker({ name, candidates, value, onChange }: { name: string; candidates: JobRef[]; value: number | ""; onChange: (id: number | "") => void }) {
+  const [q, setQ] = useState("");
+  const term = q.trim();
+  const found = useQuery({
+    queryKey: ["jobs", "pick", term], enabled: term.length >= 2,
+    queryFn: () => api.get<Page<Job>>("/jobs", { q: term, size: 8, sort: "-created_at" }),
+  }).data?.items ?? [];
+  const options: JobRef[] = [...candidates, ...found
+    .filter((j) => !candidates.some((c) => c.id === j.id))
+    .map((j) => ({ id: j.id, title: j.title, status: j.status, company: j.company.name }))];
+  return (
+    <fieldset className="min-w-0 flex-1 rounded-lg border border-slate-200 p-2">
+      <legend className="px-1 text-xs text-slate-500">Which job is this email about?</legend>
+      {options.length > 0 && (
+        <ul className="max-h-48 space-y-0.5 overflow-y-auto" aria-label="Jobs to pick from">
+          {options.map((o) => (
+            <li key={o.id}>
+              <label className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-slate-50 ${value === o.id ? "bg-indigo-50" : ""}`}>
+                <input type="radio" name={name} checked={value === o.id} onChange={() => onChange(o.id)} />
+                <span className="min-w-0 flex-1 truncate"><b className="font-medium">{o.title}</b>
+                  <span className="text-slate-500">{o.company ? ` · ${o.company}` : ""} · #{o.id}</span></span>
+                <JobStatusBadge value={o.status} />
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input className="input mt-1 text-sm" placeholder={candidates.length ? "Not here? Search title, company or #ID" : "Search title, company or #ID"}
+        aria-label="Search for the job" value={q} onChange={(e) => setQ(e.target.value)} />
+    </fieldset>
+  );
+}
+
 /** One email and what it means: Confirm (with the suggested or another status), or Dismiss. */
 function UpdateRow({ u }: { u: EmailUpdate }) {
   const qc = useQueryClient();
   const [jobId, setJobId] = useState<number | "">(u.job?.id ?? (u.candidates.length === 1 ? u.candidates[0].id : ""));
   const [status, setStatus] = useState<string>(u.suggested_status ?? "");
-  const [linkId, setLinkId] = useState("");
+  const [changing, setChanging] = useState(false);
+  const picking = !u.job || changing;
   const done = () => { qc.invalidateQueries({ queryKey: ["email"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); qc.invalidateQueries({ queryKey: ["jobs"] }); };
   const confirm = useMutation({
-    mutationFn: () => {
-      const id = jobId || Number(linkId.replace(/^#/, "")) || undefined;
-      return api.post(`/email/updates/${u.id}/confirm`, { job_id: id, status: status || undefined, change_status: status !== "" });
-    },
+    mutationFn: () => api.post(`/email/updates/${u.id}/confirm`, { job_id: jobId || undefined, status: status || undefined, change_status: status !== "" }),
     onSuccess: done,
     meta: { success: status ? `Marked ${humanize(status)}` : "Email added to the job", toastError: true },
   });
@@ -119,32 +152,22 @@ function UpdateRow({ u }: { u: EmailUpdate }) {
       <div className="mt-2 text-sm">
         {u.job ? (
           <span>Job: <Link className="font-medium text-indigo-700 hover:underline" to={`/jobs/${u.job.id}`}>{u.job.title}</Link>
-            {u.job.company ? ` at ${u.job.company}` : ""} <JobStatusBadge value={u.job.status} /></span>
-        ) : u.company ? <span>Company: <b>{u.company}</b></span> : null}
-        <span className="block text-xs text-slate-400">{u.match_reason}</span>
+            {u.job.company ? ` at ${u.job.company}` : ""} <JobStatusBadge value={u.job.status} />
+            {pending && !changing && <button type="button" className="ml-2 text-xs text-indigo-600 hover:underline" onClick={() => { setChanging(true); setJobId(""); }}>Wrong job? Change</button>}</span>
+        ) : u.company ? <span>Company: <b>{u.company}</b>{u.candidates.length > 1 ? " — pick the job below" : ""}</span>
+          : <span className="text-slate-600">No job linked yet</span>}
+        <span className="block text-xs text-slate-400">Why: {u.match_reason}</span>
       </div>
       {pending && (
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          {!u.job && u.candidates.length > 0 && (
-            <label className="text-xs text-slate-500">Which job?
-              <select className="input mt-0.5 block" aria-label="Which job" value={jobId} onChange={(e) => setJobId(e.target.value ? Number(e.target.value) : "")}>
-                <option value="">Pick a job…</option>
-                {u.candidates.map((c) => <option key={c.id} value={c.id}>{c.title} ({humanize(c.status)})</option>)}
-              </select>
-            </label>
-          )}
-          {!u.job && u.candidates.length === 0 && (
-            <label className="text-xs text-slate-500">Job ID
-              <input className="input mt-0.5 block w-28" aria-label="Job ID" placeholder="#123" value={linkId} onChange={(e) => setLinkId(e.target.value)} />
-            </label>
-          )}
+          {picking && <div className="flex w-full"><JobPicker name={`job-for-${u.id}`} candidates={u.candidates} value={jobId} onChange={setJobId} /></div>}
           <label className="text-xs text-slate-500">Set status to
             <select className="input mt-0.5 block" aria-label="Set status to" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">Don't change, just add the email to the job</option>
               {JOB_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}{s === u.suggested_status ? " (suggested)" : ""}</option>)}
             </select>
           </label>
-          <button type="button" className="btn-primary" disabled={busy || (!u.job && !jobId && !linkId.trim())} onClick={() => confirm.mutate()}>Confirm</button>
+          <button type="button" className="btn-primary" disabled={busy || (picking && !jobId)} onClick={() => confirm.mutate()}>Confirm</button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => dismiss.mutate()}>Dismiss</button>
           {!u.job && u.candidates.length === 0 && u.company === null && (
             <Link className="text-xs text-indigo-600 hover:underline" to="/jobs/new">Add this job</Link>

@@ -116,7 +116,7 @@ CV ─▶ Professional Profile ─▶ Target Profile
 - **Status picker** lists your **most used statuses** first.
 - Filters (score, recommendation, tier, technology, location, work model, source, date,
   experience, salary, applied, and **any combination of statuses**) and sorting.
-- Color-coded status labels and **status tabs** with counts: All open · New · Pending · Applied ·
+- Color-coded status labels and **status tabs** with counts: All open (just imported) · All · Pending · Applied ·
   Interview · Selected · Rejected · Not pursuing · Closed.
 - **Delete** a job (with confirmation). Deleted jobs are remembered, so imports and scans don't
   add them back; adding one again by hand still works.
@@ -284,8 +284,9 @@ Career Intelligence is running
 1. **CVs** → upload your CV → **Merge into profile**.
 2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
    scored as "unknown" until you do).
-3. *(Optional)* **Settings → Import rules**: skills a job must have (e.g. PHP, Magento), skills
-   and roles to ignore — new jobs from any source that break them are not saved.
+3. *(Optional)* **My profile → Skills & targets → Which jobs to save**: let your target titles, required
+   skills and excluded roles/technologies also filter new jobs (plus extra words to ignore) — new
+   jobs from any source that break them are not saved. *Check my open jobs* previews the effect.
 3. **Settings → Job board search → Search now** to search the job boards of companies marked
    *Job search* (and **Find job boards** to discover boards for companies that only have a careers page).
 5. **Settings → Job sources → Chrome extension → Download**, install it (Load unpacked), then click

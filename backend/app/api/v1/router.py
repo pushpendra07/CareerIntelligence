@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     advisor,
+    ai_job_search,
     applications,
     apply,
     auth,
@@ -41,6 +42,7 @@ api_router.include_router(interviews.router)
 api_router.include_router(offers.router)
 api_router.include_router(reports.router)
 api_router.include_router(career_ops.router)
+api_router.include_router(ai_job_search.router)
 api_router.include_router(scanner.router)
 api_router.include_router(setup.router)
 api_router.include_router(reminder_rules.router)

@@ -188,7 +188,7 @@ export function AiSearchPage() {
         </div>
         <textarea aria-label="Prompt" className="input h-64 w-full font-mono text-xs" readOnly value={prompt} />
         <p className="mt-2 text-xs text-slate-500">
-          Built from your <Link className="link" to="/preferences">Target roles</Link> (titles, skills, locations, salary) — change it there.
+          Built from your <Link className="link" to="/preferences">Skills & targets</Link> (titles, skills, locations, salary) — change it there.
           The assistant uses your own logged-in browser; it never applies or messages anyone.
         </p>
       </Card>

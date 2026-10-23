@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
 import { NotFoundPage } from "../pages/NotFoundPage";
 
@@ -52,7 +52,8 @@ export const routes: RouteObject[] = [
       { path: "settings", ...page(() => import("../features/settings/SettingsPage"), (m) => m.SettingsPage) },
       { path: "settings/scoring", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="scoring" />) },
       { path: "settings/data", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="data" />) },
-      { path: "settings/import-rules", ...page(() => import("../features/settings/ImportRulesSettings"), (m) => m.ImportRulesSettings) },
+      // Import rules moved to My profile → Skills & targets (old links and bookmarks still work).
+      { path: "settings/import-rules", element: <Navigate to="/preferences#import-filter" replace /> },
       { path: "settings/reminders", ...page(() => import("../features/settings/ReminderSettings"), (m) => m.ReminderSettings) },
       { path: "settings/email", ...page(() => import("../features/email/EmailUpdates"), (m) => m.EmailSettings) },
       { path: "settings/login", ...page(() => import("../features/settings/LoginSettings"), (m) => m.LoginSettings) },

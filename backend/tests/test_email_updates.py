@@ -320,3 +320,109 @@ def test_failed_check_is_recorded(db: Session, account: Account) -> None:
         email_updates.check(db, broken)
     last = email_updates.status(db)["last_check"]
     assert last["error"] == "Could not reach imap.gmail.com:993"
+
+
+def test_employer_in_subject() -> None:
+    from app.services.email_updates import employer_in_subject as emp
+
+    assert emp("Thank you for applying to Bosch Global Software Technologies Private Limited") \
+        == "Bosch Global Software Technologies Private Limited"
+    assert emp("Your application at Ziffity solutions - next steps") == "Ziffity solutions"
+    assert emp("Magento Developer at Acme Commerce") == "Acme Commerce"
+    assert emp("Thanks for your interest in joining Wayne Enterprises!") == "Wayne Enterprises"
+    assert emp("Your application status") == ""
+
+
+def test_job_platform_contact_never_decides_the_company(
+    client: TestClient, db: Session, account: Account
+) -> None:
+    """A contact saved for notification@smartrecruiters.com (at Hitachi) used to pull every
+    SmartRecruiters email to Hitachi; the employer in the subject decides now."""
+    from app.models.company import Contact
+
+    hitachi = add_job(client, "PHP Lead", "Hitachi Solutions")
+    bosch = add_job(client, "Magento Developer", "Bosch Global Software Technologies")
+    hitachi_co = db.get(Job, hitachi).company_id  # type: ignore[union-attr]
+    db.add(Contact(name="SmartRecruiters", email="notification@smartrecruiters.com",
+                   company_id=hitachi_co))
+    db.commit()
+    box = FakeMailbox({
+        1: mail(1, "Bosch Group <notification@smartrecruiters.com>",
+                "Thank you for applying to Bosch Global Software Technologies Private Limited",
+                "We have received your application."),
+        2: mail(2, "Ziffity <notification@smartrecruiters.com>",
+                "Thank you for applying to Ziffity solutions",
+                "We have received your application."),
+    })
+    email_updates.check(db, connector(box))
+    got = {u["subject"]: u for u in client.get("/api/v1/email/updates").json()}
+    to_bosch = got["Thank you for applying to Bosch Global Software Technologies Private Limited"]
+    assert to_bosch["company"] == "Bosch Global Software Technologies"
+    assert [c["id"] for c in to_bosch["candidates"]] == [bosch] or to_bosch["job"]["id"] == bosch
+    assert "employer in the subject" in to_bosch["match_reason"]
+    ziffity = got["Thank you for applying to Ziffity solutions"]
+    assert ziffity["company"] is None and ziffity["candidates"] == []  # not Hitachi
+    assert ziffity["match_reason"] == "Not a company you track (looks like Ziffity solutions)"
+
+
+def test_technology_names_are_not_companies(
+    client: TestClient, db: Session, account: Account
+) -> None:
+    add_job(client, "Experience Manager Developer", "Adobe")
+    box = FakeMailbox({1: mail(1, "Priya <priya.k@gmail.com>", "Magento Developer role",
+                               "We need someone strong in Adobe Commerce and PHP. "
+                               "We'd like to schedule an interview with you.")})
+    email_updates.check(db, connector(box))
+    [u] = client.get("/api/v1/email/updates").json()
+    assert u["company"] is None and u["job"] is None
+
+
+def test_a_company_only_named_in_the_email_gets_suggestions_not_a_link(
+    client: TestClient, db: Session, account: Account
+) -> None:
+    job = add_job(client, "PHP Lead", "Stark Industries")
+    box = FakeMailbox({1: mail(1, "Recruiter <talent@hirefast.example>", "Stark Industries role",
+                               "Unfortunately we will not be moving forward with your "
+                               "application.")})
+    email_updates.check(db, connector(box))
+    [u] = client.get("/api/v1/email/updates").json()
+    assert u["job"] is None and [c["id"] for c in u["candidates"]] == [job]  # you confirm it
+
+
+def test_rematch_fixes_pending_links(client: TestClient, db: Session, account: Account) -> None:
+    from app.models.email_update import EmailUpdate
+
+    wrong = add_job(client, "PHP Lead", "Hitachi Solutions")
+    right = add_job(client, "Magento Developer", "Ace Turtle Services")
+    db.add(EmailUpdate(message_id="<x@1>", sender_name="Ace Turtle",
+                       sender_email="notification@smartrecruiters.com",
+                       subject="Thank you for applying to Ace Turtle Services Pvt Ltd",
+                       evidence="We have received your application.", kind="RECEIVED",
+                       company_id=db.get(Job, wrong).company_id,  # type: ignore[union-attr]
+                       candidate_job_ids=[wrong], match_reason="from your contact",
+                       state="PENDING"))
+    db.commit()
+    r = client.post("/api/v1/email/updates/rematch").json()
+    assert r["rematched"] == 1
+    [u] = client.get("/api/v1/email/updates", params={"state": "PENDING"}).json()
+    assert u["company"] == "Ace Turtle Services" and [c["id"] for c in u["candidates"]] == [right]
+
+
+def test_employer_from_sender_name_and_not_a_job_title(
+    client: TestClient, db: Session, account: Account
+) -> None:
+    add_job(client, "Magento Developer", "Bosch Group")
+    add_job(client, "Experience Manager Developer", "Adobe")
+    box = FakeMailbox({
+        1: mail(1, "Bosch Group <notification@smartrecruiters.com>",
+                "Thank you for applying to Bosch Global Software Technologies Private Limited",
+                "We have received your application."),
+        2: mail(2, "Talent <no-reply@greenhouse.io>",
+                "Your Application to Adobe Commerce SaaS Technical Lead",
+                "We have received your application."),
+    })
+    email_updates.check(db, connector(box))
+    got = client.get("/api/v1/email/updates").json()
+    by = lambda start: next(u for u in got if u["subject"].startswith(start))  # noqa: E731
+    assert by("Thank you for applying")["company"] == "Bosch Group"
+    assert by("Your Application to")["company"] is None  # a job title, not Adobe the employer

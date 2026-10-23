@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { ReactNode } from "react";
-import { Badge, Card, ErrorBox, IconChip, Spinner, Stat, WeekChange, type Accent } from "../../components/ui";
+import { Badge, Card, ErrorBox, IconChip, SkeletonCards, Stat, WeekChange, type Accent } from "../../components/ui";
 import { Icon } from "../../components/icons";
 import type { Priority } from "../../types/api";
 import { formatDate, formatDateTime } from "../../utils/format";
@@ -91,7 +91,7 @@ export function DashboardPage() {
     mutationFn: () => api.post("/matches/reanalyze", { only_stale: true }, { wait: true }),
     onSuccess: () => qc.invalidateQueries(),
   });
-  if (dash.isLoading) return <Spinner />;
+  if (dash.isLoading) return <SkeletonCards />;
   if (dash.error) return <ErrorBox error={dash.error} />;
   const s = dash.data!.summary;
   const now = new Date();

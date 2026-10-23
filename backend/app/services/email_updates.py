@@ -30,6 +30,7 @@ from app.models.application import Application
 from app.models.company import Company, Contact
 from app.models.email_update import EmailKind, EmailUpdate, EmailUpdateState
 from app.models.job import Job, JobStatus
+from app.skills.catalog import find_skills
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,24 @@ ATS_DOMAINS = (
     "pinpointhq.com", "freshteam.com", "darwinbox.in", "darwinbox.com", "hirist.com",
     "instahyre.com", "cutshort.io", "wellfound.com", "linkedin.com", "naukri.com",
     "indeed.com", "foundit.in", "breezy.hr", "jazzhr.com", "recruiterbox.com",
+    # Job platforms and test / scheduling tools that also write for many employers.
+    "indeedemail.com", "jobgether.com", "uplers.com", "jobright.ai", "hirist.tech", "iimjobs.com",
+    "shine.com", "timesjobs.com", "glassdoor.com", "glassdoor.co.in", "monster.com",
+    "monsterindia.com", "apna.co", "internshala.com", "turing.com", "toptal.com", "angel.co",
+    "hackerrank.com", "hackerearth.com", "codility.com", "testgorilla.com", "mettl.com",
+    "imocha.io", "calendly.com",
 )
+# "Thank you for applying to Acme", "Your application at Acme", "Magento Developer at Acme":
+# the employer, even when a job platform sent the email.
+_EMPLOYER = [
+    re.compile(r"\b(?:applying|applied|application|apply)\s+(?:to|at|with)\s+(?P<n>[^|:!?.,()\[\]]+)",
+               re.IGNORECASE),
+    re.compile(r"\binterest in (?:joining |working (?:at|with) )?(?P<n>[^|:!?.,()\[\]]+)",
+               re.IGNORECASE),
+    re.compile(r"\b(?:position|role|opening|opportunity|job)\s+(?:at|with)\s+(?P<n>[^|:!?.,()\[\]]+)",
+               re.IGNORECASE),
+    re.compile(r"\sat\s+(?P<n>[A-Z][^|:!?.,()\[\]]*)"),
+]
 FREE_MAIL = ("gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "outlook.com",
              "hotmail.com", "live.com", "icloud.com", "me.com", "proton.me", "protonmail.com",
              "rediffmail.com", "aol.com", "zoho.com")
@@ -148,6 +166,30 @@ def _domain(address: str) -> str:
 
 def _under(domain: str, parents: tuple[str, ...]) -> bool:
     return any(domain == p or domain.endswith("." + p) for p in parents)
+
+
+def employer_in_subject(subject: str) -> str:
+    """The employer the subject names ("Thank you for applying to Acme Ltd" -> "Acme Ltd")."""
+    for pattern in _EMPLOYER:
+        if m := pattern.search(subject):
+            name = re.split(r"\s+[-–—]\s+|\s+for\s+|\s+-$", m.group("n").strip())[0]
+            name = re.sub(r"^(?:the|our|a)\s+", "", name.strip(" '\"-"), flags=re.IGNORECASE)
+            if 2 <= len(name) <= 80:
+                return name
+    return ""
+
+
+def _mentions(name: str, text: str) -> bool:
+    """`name` (normalized, " adobe ") appears in `text` as a company, not as part of a
+    technology ("Adobe Commerce", "Salesforce Commerce Cloud")."""
+    start = 0
+    while (at := text.find(name, start)) >= 0:
+        start = at + 1
+        word = name.strip()
+        after = text[at + 1: at + len(name) + 30]
+        if not any(len(s) > len(word) and s.lower().startswith(word) for s in find_skills(after)):
+            return True
+    return False
 
 
 def _sentence(text: str, at: int) -> str:
@@ -258,7 +300,9 @@ class Context:
         for address, owner in db.execute(select(Contact.email, Contact.company_id)
                                          .where(Contact.email.is_not(None),
                                                 Contact.company_id.is_not(None))):
-            if address and owner:
+            # A saved contact on a job platform (notification@smartrecruiters.com) writes for
+            # many employers, so it never decides the company.
+            if address and owner and not _under(_domain(address.strip().lower()), ATS_DOMAINS):
                 ctx.contacts[address.strip().lower()] = owner
         ctx.known = set(db.scalars(select(EmailUpdate.message_id)))
         return ctx
@@ -274,20 +318,40 @@ class Context:
             for c in self.companies.values():
                 if any(_under(domain, (d,)) for d in c.domains):
                     return c, f"sent from {domain}", True
+        if employer := employer_in_subject(h.subject):
+            span = _norm(employer)
+            hits = [c for c in self.companies.values()
+                    if any(_mentions(n, span) or (len(span.strip()) >= 4 and span in n)
+                           for n in c.names)]
+            if hits:
+                best = self._best(hits)
+                return best, f"{best.name} is the employer in the subject", False
+            # Job platforms put the employer in the sender name ("Bosch Group via ...").
+            sender = _norm(h.sender_name)
+            hits = [c for c in self.companies.values()
+                    if any(_mentions(n, sender) for n in c.names)]
+            if hits:
+                best = self._best(hits)
+                return best, f"{best.name} is the sender", False
+            return None, "", False  # an employer you don't track: never guess from the text
         head = _norm(f"{h.sender_name} {h.subject}")
-        hits = [c for c in self.companies.values() if any(n in head for n in c.names)]
+        hits = [c for c in self.companies.values() if any(_mentions(n, head) for n in c.names)]
         where = "named in the sender or subject"
         if not hits and text:
             body = _norm(text[:3000])
             hits = [c for c in self.companies.values()
-                    if any(n in body for n in c.names if len(n.strip()) > 3)]
+                    if any(_mentions(n, body) for n in c.names if len(n.strip()) > 3)]
             where = "named in the email"
         if not hits:
             return None, "", False
+        best = self._best(hits)
+        return best, f"{best.name} {where}", False
+
+    def _best(self, hits: list[_Company]) -> _Company:
         # The most specific name wins ("Acme Digital" over "Acme"); then one you applied to.
         hits.sort(key=lambda c: (max(len(n) for n in c.names),
                                  any(j.applied for j in self.jobs.get(c.id, []))), reverse=True)
-        return hits[0], f"{hits[0].name} {where}", False
+        return hits[0]
 
     def looks_relevant(self, h: Header) -> bool:
         sender = h.sender_email
@@ -301,7 +365,11 @@ class Context:
             return True
         return bool(_JOB_SUBJECT.search(h.subject))
 
-    def job_for(self, company: _Company, mail: Mail) -> tuple[_Job | None, list[_Job], str]:
+    def job_for(self, company: _Company, mail: Mail,
+                sure: bool = False) -> tuple[_Job | None, list[_Job], str]:
+        """The job an email is about. `sure`: the company itself wrote (its own domain or a
+        contact), so its only (open) job is a safe link; otherwise only a job named in the email
+        or your only application there is linked, and the rest are suggestions to pick from."""
         jobs = self.jobs.get(company.id, [])
         subject, body = _norm(mail.subject), _norm(mail.text[:6000])
         named = [j for j in jobs if len(j.norm_title.strip()) >= 5 and j.norm_title in subject]
@@ -309,13 +377,15 @@ class Context:
                           if len(j.norm_title.strip()) >= 5 and j.norm_title in body]
         if len(named) == 1:
             return named[0], [], f"“{named[0].title}” is in the email"
-        live = named or [j for j in jobs if j.applied] or [
-            j for j in jobs if is_needed(j.status, JobStatus.REJECTED)]
-        if len(live) == 1:
-            why = "your only application there" if live[0].applied else "the only open job there"
-            return live[0], [], why
-        if len(jobs) == 1:
+        applied = [j for j in named or jobs if j.applied]
+        if len(applied) == 1:
+            return applied[0], [], "your only application there"
+        live = named or applied or [j for j in jobs if is_needed(j.status, JobStatus.REJECTED)]
+        if sure and len(live) == 1:
+            return live[0], [], "the only open job there"
+        if sure and len(jobs) == 1:
             return jobs[0], [], "the only job there"
+        # Not sure which job (or one you never applied to): suggest, you confirm.
         pool = live or jobs
         pool.sort(key=lambda j: (j.applied, j.changed or datetime.min.replace(tzinfo=UTC)),
                   reverse=True)
@@ -328,6 +398,9 @@ def _host(url: str | None) -> str | None:
 
 
 def _guess_company(h: Header) -> str:
+    employer = employer_in_subject(h.subject)
+    if employer and not find_skills(employer):  # "Adobe Commerce SaaS Lead" is a job title
+        return employer
     name = re.sub(r"(?i)\b(hiring|talent|recruit\w*|careers?|team|acquisition|hr|jobs|"
                   r"people|no.?reply|notifications?|via|at)\b", " ", h.sender_name)
     name = re.sub(r"\s+", " ", name).strip(" -|,")
@@ -357,27 +430,52 @@ def analyse(ctx: Context, mail: Mail) -> EmailUpdate | None:
         sender_email=mail.sender_email, subject=mail.subject, evidence=evidence, kind=kind.value,
         candidate_job_ids=[], state=EmailUpdateState.PENDING.value,
     )
-    target = TARGET[kind]
+    _link(ctx, mail, update, (company, why, from_company))
+    return update
+
+
+def _link(ctx: Context, mail: Mail, update: EmailUpdate,
+          found: tuple[_Company | None, str, bool] | None = None) -> None:
+    """Set the company, job (or jobs to pick from), reason and suggested status of an update."""
+    company, why, from_company = found or ctx.company_for(mail, mail.text)
+    target = TARGET[EmailKind(update.kind)]
+    update.company_id, update.job_id, update.candidate_job_ids = None, None, []
+    update.suggested_status = target.value
     if company is None:
         guess = _guess_company(mail)
         update.match_reason = (f"Not a company you track{f' (looks like {guess})' if guess else ''}"
                                )[:200]
-        update.suggested_status = target.value
-        return update
+        return
     update.company_id = company.id
-    job, candidates, how = ctx.job_for(company, mail)
+    job, candidates, how = ctx.job_for(company, mail, sure=from_company)
     update.match_reason = (f"{why}; {how}" if job else why)[:200]
     if job is None:
         update.candidate_job_ids = [j.id for j in candidates]
-        update.suggested_status = target.value
-        return update
+        return
     update.job_id = job.id
-    if is_needed(job.status, target):
-        update.suggested_status = target.value
-    else:
+    if not is_needed(job.status, target):
+        update.suggested_status = None
         update.state = EmailUpdateState.DONE.value  # nothing to change: kept as history
         update.resolved_at = datetime.now(UTC)
-    return update
+
+
+def rematch_pending(db: Session) -> dict[str, int]:
+    """Match the emails still waiting for review again — after the matching improves, or
+    after you add the job an email is about. Uses what was kept (sender, subject, the quoted
+    sentence); emails you confirmed or dismissed are left as they are."""
+    ctx = Context.load(db, "")
+    changed = 0
+    for update in db.scalars(select(EmailUpdate).where(
+            EmailUpdate.state == EmailUpdateState.PENDING.value)):
+        before = (update.company_id, update.job_id, list(update.candidate_job_ids or []))
+        mail = Mail(uid=0, message_id=update.message_id, sender_name=update.sender_name,
+                    sender_email=update.sender_email, subject=update.subject,
+                    received_at=update.received_at, text=update.evidence)
+        _link(ctx, mail, update)
+        if (update.company_id, update.job_id, list(update.candidate_job_ids or [])) != before:
+            changed += 1
+    db.commit()
+    return {"rematched": changed, "pending": pending_count(db)}
 
 
 # --- settings and state ---------------------------------------------------------------------
@@ -529,6 +627,7 @@ def _check(db: Session, account: Account, state: dict[str, Any], connect: Connec
     _save_state(db, {"user": account.user, "uidvalidity": uidvalidity, "last_uid": last_uid,
                      "last_check": summary})
     db.commit()
+    rematch_pending(db)  # older ones may now match a job you added since
     logger.info("email check", extra={k: v for k, v in summary.items() if k != "at"})
     return {**summary, "pending": pending_count(db)}
 

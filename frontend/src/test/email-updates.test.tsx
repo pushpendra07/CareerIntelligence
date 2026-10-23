@@ -55,7 +55,7 @@ describe("Email updates", () => {
     // No job yet: Confirm waits for the job to be picked.
     const confirm = within(second).getByRole("button", { name: "Confirm" });
     expect(confirm).toBeDisabled();
-    await userEvent.selectOptions(within(second).getByLabelText("Which job"), "9");
+    await userEvent.click(within(second).getByRole("radio", { name: /Frontend Engineer/ }));
     await userEvent.selectOptions(within(second).getByLabelText("Set status to"), "");
     await userEvent.click(confirm);
     await waitFor(() => expect(api.calls.find((c) => c.path === "/email/updates/2/confirm")?.body)
@@ -63,6 +63,25 @@ describe("Email updates", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Check now" }));
     await waitFor(() => expect(api.calls.some((c) => c.method === "POST" && c.path === "/email/check")).toBe(true));
+  });
+
+  it("a wrongly linked email can be moved to another job, found by search", async () => {
+    const api = mockApi({
+      "GET /email/account": CONNECTED, "GET /email/updates": [REJECTION],
+      "GET /jobs": { items: [{ id: 42, title: "Magento Lead", status: "APPLIED", company: { id: 5, name: "Bosch" } }], total: 1, page: 1, size: 8 },
+      "POST /email/updates/1/confirm": { ...REJECTION, state: "DONE" },
+    });
+    renderAt(<EmailUpdatesPage />);
+    const row = (await screen.findAllByRole("listitem"))[0];
+    expect(within(row).getByText(/^Why:/)).toBeInTheDocument();
+    await userEvent.click(within(row).getByRole("button", { name: "Wrong job? Change" }));
+    expect(within(row).getByRole("button", { name: "Confirm" })).toBeDisabled();
+    await userEvent.type(within(row).getByLabelText("Search for the job"), "Bosch");
+    await userEvent.click(await within(row).findByRole("radio", { name: /Magento Lead/ }));
+    await userEvent.click(within(row).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(api.calls.find((c) => c.path === "/email/updates/1/confirm")?.body)
+      .toMatchObject({ job_id: 42 }));
+    expect(within(row).getByText(/Bosch · #42/)).toBeInTheDocument();
   });
 
   it("asks to connect the inbox first", async () => {

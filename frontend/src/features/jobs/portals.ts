@@ -41,6 +41,8 @@ export const PORTALS: Portal[] = [
     search: ({ title, location }) => `https://www.foundit.in/srp/results?query=${enc(title)}&locations=${enc(place(location))}` },
   { name: "Glassdoor", host: "www.glassdoor.co.in", filled: true,
     search: ({ title, location, days }) => `https://www.glassdoor.co.in/Job/jobs.htm?sc.keyword=${enc(title)}&locKeyword=${enc(place(location))}&fromAge=${days}` },
+  { name: "Shine", host: "www.shine.com", filled: true,
+    search: ({ title, location }) => `https://www.shine.com/job-search/${slug(title)}-jobs${isRemote(location) ? "" : `-in-${slug(location)}`}` },
   { name: "Instahyre", host: "www.instahyre.com", filled: false, search: () => "https://www.instahyre.com/search-jobs/" },
   { name: "Wellfound", host: "wellfound.com", filled: false, search: () => "https://wellfound.com/jobs" },
   { name: "Cutshort", host: "cutshort.io", filled: false, search: () => "https://cutshort.io/jobs" },

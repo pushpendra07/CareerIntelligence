@@ -26,7 +26,7 @@ browser). **+ Add job** is always at the top right.
 | **Jobs** (number = new jobs to review) | All jobs · Companies · AI search · Review new |
 | **Pipeline** | Applications · Interviews · Offers · Recruiters |
 | **Follow-ups** (number = due today or late) | — |
-| **My profile** | Profile · Target roles · CVs · Question bank |
+| **My profile** | Profile · Skills & targets · CVs · Question bank |
 | **Settings** | — |
 
 ## Contents
@@ -100,7 +100,7 @@ open jobs ask for with your profile and your active CV:
 | Section | Fields |
 |---|---|
 | **Identity** | Name, Headline, Email, Phone, LinkedIn, Location, Summary |
-| **Skills & experience** | Total experience (yrs), Relevant experience (yrs), Leadership experience (yrs), Primary roles, Core skills, Additional skills, Domains, Leadership, Certifications, Achievements |
+| **Skills & experience** (edited on **Skills & targets → What you bring**, saved with that page) | Total experience (yrs), Relevant experience (yrs), Leadership experience (yrs), Primary roles, Core skills, Additional skills, Domains, Leadership, Certifications, Achievements |
 | **Projects (from CV)** | Projects read from the CV, used for interview prep |
 
 Tips:
@@ -111,7 +111,7 @@ Tips:
 
 ## 3. Set your Target Profile (what you want)
 
-**My profile → Target roles**. Every score is "how well does this job fit what I want".
+**My profile → Skills & targets** (what you want is under *What you want next*, below *What you bring*). Every score is "how well does this job fit what I want".
 
 | Section | Fields |
 |---|---|
@@ -211,9 +211,14 @@ Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to m
 | **Google Sheets** | Settings → Google Sheets → **Import** | Your tracking sheets (all tabs) — see [google-sheets.md](google-sheets.md) |
 | **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now**, or automatically (*Run automatically*: every N hours, and import as soon as Career-Ops finds something new) — set up once with `./scripts/setup-career-ops.sh` | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
+| **AI Job Search** (optional) | Settings → AI Job Search → **Import now**, or tick *Import as soon as AI Job Search finds something new* — set up once with `./scripts/setup-ai-job-search.sh` | What you search with `/scrape` in Claude Code (in `ai-job-search/`; uses your Claude tokens). The app imports its jobs, its `/rank` score with strengths and gaps (in the job's notes) and its tracker's applications; jobs failing its location or language check come in as *Not relevant* |
 
-**Import rules** (Settings → Import rules) decide which new jobs any source may save — tick
-*Use import rules*, then add or remove (× on a chip) **skills a job must have** (e.g. PHP,
+**Which jobs to save** (My profile → Skills & targets, at the bottom; saved with the rest of the page)
+decides which new jobs any source may save — tick *Filter new jobs before they're saved*, tick
+which of your target lists should also filter (**target job titles**: the title must fit one, level
+words like Senior don't count; **required skills**; **excluded roles**; **excluded technologies**),
+press **Check my open jobs** to see how many current jobs the rules would have blocked, then under
+*Extra words for filtering only* add or remove (× on a chip) **skills a job must have** (e.g. PHP,
 Magento, Magento 2, Adobe Commerce: the title or description must mention at least one),
 **skills to ignore** (e.g. Java: a job mentioning one is not saved), **roles to keep** (the title
 must contain one; empty = any) and **roles to ignore** (e.g. Intern). Whole words, any case
@@ -278,18 +283,19 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   new jobs one at a time, best match first, with *Why it fits*, *Watch out for* and the job
   description. **Closed** (`C`), **Not relevant** (`N`), **Shortlist** (`S`), **Skip for now** (`K`),
   **Open posting** (`O`), **Undo** (`U`). Pick *Score 70+* to see only strong matches.
-- **Jobs → All jobs**. One bar of tabs, grouped by stage, each with a count: **All open** ·
-  *To review* **New · Pending** · *In progress* **Applied · Interview · Selected** · *Finished*
-  **Rejected · Not pursuing · Closed**. **All open** is every job still in play, so its count is
-  New + Pending + Applied + Interview + Selected (the same number as *Jobs* on Today).
-  The page opens on **New** — jobs that just arrived, newest first (*Recently added*). Setting a
+- **Jobs → All jobs**. One bar of tabs, grouped by stage, each with a count: *Everything*
+  **All open · All** · *To review* **Pending** · *In progress* **Applied · Interview · Selected** ·
+  *Finished* **Rejected · Not pursuing · Closed**. **All open** lists only jobs as they were
+  imported — New or Discovered, with no status set since — and the page opens on it, newest
+  first (*Recently added*). **All** lists every job except closed ones, whatever its status.
+  Setting a
   status moves the job to its tab (Shortlist → Pending, Applied → Applied, Not relevant, Ignore or
   Duplicate → Not pursuing, Closed → Closed). **Ignore** puts a job aside for now without judging
   the fit; **Duplicate** hides a second copy of a posting you already have. Both are quick buttons
   next to *Not relevant* in the list, the preview and the job page, and always under *Most used*
   in the status menu. Search and filters apply **inside the tab you're on** (searching on
-  New searches new jobs only); switch tabs to search elsewhere. Links from Today and Insights that
-  carry filters open **All open**.
+  All open searches untouched jobs only); switch tabs to search elsewhere. Links from Today and
+  Insights that carry filters open **All**.
   Each job shows its skills; click one to add it to the **Skills** filter (click again to take
   it out). Under *More filters* → **Skills**, add several skills (Enter after each) and choose
   **Any of these** or **All of these**; tick **Exact skill only** to leave out more specific forms
@@ -298,7 +304,7 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   A tab with several statuses shows a chip per status with its count (Pending: *Reviewing ·
   Shortlisted · Ready to apply · On hold*; Applied: *Applied · Recruiter contacted · Screening*);
   click one to see only that status, **All** for the whole tab.
-- Filters: search, status (All open: a multi-select) and sort, then one-click buttons for
+- Filters: search, status (All: a multi-select) and sort, then one-click buttons for
   **Score** (60+ / 70+ / 80+), **Work** (remote / hybrid / on-site), **Posted** (last 7 / 14 /
   30 days) and **Added via**. **More filters** opens exact minimum score, recommendation,
   company tier, technology, location, source, your years and applied or not. 10 jobs per page.
@@ -577,7 +583,6 @@ Settings has these tabs (plus **Reminders** and **Email** — connect your inbox
 | Tab | What's there |
 |---|---|
 | **Job sources** | An overview of every job source (set up? last run?), then: **Job board search** — *Search every company* switch, Search now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import, *Run automatically* (Scan + import every N hours; import when its files change), *What Career-Ops searches* (its companies and filters, read-only) |
-| **Import rules** | Which new jobs any source may save: skills a job must have, skills to ignore, roles to keep, roles to ignore, which sources they apply to, jobs without a description, and a tester |
 | **Scoring** | What each part of the 0–100 score looks at, their weights (must total 100), the score each recommendation label needs, and (Advanced) company-tier points and deal-breakers. Save re-scores every job; Undo changes discards edits |
 | **Backup & import** | Download a full JSON backup or any list as CSV; import jobs or recruiters from a CSV/JSON file |
 | **About & AI** | Whether optional AI is on and how to turn it on; versions, Google account, Career-Ops path, storage |

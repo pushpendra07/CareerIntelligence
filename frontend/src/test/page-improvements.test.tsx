@@ -37,23 +37,27 @@ const lastList = (fn: { mock: { calls: unknown[][] } }) => fn.mock.calls.map((c)
   .filter((u) => u.pathname.endsWith("/jobs") && u.searchParams.get("size") !== "1").at(-1)!;
 
 describe("jobs list", () => {
-  it("row actions: Closed and Not relevant first, then Applied, Shortlist last; the rest is under ⋯", async () => {
+  it("row actions: Shortlist and Not relevant as buttons; every other step under ⋯", async () => {
     const api = mockApi({ "GET /jobs": listOf([ROW]), "POST /jobs/7/status": { ok: true } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    const closed = await screen.findByRole("button", { name: "Closed: Magento Lead" });
-    const row = closed.parentElement!;
-    expect(within(row).getAllByRole("button").slice(0, 6).map((b) => b.getAttribute("aria-label")))
-      .toEqual(["Closed: Magento Lead", "Not relevant: Magento Lead", "Ignore: Magento Lead", "Duplicate: Magento Lead",
-        "Applied: Magento Lead", "Shortlist Magento Lead"]);
-    await userEvent.click(screen.getByRole("button", { name: "Applied: Magento Lead" }));
-    await userEvent.click(closed);
-    await userEvent.click(screen.getByRole("button", { name: "Not relevant: Magento Lead" }));
-    expect(api.calls.filter((c) => c.path === "/jobs/7/status").map((c) => c.body))
-      .toEqual([{ status: "APPLIED" }, { status: "CLOSED" }, { status: "NOT_RELEVANT" }]);
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "More actions for Magento Lead" }));
+    const shortlist = await screen.findByRole("button", { name: "Shortlist Magento Lead" });
+    expect(within(shortlist.parentElement!).getAllByRole("button").map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Shortlist Magento Lead", "Not relevant: Magento Lead", "More actions for Magento Lead"]);
+    expect(screen.queryByRole("button", { name: "Closed: Magento Lead" })).not.toBeInTheDocument();
+    const more = () => userEvent.click(screen.getByRole("button", { name: "More actions for Magento Lead" }));
+    await more();
     const menu = screen.getByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((b) => b.textContent)).toEqual(
+      ["Mark applied", "Mark closed", "Ignore for now", "Duplicate", "Open posting ↗"]);
     expect(within(menu).getByRole("menuitem", { name: "Open posting: Magento Lead" })).toHaveAttribute("href", ROW.source_url);
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Applied: Magento Lead" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument(); // a status choice closes the menu
+    await more();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Closed: Magento Lead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Not relevant: Magento Lead" }));
+    await userEvent.click(shortlist);
+    expect(api.calls.filter((c) => c.path === "/jobs/7/status").map((c) => c.body))
+      .toEqual([{ status: "APPLIED" }, { status: "CLOSED" }, { status: "NOT_RELEVANT" }, { status: "SHORTLISTED" }]);
   });
 
   it("status: the pill, what it means and since when; actions are verbs below it", async () => {
@@ -63,8 +67,11 @@ describe("jobs list", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByText(/^apply next ·/)).toHaveAttribute("title", expect.stringContaining("Status set"));
     expect(screen.getByText("3 days")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Closed: Magento Lead" })).toHaveTextContent("Mark closed");
-    expect(screen.getByRole("button", { name: "Applied: Magento Lead" })).toHaveTextContent("Mark applied");
+    expect(screen.getByRole("link", { name: "Apply to Magento Lead" })).toHaveTextContent("Apply");
+    expect(screen.getByRole("button", { name: "Not relevant: Magento Lead" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Magento Lead" }));
+    expect(screen.getByRole("menuitem", { name: "Closed: Magento Lead" })).toHaveTextContent("Mark closed");
+    expect(screen.getByRole("menuitem", { name: "Applied: Magento Lead" })).toHaveTextContent("Mark applied");
     vi.useRealTimers();
   });
 
@@ -98,12 +105,15 @@ describe("jobs list", () => {
 });
 
 describe("ignore and duplicate", () => {
-  it("are quick buttons in the list and always under Most used", async () => {
+  it("are in each row's ⋯ menu and always under Most used", async () => {
     const api = mockApi({ "GET /jobs": listOf([ROW]), "POST /jobs/7/status": { ok: true },
       "GET /jobs/status-usage": { APPLIED: 9, NOT_RELEVANT: 5, CLOSED: 3 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    await userEvent.click(await screen.findByRole("button", { name: "Ignore: Magento Lead" }));
-    await userEvent.click(screen.getByRole("button", { name: "Duplicate: Magento Lead" }));
+    const more = async () => userEvent.click(await screen.findByRole("button", { name: "More actions for Magento Lead" }));
+    await more();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Ignore: Magento Lead" }));
+    await more();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Duplicate: Magento Lead" }));
     await waitFor(() => expect(api.calls.filter((c) => c.path === "/jobs/7/status").map((c) => c.body))
       .toEqual([{ status: "IGNORED" }, { status: "DUPLICATE" }]));
     renderAt(<select aria-label="Status"><JobStatusOptions /></select>);
@@ -232,12 +242,36 @@ describe("companies list", () => {
     renderAt(<CompaniesPage />, { path: "/companies", route: "/companies" });
     expect(await screen.findByTitle("Employee rating on Naukri from 1,200 reviews")).toHaveTextContent("★ 4.3");
     expect(await screen.findByRole("link", { name: "4 possible duplicates" })).toHaveAttribute("href", "/companies/duplicates");
+    expect(screen.queryByRole("combobox", { name: "Portal link" })).not.toBeInTheDocument(); // behind Filters
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Portal link" }), await screen.findByRole("option", { name: "On Naukri (5)" }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Company size" }), "51-200");
     const url = new URL(String(api.fn.mock.calls.filter((c) => String(c[0]).includes("/companies?")).at(-1)![0]), "http://x");
     expect(url.searchParams.get("portal")).toBe("naukri");
     expect(url.searchParams.get("company_size")).toBe("51-200");
+    expect(screen.getByRole("button", { name: /^Filters/ })).toHaveTextContent("Filters2");
     await userEvent.click(screen.getByRole("button", { name: "Clear 2 filters" }));
+  });
+
+  it("hides and shows columns, remembered for next time", async () => {
+    mockApi({ "GET /companies": { items: [CO], total: 1, page: 1, size: 25 }, "GET /companies/stats": {} });
+    const first = renderAt(<CompaniesPage />, { path: "/companies", route: "/companies" });
+    await screen.findByTitle("Employee rating on Naukri from 1,200 reviews");
+    const heads = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[▲▼↕]/g, "").trim());
+    expect(heads()).not.toContain("Size"); // hidden by default
+    expect(heads()).toContain("Rating");
+    await userEvent.click(screen.getByRole("button", { name: /^Columns/ }));
+    const menu = screen.getByRole("group", { name: "Columns shown" });
+    await userEvent.click(within(menu).getByRole("checkbox", { name: "Size" }));
+    await userEvent.click(within(menu).getByRole("checkbox", { name: "Rating" }));
+    expect(heads()).toContain("Size");
+    expect(heads()).not.toContain("Rating");
+    first.unmount();
+    renderAt(<CompaniesPage />, { path: "/companies", route: "/companies" });
+    await screen.findAllByRole("columnheader");
+    expect(heads()).toContain("Size");
+    expect(heads()).not.toContain("Rating");
+    expect(screen.getByRole("columnheader", { name: "Company" })).toHaveClass("sticky");
   });
 
   it("acts on ticked companies", async () => {

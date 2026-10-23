@@ -35,6 +35,7 @@ Everything runs locally (no Docker needed): FastAPI + PostgreSQL backend, React 
 ./install.sh          # buyers / end users: Docker image (UI + API on 8010) + PostgreSQL, or --native
 ./start.sh            # dev DB + migrations + API (8010) + UI (5173), opens Chrome
 ./start.sh --no-open  # same, no browser
+./start-tunnel.sh     # start.sh + Cloudflare Quick Tunnel (prints a https://….trycloudflare.com link)
 ./stop.sh             # stop API, UI and dev DB
 ./stop.sh --keep-db   # stop API and UI, keep the DB running (use this to restart)
 ./stop.sh --force     # also when a scan is running (stop.sh refuses otherwise: the scan would be lost)
@@ -75,6 +76,7 @@ all migrations. To use your own PostgreSQL instead, export `DATABASE_URL` before
 | `CAREER_OPS_PATH` | `career-ops/` in the project, if present | Career-Ops checkout (read-only for this app); leave empty for the in-project copy |
 | `CAREER_OPS_DATA_PATH` | — | Only if Career-Ops keeps its data outside the checkout; leave empty otherwise |
 | `CAREER_OPS_SCAN_ENABLED` | `false` | `true` allows **Scan + import** to run Career-Ops' `scan.mjs` |
+| `AI_JOB_SEARCH_PATH` | `ai-job-search/` in the project, if present | AI Job Search checkout (read-only for this app) |
 | `AI_PROVIDER` | `none` | Optional AI: `none`, `anthropic`, `gemini`, `openai`, `omniroute` (OpenAI-compatible gateway, default `http://localhost:20128/v1`), `ollama`. Powers the Assistant chat in free-form mode |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | — | Only when an AI provider is set (costs tokens) |
 | `STORAGE_PATH` | `storage` | Where uploaded CVs are stored (git-ignored) |
@@ -196,6 +198,31 @@ merged, never duplicated; jobs the user deleted are skipped.
 | "already running" (409) | Wait for the current scan; it appears under `running` in the status |
 | Run stuck as RUNNING after a restart | Closed as FAILED when the app starts again (scans and imports run in the app's own threads); start a new one |
 
+## AI Job Search — optional, read-only (like Career-Ops)
+
+[AI Job Search](https://github.com/ai-job-search-dev/ai-job-search) is a separate Claude Code
+workflow (`/setup`, `/scrape`, `/rank`, `/apply`, `/outcome`; its AI commands cost the user's
+tokens and are **never** run by this app). It lives in `career-intelligence/ai-job-search/`
+(git-ignored and docker-ignored: its `/setup` writes personal data into its own files).
+
+- Set up: `./scripts/setup-ai-job-search.sh` (`--from DIR` copies an old install's data,
+  `--update` pulls); `AI_JOB_SEARCH_PATH=` empty = the in-project copy; restart the API once.
+- Reads only `job_scraper/seen_jobs.json` (statuses new / ranked / unreachable; skipped and
+  expired are not imported) and `job_search_tracker.csv`. Code: `integrations/ai_job_search.py`,
+  API `api/v1/ai_job_search.py`, UI `features/settings/AiJobSearchSettings.tsx`.
+- Every job goes through `ingest_job` with origin `ai_job_search` (Added via **AI Job Search**,
+  `added_via=ai_job_search`). Its `/rank` result (score, verdict, strengths, gaps, gate notes)
+  goes into the job's notes and the source link's `raw`, never into the 0–100 match score; a FAIL
+  location or language check imports the job as Not relevant. Tracker status → job status:
+  drafted → Ready to apply, applied / no_response → Applied, interview, offer, hired → Accepted,
+  rejected, offer_declined / withdrawn → Withdrawn; sent applications become Application rows.
+  A job's status only moves forward.
+- Import now: Settings → Job sources → AI Job Search, or `POST /api/v1/ai-job-search/import`.
+  Automatic: `PUT /api/v1/ai-job-search/settings {"auto_import": true}` imports when the two
+  files change (checked every 5 minutes, thread started in `main.py`); state in app settings
+  `ai_job_search` (`auto_import`, `last_import`, `file_hashes`).
+- Never write to `ai-job-search/` and never commit or delete its data.
+
 ## Job board search — built-in scanner (no Career-Ops needed)
 
 Naming: in the UI this app's own scanner is **Job board search** (buttons "Search now", "Search its
@@ -308,7 +335,13 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   app passwords), **read-only** (BODY.PEEK, folder opened read-only), on a schedule (thread
   started in `main.py`, app settings `email`; where the last check stopped: `email_sync`).
   Headers first; the text only of job-search emails (contact / company domain / ATS sender /
-  job words in the subject; alerts skipped). Rule-based `classify` (rejection, offer, interview,
+  job words in the subject; alerts skipped). Company: a saved contact (never one on a job platform /
+  ATS domain, `ATS_DOMAINS`) → the company's own domain → the employer named in the subject
+  (`employer_in_subject`: "applying to X", "… at X"; then the sender name) → a name in the sender,
+  subject or text (`_mentions`: not when it's part of a technology, "Adobe Commerce"). Job: auto-linked
+  only when its title is in the email, it's your only application there, or the company itself wrote
+  and has one open job; otherwise suggestions to pick from. `rematch_pending` (after every check,
+  `POST /email/updates/rematch`) re-matches emails still waiting for review. Rule-based `classify` (rejection, offer, interview,
   assessment, received, recruiter; conditional "if…" sentences ignored) and matching to company
   and job; the status is only **suggested** (`confirm` applies it via `set_status`, never
   backwards — `is_needed`). The account (with app password) lives in
@@ -347,7 +380,9 @@ Full page-by-page guide for a fresh start (CV upload, profile fields, target pro
 companies, applying, interviews, offers, settings, backups): `docs/USER_GUIDE.md`. When the user
 asks how to do something in the app, answer from it.
 
-1. **CVs** → upload CV → *Merge into profile*. Review **Profile** and **Target Profile**
+1. **CVs** → upload CV → *Merge into profile*. Review **Profile** (name, contact, summary) and
+   **Skills & targets** (`/preferences`: what you bring — experience years, skills, domains — and
+   what you want; one Save writes `PATCH /profile`, `/preferences` and the import rules)
    (titles, skills, locations, salary).
 2. Get jobs: **Search now** (Job board search), **Scan + import** (Career-Ops), Google Sheets, Add Job.
 3. **Dashboard** → Today's Priorities; cards open the matching filtered lists.
@@ -469,9 +504,17 @@ Never insert `Job` rows directly. Jobs saved twice before the rules caught them:
 `GET /jobs/duplicates`, `POST /jobs/duplicates/merge` (UI: Jobs → "N duplicates",
 `/jobs/duplicates`); the copy kept is the one with the furthest status.
 
-- **Import rules** (Settings → Import rules, `services/import_rules.py`, app settings
-  `import_rules`): before a **new** job is created, `ingest_job` checks required / ignored skills
-  (title + JD + sent skills) and required / ignored roles (title) for the origins in `sources`;
+- **Import rules** (My profile → Skills & targets → *Which jobs to save*, `features/profile/ImportFilter.tsx`,
+  saved with the target profile by one Save; `/settings/import-rules` redirects there;
+  `services/import_rules.py`, app settings `import_rules`): before a **new** job is created,
+  `ingest_job` checks required / ignored skills (title + JD + sent skills) and required / ignored
+  roles (title) for the origins in `sources`. `from_profile` links target profile lists in
+  (`profile_terms`): target titles (`title_fits`: all words but level words), required skills,
+  excluded roles, excluded technologies — so words aren't kept twice. `POST /import-rules/impact`
+  previews what the rules would block among open jobs. The page is one *Job search* form: a row per
+  list with a **Filter** switch (titles, must-have skills, ignore titles, ignore skills; old
+  filter-only words are merged into these rows), suggestions learned from your jobs
+  (`GET /preferences/suggestions`, `services/search_suggestions.py`), Search job boards / portals;
   a failure raises `FilteredJobError` (a `DomainValidationError`, code `job_filtered`), which
   importers count as skipped. Existing jobs are still merged. New import paths must catch it.
 - `JobInput.origin`: `manual` | `import` | `career_ops` | `scan`. Only `manual` may re-add a
@@ -502,15 +545,16 @@ If you change engine logic, bump `ENGINE_VERSION`.
   Sheets, tabs, columns and row mappings for jobs **and** companies: `docs/google-sheets.md`.
 - CSV/JSON uploads and Add Job (manual).
 
-**Jobs UI**: status tabs with counts — All open, New, Pending, Applied, Interview,
+**Jobs UI**: status tabs with counts — All open, All, Pending, Applied, Interview,
 Selected, Rejected, Not pursuing (`/jobs?tab=<key>`), Closed (`/jobs/closed`). Plain `/jobs` opens
-New (sorted `-created_at`); with filters in the link it opens All open. Closed / Not relevant on
+All open (sorted `-created_at`); with filters in the link it opens All. Closed / Not relevant on
 a job page returns to the last list (`lastJobListUrl` in `JobNav.tsx`). Tab → statuses:
-new = New+Discovered · pending = Reviewing+Shortlisted+Ready to apply+On hold · applied =
-Applied+Recruiter contacted+Screening · interview = Interview+Awaiting feedback · selected = Offer+Accepted · rejected ·
-not-pursuing = Withdrawn+Not relevant+Ignored+Duplicate · closed (defined in `JOB_TABS`, `jobTabs.ts`; grouped by
-stage in `JOB_TAB_GROUPS`). All open = every unfinished job = the sum of the to-review and
-in-progress tabs; the dashboard's `total_jobs` uses the same set (`JOB_FINISHED`).
+all (All open) = New+Discovered, i.e. jobs as imported with no status set since (`tab=new` is an
+old alias) · every (All) = every status but Closed · pending = Reviewing+Shortlisted+Ready to
+apply+On hold · applied = Applied+Recruiter contacted+Screening · interview = Interview+Awaiting
+feedback · selected = Offer+Accepted · rejected · not-pursuing = Withdrawn+Not relevant+Ignored+
+Duplicate · closed (defined in `JOB_TABS`, `jobTabs.ts`; grouped by stage in `JOB_TAB_GROUPS`).
+The dashboard's `total_jobs` still counts every unfinished job (`JOB_FINISHED`).
 Counts: `GET /api/v1/jobs/status-counts` (same filters as the list).
 Every job has `added_via` (list, in arrival order): `manual` | `sheet` | `scanner` | `career_ops` |
 `file` | `ai_search`, set by `ingest_job` from `JobInput.origin` (`manual`, `sheet`, `scan`, `career_ops`,
@@ -550,6 +594,7 @@ search-engine or fake URLs are INVALID. Don't overwrite verified data with unver
 3. **Ask before pushing**, force-pushing, rewriting history or deleting data.
 4. **Never modify Career-Ops' code** (`career-ops/`); the app only reads its files. Its personal data
    (`portals.yml`, `cv.md`, `data/`, `reports/`…) is the user's — never commit or delete it.
+   The same holds for AI Job Search (`ai-job-search/`): read-only, its data never committed.
 5. **Never fabricate data** (companies, jobs, salaries, verification). Unknown stays unknown.
 6. Don't kill processes or free ports you didn't start (port 8000 is another app).
 7. Keep scores deterministic: no randomness or wall-clock dependence in `matching/`.

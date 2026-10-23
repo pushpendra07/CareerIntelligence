@@ -37,6 +37,19 @@ describe("menu", () => {
     expect(within(tabs).getByRole("link", { name: "Recruiters" })).toHaveAttribute("href", "/recruiters");
   });
 
+  it("phones: a bottom bar with the four main places, counts, and More for the full menu", async () => {
+    mockApi({ "GET /dashboard": { summary: { new_jobs: 12, due_followups: 3 }, priorities: [], funnels: {} } });
+    renderAt(<AppLayout />, { path: "/interviews", route: "/interviews" });
+    const bar = screen.getByRole("navigation", { name: "Quick menu" });
+    expect(within(bar).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/", "/jobs", "/applications/board", "/followups"]);
+    expect(within(bar).getByRole("link", { name: /Pipeline/ })).toHaveAttribute("aria-current", "page");
+    expect(await within(bar).findByLabelText("12 new")).toHaveTextContent("12");
+    expect(within(bar).getByLabelText("3 due")).toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole("button", { name: "More" }));
+    expect(within(bar).getByRole("button", { name: "More" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("navigation", { name: "Main" })).toHaveLength(2); // the drawer opened
+  });
+
   it("switches theme and remembers it", async () => {
     mockApi({ "GET /dashboard": { summary: {}, priorities: [], funnels: {} } });
     renderAt(<AppLayout />, { path: "/", route: "/" });

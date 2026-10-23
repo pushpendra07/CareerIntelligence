@@ -147,6 +147,8 @@ PORTALS = {
     "instahyre": "instahyre",
     "wellfound": "wellfound",
     "cutshort": "cutshort",
+    "shine": "shine",
+    "timesjobs": "timesjobs",
 }
 
 
@@ -198,6 +200,7 @@ _LISTING_PATTERNS = [
         r"linkedin\.com/jobs/(search|collections)",
         r"naukri\.com/[^/?#]*-jobs(-in-[^/?#]*)?/?($|\?)",
         r"foundit\.[a-z.]+/(srp|search)",
+        r"shine\.com/job-search/",
         r"glassdoor\.[a-z.]+/(job|Job)/[^/]*-jobs-SRCH",
         r"/(search|srp)(/|\?|$)",
         r"[?&](q|query|keywords?|search)=",

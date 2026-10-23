@@ -12,6 +12,13 @@ async function readPage(tabId) {
   return res && res.result;
 }
 
+/** How the app recognised the job (matched_by from ingest_job's duplicate rules). */
+const MATCHED_BY = {
+  url: "same link", external_id: "same posting ID on this portal", url_id: "same posting ID in the link",
+  company_title_location: "same company, title and city", company_title: "same company and title",
+  reposted: "a repost of it (similar title and description)", similar_jd: "the same description",
+};
+
 function jobLink(appUrl, r) {
   return `<a href="${esc(appUrl)}/jobs/${r.job_id}" target="_blank" rel="noopener">#${r.job_id}</a>`;
 }
@@ -35,7 +42,7 @@ async function save(job, opts = {}) {
   } else if (r.result === "duplicate" || r.result === "repeat") {
     show(`<h2>Already in your list: ${jobLink(appUrl, r)}</h2>${head}
       <p class="muted">${r.existing_title && r.existing_title !== r.title ? `Saved as “${esc(r.existing_title)}”. ` : ""}Status: ${esc((r.status || r.existing_status || "").replace(/_/g, " ").toLowerCase())}.
-      This link was added to it.</p>`);
+      ${MATCHED_BY[r.matched_by] ? `Matched by ${esc(MATCHED_BY[r.matched_by])}. ` : ""}Not added again; this link was added to it.</p>`);
   } else if (r.result === "deleted") {
     show(`<h2 class="warn">You deleted this job before</h2>${head}<button id="anyway">Add it anyway</button>`);
     document.getElementById("anyway").onclick = () => save(job, { allow_deleted: true });
@@ -144,6 +151,11 @@ async function addFlow(tab) {
     job = await readPage(tab.id);
   } catch (e) {
     return show(`<p class="bad">Can't read this page: ${esc(e.message)}</p>`);
+  }
+  if (job && job.listing) {
+    return show(`<h2 class="warn">This is a list of jobs</h2>
+      <p>Click one job on ${esc(job.portal)} so its details open, then click this button again.</p>
+      <p class="muted">To add many jobs at once: in the app, Jobs → AI search → ${esc(job.portal)} → Job collector.</p>`);
   }
   if (!job || !job.title || !job.company) return form(job || { url: tab.url }, "Couldn't find the job title or company on this page — fill them in:");
   save(job);

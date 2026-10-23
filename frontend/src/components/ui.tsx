@@ -124,6 +124,7 @@ export const ADDED_VIA: Record<string, { label: string; cls: string }> = {
   career_ops: { label: "Career-Ops", cls: "bg-violet-50 text-violet-700 ring-violet-200" },
   file: { label: "File import", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
   ai_search: { label: "AI search", cls: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200" },
+  ai_job_search: { label: "AI Job Search", cls: "bg-sky-50 text-sky-700 ring-sky-200" },
 };
 
 export function AddedViaTags({ values }: { values?: string[] | null }) {
@@ -161,6 +162,46 @@ export function Spinner({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500" role="status">
       <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-500" />{label}
+    </div>
+  );
+}
+
+/** Grey shapes of the rows a list is about to show, so the page doesn't jump when they arrive. */
+export function SkeletonList({ rows = 6, label = "Loading…" }: { rows?: number; label?: string }) {
+  return (
+    <div role="status" className="card space-y-4">
+      <span className="sr-only">{label}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} aria-hidden className="flex items-start gap-4">
+          <span className="skeleton mt-0.5 h-4 w-4 rounded" />
+          <span className="skeleton h-5 w-9 rounded-full" />
+          <span className="flex-1 space-y-2">
+            <span className="skeleton block h-4" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
+            <span className="skeleton block h-3 w-1/3" />
+          </span>
+          <span className="skeleton hidden h-4 w-24 md:block" />
+          <span className="skeleton hidden h-6 w-44 rounded-full lg:block" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Grey shapes of a page of cards (Today): a banner and a row of tiles. */
+export function SkeletonCards({ count = 5, label = "Loading…" }: { count?: number; label?: string }) {
+  return (
+    <div role="status" className="space-y-4">
+      <span className="sr-only">{label}</span>
+      <div aria-hidden className="skeleton h-32 rounded-2xl" />
+      <div aria-hidden className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="card space-y-3">
+            <span className="skeleton block h-8 w-8 rounded-lg" />
+            <span className="skeleton block h-7 w-12" />
+            <span className="skeleton block h-3 w-3/4" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -408,6 +449,17 @@ export function CopyLinkButton({ url, compact = false, className }: { url: strin
     <button type="button" className={className ?? (compact ? "btn-secondary px-2 py-1 text-xs" : "btn-secondary")} onClick={copy}
       aria-label="Copy job link" title={state === "failed" ? url : "Copy the job posting link to share it"}>
       {state === "idle" && <Icon name="link" className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />}{label}
+    </button>
+  );
+}
+
+/** An on/off switch (a button with role="switch"), for settings that take effect when saved. */
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} title={label} disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/25 disabled:opacity-50 ${checked ? "bg-indigo-600" : "bg-slate-300"}`}>
+      <span aria-hidden className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
     </button>
   );
 }

@@ -750,6 +750,24 @@ def test_agent_import_checks_then_adds_jobs_from_portals(client: TestClient) -> 
     assert again["results"][0]["result"] == "new"
 
 
+def test_extension_adds_one_job_once_across_portals(client: TestClient) -> None:
+    """The Job collector adds the job the user is looking at; seen again (same link with other
+    tracking, or the same job on another portal) it is matched, never added twice."""
+    shine = {"title": "Magento Developer", "company": "Delta Retail Pvt Ltd", "location": "Jaipur",
+             "portal": "Shine", "description": "Adobe Commerce, PHP, MySQL.",
+             "url": "https://www.shine.com/jobs/magento-developer/delta-retail-pvt-ltd/17654321"}
+    first = client.post("/api/v1/jobs/agent-import", json={"jobs": [shine]}).json()["results"][0]
+    assert first["result"] == "new"
+    tracked = {**shine, "url": shine["url"] + "?utm_source=mail&utm_medium=x"}
+    naukri = {**shine, "portal": "Naukri", "location": "Jaipur, Rajasthan",
+              "url": "https://www.naukri.com/job-listings-magento-developer-delta-retail-jaipur-231024500777"}
+    for row, how in ((tracked, "url"), (naukri, "company_title_location")):
+        r = client.post("/api/v1/jobs/agent-import", json={"jobs": [row]}).json()["results"][0]
+        assert (r["result"], r["job_id"], r["matched_by"]) == ("duplicate", first["job_id"], how)
+    job = client.get(f"/api/v1/jobs/{first['job_id']}").json()
+    assert len(job["source_links"]) == 2  # the Naukri link was added to the same job
+
+
 def test_extension_download_is_set_up_for_this_app(client: TestClient) -> None:
     import io
     import zipfile

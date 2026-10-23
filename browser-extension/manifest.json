@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Career Intelligence – Job collector",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Add the job you are looking at to your Career Intelligence app in one click, and fill job application forms with your details and CV (you check and submit).",
   "action": {
     "default_popup": "popup.html",
@@ -15,7 +15,7 @@
     "http://127.0.0.1/*", "http://localhost/*",
     "https://www.linkedin.com/*", "https://www.naukri.com/*", "https://in.indeed.com/*", "https://www.foundit.in/*",
     "https://www.glassdoor.co.in/*", "https://www.instahyre.com/*", "https://wellfound.com/*", "https://cutshort.io/*",
-    "https://www.hirist.tech/*", "https://www.iimjobs.com/*"
+    "https://www.hirist.tech/*", "https://www.iimjobs.com/*", "https://www.shine.com/*", "https://www.timesjobs.com/*"
   ],
   "content_scripts": [
     { "matches": ["http://127.0.0.1/*", "http://localhost/*"], "js": ["bridge.js"], "run_at": "document_start" }

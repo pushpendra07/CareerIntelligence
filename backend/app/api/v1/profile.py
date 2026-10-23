@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter
 
 from app.api.deps import DB
@@ -8,7 +10,7 @@ from app.schemas.profile import (
     TargetProfileOut,
     TargetProfileUpdate,
 )
-from app.services import profile_service
+from app.services import profile_service, search_suggestions
 
 router = APIRouter(tags=["profile"])
 
@@ -40,6 +42,13 @@ def _target_out(db: DB) -> TargetProfileOut:
 @router.get("/preferences", response_model=TargetProfileOut)
 def get_preferences(db: DB) -> TargetProfileOut:
     return _target_out(db)
+
+
+@router.get("/preferences/suggestions")
+def preference_suggestions(db: DB) -> dict[str, Any]:
+    """Titles and skills to look for or ignore, learned from the jobs you went for (shortlisted,
+    applied, interviewed…) and the ones you marked Not relevant or Ignored."""
+    return search_suggestions.suggestions(db)
 
 
 @router.patch("/preferences", response_model=TargetProfileOut)

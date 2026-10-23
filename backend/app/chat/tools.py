@@ -673,7 +673,8 @@ TOOLS: list[Tool] = [
             "closed": {"type": "boolean", "description": "true = only closed postings"},
             "added_via": {
                 "type": "string",
-                "enum": ["manual", "sheet", "scanner", "career_ops", "file", "ai_search"],
+                "enum": ["manual", "sheet", "scanner", "career_ops", "file", "ai_search",
+                         "ai_job_search"],
             },
             "sort": {"type": "string", "enum": list(SORTS)},
             "limit": _LIMIT,

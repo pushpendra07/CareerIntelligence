@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 # Career-Ops cloned inside the project by scripts/setup-career-ops.sh (git-ignored).
 BUNDLED_CAREER_OPS = BACKEND_DIR.parent / "career-ops"
+BUNDLED_AI_JOB_SEARCH = BACKEND_DIR.parent / "ai-job-search"
 
 
 class Settings(BaseSettings):
@@ -30,6 +31,8 @@ class Settings(BaseSettings):
     career_ops_url: str | None = None
     career_ops_api_key: SecretStr | None = None
     career_ops_scan_enabled: bool = False
+    # AI Job Search (github.com/ai-job-search-dev/ai-job-search) checkout, read-only for us.
+    ai_job_search_path: Path | None = None
 
     # Google service-account key (JSON) for reading private Google Sheets. If unset, the app
     # uses backend/secrets/google-service-account.json when that file exists.
@@ -61,7 +64,7 @@ class Settings(BaseSettings):
     @field_validator(
         "career_ops_path", "career_ops_data_path", "career_ops_url", "career_ops_api_key",
         "ai_api_key", "ai_model", "ai_base_url", "redis_url", "google_service_account_file",
-        "app_password", "static_dir", mode="before",
+        "app_password", "static_dir", "ai_job_search_path", mode="before",
     )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:
@@ -86,6 +89,12 @@ class Settings(BaseSettings):
         if (self.career_ops_path is None and self.environment != "test"
                 and (BUNDLED_CAREER_OPS / "scan.mjs").is_file()):
             object.__setattr__(self, "career_ops_path", BUNDLED_CAREER_OPS)
+        if self.ai_job_search_path is not None and not self.ai_job_search_path.is_absolute():
+            object.__setattr__(self, "ai_job_search_path",
+                               (BACKEND_DIR / self.ai_job_search_path).resolve())
+        if (self.ai_job_search_path is None and self.environment != "test"
+                and (BUNDLED_AI_JOB_SEARCH / "tools" / "job_key.py").is_file()):
+            object.__setattr__(self, "ai_job_search_path", BUNDLED_AI_JOB_SEARCH)
         return self
 
     @property

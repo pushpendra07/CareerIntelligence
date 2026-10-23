@@ -275,9 +275,20 @@ Conventions:
 
 ### import rules
 - `GET /api/v1/import-rules` — `rules` (`enabled`, `required_skills`, `ignored_skills`,
-  `required_roles`, `ignored_roles`, `keep_without_description`, `sources`) and `sources`
-  (origin → name: scan, career_ops, sheet, import, agent, manual). Change them with
-  `PATCH /api/v1/settings/app {"import_rules": {...}}`.
+  `required_roles`, `ignored_roles`, `keep_without_description`, `sources`, `from_profile`:
+  which target profile lists also filter — `target_titles`, `required_skills`, `excluded_roles`,
+  `excluded_technologies`), `sources` (origin → name) and `profile` (those lists' current words).
+  Change them with `PATCH /api/v1/settings/app {"import_rules": {...}}`.
+- `GET /api/v1/preferences/suggestions` — titles and skills to look for (`target_titles`,
+  `required_skills`) or ignore (`excluded_roles`, `excluded_technologies`), each `[{value, count}]`,
+  learned from jobs you went for (shortlisted … rejected) vs. marked Not relevant / Ignored
+  (`based_on`: `went_for`, `turned_down`). `services/search_suggestions.py`.
+- `POST /api/v1/import-rules/check` and `/impact` also take `profile` (unsaved target lists).
+- `POST /api/v1/email/updates/rematch` — match the emails waiting for review again (`rematched`,
+  `pending`); also runs after every inbox check.
+- `POST /api/v1/import-rules/impact {rules?, profile?}` — what the rules would block among your open jobs
+  (`checked`, `blocked`, `high_scoring_blocked`, `reasons` [{reason, count}], `examples`); nothing
+  is changed.
 - `POST /api/v1/import-rules/check {title, description?, rules?}` — would this job be saved
   (`saved`, `reason`, `found_skills`, `found_ignored_skills`, `found_roles`,
   `found_ignored_roles`)? `rules` tests unsaved rules; nothing is saved.
@@ -292,6 +303,12 @@ Conventions:
 - `GET /api/v1/career-ops/portals` — what Career-Ops scans (its `portals.yml`, read-only): companies, titles to keep/skip, locations, max age
 - `GET /api/v1/career-ops/imports`
 - `POST /api/v1/career-ops/jobs/{job_id}/fetch-jd`
+
+### ai-job-search
+Read-only adapter for an AI Job Search checkout (`AI_JOB_SEARCH_PATH`, default `ai-job-search/`).
+- `GET /api/v1/ai-job-search/status` — `configured`, `path`, `available`, `version`, `counts` (`seen`, `new`, `ranked`, `skipped`, `tracker`), `auto_import`, `changed_since_import`, `last_import` (`stats`, `errors`)
+- `POST /api/v1/ai-job-search/import` — reads `job_scraper/seen_jobs.json` and `job_search_tracker.csv`; returns the result (`stats`: `created`, `merged`, `ranked`, `applications`, `vetoed`, `deleted_skipped`, `filtered_skipped`, `skipped_by_scrape`, `expired`); 409 while one runs
+- `PUT /api/v1/ai-job-search/settings` `{"auto_import": true}` — import whenever those files change (checked every 5 minutes)
 
 ### scanner
 - `GET /api/v1/scanner/status`

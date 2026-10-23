@@ -44,6 +44,7 @@ describe("company jobs", () => {
     });
     renderAt(<CompaniesPage />, { path: "/companies", route: "/companies" });
     expect(await screen.findByTitle("1 open · 4 in total")).toHaveAttribute("href", "/companies/3#jobs");
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Jobs in app" }), "true");
     const last = new URL(String(api.fn.mock.calls.filter((c) => String(c[0]).includes("/companies?")).at(-1)![0]), "http://x");
     expect(last.searchParams.get("has_jobs")).toBe("true");

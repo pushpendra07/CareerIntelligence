@@ -22,8 +22,8 @@ export type ApplyKit = {
 const DETAIL_KEYS = ["full_name", "email", "phone", "linkedin", "location", "total_experience", "current_company",
   "current_title", "current_ctc", "expected_ctc", "notice_period", "relocate", "work_authorization", "github", "portfolio"];
 const SAVED_FIELDS: [keyof Omit<ApplyAnswers, "answers">, string, string][] = [
-  ["current_ctc", "Current CTC", "e.g. 28 LPA"], ["expected_ctc", "Expected CTC", "empty: from Target roles"],
-  ["notice_period", "Notice period", "empty: from Target roles"], ["relocate", "Willing to relocate", "Yes / No / Pune, Bengaluru"],
+  ["current_ctc", "Current CTC", "e.g. 28 LPA"], ["expected_ctc", "Expected CTC", "empty: from Skills & targets"],
+  ["notice_period", "Notice period", "empty: from Skills & targets"], ["relocate", "Willing to relocate", "Yes / No / Pune, Bengaluru"],
   ["work_authorization", "Work authorisation", "e.g. Indian citizen"], ["current_company", "Current company", "empty: from your profile"],
   ["current_title", "Current title", "empty: from your profile"], ["github", "GitHub", "https://github.com/…"],
   ["portfolio", "Portfolio / website", "https://…"],

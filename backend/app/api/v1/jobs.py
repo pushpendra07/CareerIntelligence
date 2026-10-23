@@ -158,8 +158,9 @@ def job_filters(
     salary_min: Decimal | None = None,
     status: Annotated[list[str] | None, Query()] = None,
     closed: bool | None = None,
-    added_via: Literal["manual", "sheet", "scanner", "career_ops", "file", "ai_search"]
-    | None = None,
+    added_via: Literal[
+        "manual", "sheet", "scanner", "career_ops", "file", "ai_search", "ai_job_search"
+    ] | None = None,
     stale: bool | None = None,
     has_application: bool | None = None,
     sort: Literal[

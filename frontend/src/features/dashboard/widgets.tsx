@@ -67,7 +67,7 @@ export function BestMatches() {
     onSuccess: () => qc.invalidateQueries(),
     meta: { toastError: true },
   });
-  const all = "/jobs?tab=new&min_score=70&has_application=false";
+  const all = "/jobs?tab=all&min_score=70&has_application=false";
   return (
     <Card title="Best new matches to review" actions={<Link className="link text-sm" to={all}>See all {jobs.data ? `(${jobs.data.total})` : ""}</Link>}>
       {!jobs.data ? <Spinner /> : !jobs.data.items.length ? (

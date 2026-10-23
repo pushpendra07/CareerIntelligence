@@ -134,20 +134,54 @@ class RuleCheckIn(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     description: str = Field(default="", max_length=200_000)
     rules: dict[str, Any] | None = None  # unsaved rules from the form; default: the saved ones
+    # Unsaved target profile lists from the form (target_titles, required_skills,
+    # excluded_roles, excluded_technologies); default: the saved ones.
+    profile: dict[str, list[str]] | None = None
+
+
+class RuleImpactIn(BaseModel):
+    rules: dict[str, Any] | None = None  # unsaved rules from the form; default: the saved ones
+    profile: dict[str, list[str]] | None = None  # unsaved target profile lists, as above
+
+
+def _rules_and_profile(db: DB, rules: dict[str, Any] | None,
+                       profile: dict[str, list[str]] | None = None
+                       ) -> tuple[dict[str, Any], dict[str, list[str]]]:
+    checked = (import_rules.validate_settings(rules) if rules is not None
+               else import_rules.get_rules(db))
+    lists = import_rules.profile_terms(
+        db, {**checked, "from_profile": {k: True for k in import_rules.PROFILE_LISTS}})
+    for key, values in (profile or {}).items():
+        if key in lists and isinstance(values, list):
+            lists[key] = [str(v) for v in values if str(v).strip()][:import_rules.MAX_TERMS]
+    return checked, lists
 
 
 @router.get("/import-rules")
 def get_import_rules(db: DB) -> dict[str, Any]:
-    """The saved rules, and the sources they can apply to."""
-    return {"rules": import_rules.get_rules(db), "sources": import_rules.SOURCES}
+    """The saved rules, the sources they can apply to, and the target profile lists they can
+    reuse (`profile`, whether linked or not)."""
+    rules, profile = _rules_and_profile(db, None)
+    return {"rules": rules, "sources": import_rules.SOURCES, "profile": profile}
+
+
+def _linked(rules: dict[str, Any], profile: dict[str, list[str]]) -> dict[str, list[str]]:
+    on = rules.get("from_profile") or {}
+    return {k: v if on.get(k) else [] for k, v in profile.items()}
 
 
 @router.post("/import-rules/check")
 def check_import_rules(db: DB, body: RuleCheckIn) -> dict[str, Any]:
     """Would a job with this title and description be saved? Nothing is saved."""
-    rules = (import_rules.validate_settings(body.rules) if body.rules is not None
-             else import_rules.get_rules(db))
-    return import_rules.explain(rules, body.title, body.description)
+    rules, profile = _rules_and_profile(db, body.rules, body.profile)
+    return import_rules.explain(rules, body.title, body.description, _linked(rules, profile))
+
+
+@router.post("/import-rules/impact")
+def import_rules_impact(db: DB, body: RuleImpactIn) -> dict[str, Any]:
+    """How many of your open jobs these rules would not have saved (nothing is changed)."""
+    rules, profile = _rules_and_profile(db, body.rules, body.profile)
+    return import_rules.impact(db, rules, _linked(rules, profile))
 
 
 @router.get("/extension.zip")

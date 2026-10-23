@@ -37,10 +37,10 @@ export const SECTIONS: Section[] = [
   { to: "/reports", label: "Reports", icon: "reports", hint: "Charts and details for any period: jobs, applications, interviews, offers, sources…",
     tabs: [{ to: "/reports", label: "Reports" }] },
   { to: "/profile", label: "My profile", icon: "profile", hint: "Your experience, what you want, CVs and interview answers",
-    tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Target roles" },
+    tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Skills & targets" },
       { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
   { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
-    tabs: [{ to: "/settings", label: "Job sources" }, { to: "/settings/import-rules", label: "Import rules" },
+    tabs: [{ to: "/settings", label: "Job sources" },
       { to: "/settings/scoring", label: "Scoring" },
       { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" }, { to: "/settings/login", label: "Login" },
       { to: "/settings/about", label: "About & AI" }] },
@@ -100,6 +100,35 @@ function ThemeSwitch() {
 }
 
 const SIDEBAR_KEY = "layout.sidebar";
+
+/** Phones: the four places you go most, a thumb away; "More" opens the full menu. */
+const BOTTOM_TABS = ["/", "/jobs", "/applications/board", "/followups"];
+
+function BottomNav({ section, summary, onMore, moreOpen }: { section: Section | undefined; summary?: Record<string, number>;
+  onMore: () => void; moreOpen: boolean }) {
+  const tab = "relative flex flex-1 flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium transition";
+  return (
+    <nav aria-label="Quick menu" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200/70 bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl print:hidden md:hidden">
+      {BOTTOM_TABS.map((to) => {
+        const s = SECTIONS.find((x) => x.to === to)!;
+        const on = s === section;
+        const n = summary && s.badge ? s.badge(summary) : undefined;
+        return (
+          <Link key={to} to={to} aria-current={on ? "page" : undefined} className={`${tab} ${on ? "text-indigo-600" : "text-slate-500"}`}>
+            {on && <span aria-hidden className="absolute top-0 h-0.5 w-8 rounded-full bg-indigo-500" />}
+            <Icon name={s.icon} className="h-5 w-5" />
+            {s.label}
+            {!!n && <span className={`absolute left-1/2 top-1 ml-1.5 min-w-4 rounded-full px-1 text-center text-[10px] font-bold leading-4 ${to === "/followups" ? "bg-[#f59e0b] text-[#3b2400]" : "bg-[#6366f1] text-white"}`}
+              aria-label={`${n} ${to === "/followups" ? "due" : "new"}`}>{n > 99 ? "99+" : n}</span>}
+          </Link>
+        );
+      })}
+      <button type="button" onClick={onMore} aria-expanded={moreOpen} className={`${tab} ${moreOpen || (section && !BOTTOM_TABS.includes(section.to)) ? "text-indigo-600" : "text-slate-500"}`}>
+        <Icon name="menu" className="h-5 w-5" />More
+      </button>
+    </nav>
+  );
+}
 
 const showReminder = (e: ReminderEvent) => toast(`🔔 ${e.title} — ${e.body}`, "info");
 
@@ -181,6 +210,7 @@ export function AppLayout() {
         </span>
       </Link>
       <div className="flex items-center justify-between px-1.5 text-[11px] text-sidebar-muted">Theme <ThemeSwitch /></div>
+      <div className="px-1.5 sm:hidden"><LogoutButton /></div>
     </div>
   );
   const sidebar = "flex flex-col overflow-y-auto bg-sidebar border-r border-sidebar-line";
@@ -204,13 +234,14 @@ export function AppLayout() {
           <div className="min-w-0 flex-1"><GlobalSearch /></div>
           <NotificationBell summary={summary} />
           <Link to="/jobs/new" className="btn-primary hidden sm:inline-flex"><span aria-hidden className="text-base leading-none">+</span>Add job</Link>
-          <LogoutButton />
+          <span className="hidden sm:inline"><LogoutButton /></span>
           {hidden && <div className="hidden sm:block"><ThemeSwitch /></div>}
         </header>
-        <main className={`mx-auto w-full flex-1 px-4 py-6 md:px-8 md:py-8 ${hidden ? "" : "max-w-[1440px]"}`}>
+        <main className={`mx-auto w-full flex-1 px-4 pb-24 pt-6 md:px-8 md:py-8 ${hidden ? "" : "max-w-[1440px]"}`}>
           {section && <SectionTabs section={section} active={tab} />}
           <Outlet />
         </main>
+        <BottomNav section={section} summary={summary} moreOpen={drawer} onMore={() => setDrawer((v) => !v)} />
         <CommandPalette pages={PAGES} />
         <ChatLauncher />
         <Toaster />

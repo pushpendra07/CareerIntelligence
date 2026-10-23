@@ -16,6 +16,7 @@ frontend/dist
 frontend/test-results
 frontend/playwright-report
 career-ops
+ai-job-search
 graphify-out
 scratch
 .run

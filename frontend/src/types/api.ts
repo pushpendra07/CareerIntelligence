@@ -17,6 +17,8 @@ export interface CompanyBrief {
 }
 
 export interface Job {
+  /** Client only: the row is fading out of the list after a status change. */
+  leaving?: boolean;
   id: number;
   title: string;
   company: CompanyBrief;

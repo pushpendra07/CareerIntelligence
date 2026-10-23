@@ -66,6 +66,7 @@ if [[ $FORCE -eq 0 && -f "$RUN/backend.pid" ]]; then
   fi
 fi
 
+[[ -f "$RUN/tunnel.pid" ]] && stop_service tunnel
 stop_service frontend
 stop_service backend
 

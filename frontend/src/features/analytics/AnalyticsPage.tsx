@@ -214,7 +214,7 @@ export function AnalyticsPage() {
             {hi.n > 0 && lo.n > 0 ? (
               <Takeaway>
                 Jobs scored 80+ got an answer {hi.pct}% of the time ({hi.answers} of {hi.n}); below 80, {lo.pct}% ({lo.answers} of {lo.n}).
-                {hi.pct > lo.pct ? " The score is a good guide — apply to high scores first." : hi.pct < lo.pct ? " Lower scores do as well here — the score may be missing something; check your Target roles." : ""}
+                {hi.pct > lo.pct ? " The score is a good guide — apply to high scores first." : hi.pct < lo.pct ? " Lower scores do as well here — the score may be missing something; check Skills & targets." : ""}
               </Takeaway>
             ) : bands.length ? <Takeaway>Applications by the score the job had. Once some get answers, you'll see whether high scores do better.</Takeaway> : null}
             <BarChart data={bands.map((r) => ({ ...r, value: r.applications }))} color="bg-emerald-500"
@@ -284,7 +284,7 @@ export function AnalyticsPage() {
               <Takeaway>
                 Jobs lose the most points on <b>{humanize(weakest[0])}</b> (average fit {Math.round(weakest[1] * 100)}%).
                 {weakest[0].includes("skill") ? " Adding missing skills to your profile or CV helps most." : ""}
-                {weakest[0].includes("location") ? " Check your preferred locations in Target roles." : ""}
+                {weakest[0].includes("location") ? " Check your preferred locations in Skills & targets." : ""}
                 {weakest[0].includes("salary") ? " Set a salary target so salary fit can be judged." : ""}
                 {weakest[0].includes("company") ? " Most companies have no tier yet: mark the ones you'd love to join as Tier A in Companies." : ""}
               </Takeaway>

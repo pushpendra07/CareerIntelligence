@@ -22,7 +22,7 @@ function listUrls(fn: { mock: { calls: unknown[][] } }): URL[] {
 describe("status multi-select", () => {
   it("shows any combination of statuses", async () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
-    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=all" });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=every" });
     await userEvent.click(await screen.findByRole("button", { name: "Status" }));
     const box = screen.getByRole("listbox", { name: "Job statuses" });
     expect(within(box).queryByLabelText("Closed")).not.toBeInTheDocument(); // closed has its own tab
@@ -48,8 +48,8 @@ describe("status multi-select", () => {
     await userEvent.click(within(box).getByRole("button", { name: "Clear" }));
     const cleared = listUrls(api.fn).at(-1)!.searchParams.getAll("status");
     expect(cleared).toContain("NEW");
-    expect(cleared).not.toContain("NOT_RELEVANT"); // finished: its own tab
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any open status");
+    expect(cleared).not.toContain("CLOSED"); // closed: its own tab
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any status");
   }, 15_000); // clicks through every status
 });
 
@@ -108,6 +108,7 @@ describe("added via", () => {
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     expect(await screen.findByTitle("Added via Job board search")).toHaveTextContent("Job board search");
     expect(screen.getByTitle("Added via Google Sheet")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Added via" }), "career_ops");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("added_via")).toBe("career_ops");
   });
@@ -138,6 +139,7 @@ describe("remembered sort and filters", () => {
     await screen.findByText("Magento Lead");
     expect(listUrls(api.fn).at(-1)!.searchParams.get("sort")).toBe("-created_at"); // newest first
     await userEvent.click(screen.getByRole("button", { name: "Sort by posted" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.click(within(screen.getByRole("group", { name: "Score" })).getByRole("button", { name: "70+" }));
     await userEvent.click(within(screen.getByRole("group", { name: "Work" })).getByRole("button", { name: "Remote" }));
     first.unmount();
@@ -149,6 +151,8 @@ describe("remembered sort and filters", () => {
     expect(last.searchParams.get("sort")).toBe("-posting_date");
     expect(last.searchParams.get("min_score")).toBe("70");
     expect(last.searchParams.get("work_model")).toBe("REMOTE");
+    expect(screen.getByRole("button", { name: /^Filters/ })).toHaveTextContent("Filters2"); // how many are on
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     expect(within(screen.getByRole("group", { name: "Score" })).getByRole("button", { name: "70+" })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
@@ -174,6 +178,7 @@ describe("remembered sort and filters", () => {
     const api = mockApi({ "GET /jobs": page([JOB]) });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
     await screen.findByText("Magento Lead");
+    await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     await userEvent.click(within(screen.getByRole("group", { name: "Posted" })).getByRole("button", { name: "7 days" }));
     const after = listUrls(api.fn).at(-1)!.searchParams.get("posted_after")!;
     const days = (Date.now() - new Date(after).getTime()) / 86_400_000;
@@ -276,7 +281,7 @@ describe("ticked jobs", () => {
     await userEvent.click(screen.getByLabelText("Select Magento Lead"));
     await userEvent.click(screen.getByLabelText("Select PHP Lead"));
     expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
-    await userEvent.click(screen.getByRole("button", { name: /More filters/ }));
+await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     expect(screen.getByRole("region", { name: "Selected jobs" })).toHaveTextContent("2 selected");
     const calls = listUrls(api.fn).length;
     for (const name of ["Location", "Skills", "Experience fits"]) {

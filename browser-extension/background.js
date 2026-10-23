@@ -4,7 +4,7 @@
 importScripts("settings.js");
 
 const PORTAL_HOSTS = ["www.linkedin.com", "www.naukri.com", "in.indeed.com", "www.foundit.in", "www.glassdoor.co.in",
-  "www.instahyre.com", "wellfound.com", "cutshort.io", "www.hirist.tech", "www.iimjobs.com"];
+  "www.instahyre.com", "wellfound.com", "cutshort.io", "www.hirist.tech", "www.iimjobs.com", "www.shine.com", "www.timesjobs.com"];
 const PAUSE_MS = 2500;
 let running = null; // { appTab, portal, stop }
 

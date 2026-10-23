@@ -82,6 +82,9 @@ google-credentials*.json
 # Career-Ops (separate project, cloned by scripts/setup-career-ops.sh; holds personal data)
 /career-ops/
 
+# AI Job Search (separate project, cloned by scripts/setup-ai-job-search.sh; holds personal data)
+/ai-job-search/
+
 # Graphify knowledge graph (generated)
 /graphify-out/
 scratch/

@@ -99,14 +99,15 @@ class JobInput:
     recruiter_phone: str | None = None
     status: JobStatus = JobStatus.NEW
     raw: dict[str, Any] = field(default_factory=dict)
-    origin: str = "manual"  # "manual" | "sheet" | "import" | "career_ops" | "scan" | "agent"
+    # "manual" | "sheet" | "import" | "career_ops" | "scan" | "agent" | "ai_job_search"
+    origin: str = "manual"
     # False for search/listing pages: kept as provenance, never used to identify the job.
     url_identifies_job: bool = True
 
 
 # JobInput.origin -> the "Added via" tag stored on the job.
 ADDED_VIA = {"manual": "manual", "sheet": "sheet", "import": "file", "career_ops": "career_ops",
-             "scan": "scanner", "agent": "ai_search"}
+             "scan": "scanner", "agent": "ai_search", "ai_job_search": "ai_job_search"}
 
 
 def _tag_origin(job: Job, origin: str) -> None:
@@ -549,9 +550,10 @@ def ingest_job(
         result = IngestResult(job, created=False, matched_by=matched_by)
     else:
         rules = import_rules.get_rules(db)
-        if import_rules.applies(rules, data.origin):  # Settings → Import rules; new jobs only
+        if import_rules.applies(rules, data.origin):  # Target roles → Which jobs to save; new only
             skills = [*(data.required_skills or []), *(data.preferred_skills or [])]
-            if reason := import_rules.check(rules, title, data.jd_text, skills):
+            if reason := import_rules.check(rules, title, data.jd_text, skills,
+                                            profile=import_rules.profile_terms(db, rules)):
                 raise import_rules.FilteredJobError(reason)
         job = Job(
             company=company,
@@ -664,7 +666,8 @@ class JobFilters:
     salary_min: Decimal | None = None
     status: list[str] | None = None
     closed: bool | None = None  # True: only closed positions; False: hide them
-    added_via: str | None = None  # manual | sheet | scanner | career_ops | file | ai_search
+    # manual | sheet | scanner | career_ops | file | ai_search | ai_job_search
+    added_via: str | None = None
     stale: bool | None = None
     has_application: bool | None = None
     sort: str = "-match_score"

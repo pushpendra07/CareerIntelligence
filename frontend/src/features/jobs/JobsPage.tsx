@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { Badge, Card, CopyLinkButton, Empty, ErrorBox, JobStatusSummary, Pagination, ScoreBadge, Spinner, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
+import { Badge, CopyLinkButton, Empty, ErrorBox, JobStatusSummary, Pagination, ScoreBadge, SkeletonList, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
+import { toast } from "../../components/Toaster";
 import type { Job, Page } from "../../types/api";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobPreview } from "./JobPreview";
@@ -210,8 +211,8 @@ function StatusChips({ tab, query, picked, onPick }: { tab: { key: string; statu
   );
 }
 
-/** Less-used actions for a row, behind "⋯": posting link, copy, delete. */
-function RowMenu({ job }: { job: Job }) {
+/** Less-used actions for a row, behind "⋯": the other status changes, posting link, copy, delete. */
+function RowMenu({ job, actions }: { job: Job; actions?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -222,16 +223,18 @@ function RowMenu({ job }: { job: Job }) {
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", esc); };
   }, [open]);
-  const item = "block w-full rounded px-2 py-1 text-left text-xs hover:bg-slate-100 dark:hover:bg-white/10";
   return (
     <span ref={ref} className="relative inline-block">
-      <button type="button" className="btn-secondary px-2 py-1 text-xs" aria-haspopup="menu" aria-expanded={open}
+      <button type="button" className="btn-secondary px-2 py-0.5 text-xs" aria-haspopup="menu" aria-expanded={open}
         aria-label={`More actions for ${job.title}`} title="More actions" onClick={() => setOpen((v) => !v)}>⋯</button>
       {open && (
-        <span role="menu" className="absolute right-0 top-full z-30 mt-1 flex w-52 flex-col gap-0.5 whitespace-normal rounded-md border border-slate-200 bg-surface p-1 shadow-lg">
-          {job.source_url && <a role="menuitem" className={item} href={job.source_url} target="_blank" rel="noopener noreferrer"
+        <span role="menu" onClick={(e) => { if ((e.target as HTMLElement).closest("[data-closes-menu]")) setOpen(false); }}
+          className="menu-pop absolute right-0 top-full z-30 mt-1 flex w-56 flex-col gap-0.5 whitespace-normal rounded-lg border border-slate-200 bg-surface p-1 shadow-lift">
+          {actions}
+          {actions && <span className="my-1 border-t border-slate-100" aria-hidden />}
+          {job.source_url && <a role="menuitem" className={MENU_ITEM} href={job.source_url} target="_blank" rel="noopener noreferrer"
             aria-label={`Open posting: ${job.title}`}>Open posting ↗</a>}
-          {job.source_url && <CopyLinkButton url={job.source_url} className={`${item} inline-flex items-center gap-1`} />}
+          {job.source_url && <CopyLinkButton url={job.source_url} className={`${MENU_ITEM} inline-flex items-center gap-1`} />}
           <span className="px-1 py-0.5"><DeleteJobButton jobId={job.id} title={job.title} /></span>
         </span>
       )}
@@ -239,52 +242,94 @@ function RowMenu({ job }: { job: Job }) {
   );
 }
 
-/** The one thing to do next with a job, right in the list: Closed and Not relevant first, then
- * the step forward. The rest is under "⋯". */
-function NextStep({ job }: { job: Job }) {
+const MENU_ITEM = "block w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-white/10";
+
+/** Status changes a toast can take back (Applied also records an application, so it can't). */
+const UNDO_LABEL: Record<string, string> = {
+  SHORTLISTED: "Shortlisted", NOT_RELEVANT: "Not relevant", CLOSED: "Closed", IGNORED: "Ignored", DUPLICATE: "Duplicate",
+};
+
+/** A status change from the list, shown at once: the job fades out of every list it no longer
+ * belongs to (or shows its new status), the server catches up, and a toast offers Undo. */
+function useRowStatus(job: Job) {
   const qc = useQueryClient();
-  const status = useMutation({
+  const lists = () => qc.getQueriesData<Page<Job>>({ queryKey: ["jobs"] })
+    .filter(([, d]) => Array.isArray(d?.items) && d!.items.some((j) => j.id === job.id));
+  return useMutation({
     mutationFn: (s: string) => api.post(`/jobs/${job.id}/status`, { status: s }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    onMutate: async (s: string) => {
+      await qc.cancelQueries({ queryKey: ["jobs"] });
+      const before = lists();
+      for (const [key, d] of before) {
+        const shown = (key[1] as { status?: string[] } | undefined)?.status;
+        const stays = !shown?.length || shown.includes(s);
+        qc.setQueryData<Page<Job>>(key, { ...d!, items: d!.items.map((j) => (j.id === job.id ? { ...j, status: s, leaving: !stays } : j)) });
+      }
+      setTimeout(() => {
+        for (const [key] of before) {
+          qc.setQueryData<Page<Job>>(key, (d) => (d && d.items.some((j) => j.id === job.id && j.leaving)
+            ? { ...d, items: d.items.filter((j) => j.id !== job.id), total: d.total - 1 } : d));
+        }
+      }, 220);
+      return { before };
+    },
+    onError: (_e, _s, ctx) => ctx?.before.forEach(([key, d]) => qc.setQueryData(key, d)),
+    onSuccess: (_d, s) => {
+      if (!UNDO_LABEL[s] || s === job.status) return;
+      toast(`${job.title} → ${UNDO_LABEL[s]}`, "info", {
+        label: "Undo",
+        run: () => {
+          api.post(`/jobs/${job.id}/status`, { status: job.status })
+            .then(() => qc.invalidateQueries({ queryKey: ["jobs"] }))
+            .catch((e) => toast(errorMessage(e), "error"));
+        },
+      });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
     meta: { toastError: true },
   });
+}
+
+/** What to do next with a job, right in the list: the one or two likely steps as buttons, every
+ * other status change under "⋯" — so a row stays one or two lines tall. */
+function NextStep({ job }: { job: Job }) {
+  const status = useRowStatus(job);
   // Actions are plain buttons with verbs, so they never look like the status pill above them.
   const b = "btn-secondary whitespace-nowrap px-2 py-0.5 text-xs font-medium";
-  const applied = (
-    <button className={b} disabled={status.isPending} aria-label={`Applied: ${job.title}`}
-      title="Already applied — records the application" onClick={() => status.mutate("APPLIED")}>Mark applied</button>
+  const item = (value: string, label: string, aria: string, title: string) => (
+    <button key={value} type="button" role="menuitem" data-closes-menu className={MENU_ITEM} disabled={status.isPending}
+      aria-label={`${aria}: ${job.title}`} title={title} onClick={() => status.mutate(value)}>{label}</button>
   );
-  const dismiss = <>
-    <button className={b} disabled={status.isPending} aria-label={`Closed: ${job.title}`}
-      title="The posting is no longer open" onClick={() => status.mutate("CLOSED")}>Mark closed</button>
-    <button className={b} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
+  const applied = item("APPLIED", "Mark applied", "Applied", "Already applied — records the application");
+  const closed = item("CLOSED", "Mark closed", "Closed", "The posting is no longer open");
+  const ignore = item("IGNORED", "Ignore for now", "Ignore", "Not now — hides it from the open lists (Not pursuing tab)");
+  const duplicate = item("DUPLICATE", "Duplicate", "Duplicate", "The same posting as another job — hides this copy (Not pursuing tab)");
+  const notRelevant = (
+    <button className={`${b} hover:border-rose-300 hover:text-rose-700`} disabled={status.isPending} aria-label={`Not relevant: ${job.title}`}
       title="Not a fit — hides it from the open lists" onClick={() => status.mutate("NOT_RELEVANT")}>Not relevant</button>
-    <button className={b} disabled={status.isPending} aria-label={`Ignore: ${job.title}`}
-      title="Not now — hides it from the open lists (Not pursuing tab)" onClick={() => status.mutate("IGNORED")}>Ignore</button>
-    <button className={b} disabled={status.isPending} aria-label={`Duplicate: ${job.title}`}
-      title="The same posting as another job — hides this copy (Not pursuing tab)" onClick={() => status.mutate("DUPLICATE")}>Duplicate</button>
-  </>;
+  );
   let main: ReactNode = null;
+  let more: ReactNode = null;
   if (NEW_STATUSES.includes(job.status)) {
     main = <>
-      {dismiss}
-      {applied}
-      <button className={b} disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
+      <button className="btn-primary whitespace-nowrap px-2 py-0.5 text-xs" disabled={status.isPending} aria-label={`Shortlist ${job.title}`}
         title="Worth applying to" onClick={() => status.mutate("SHORTLISTED")}>Shortlist</button>
+      {notRelevant}
     </>;
+    more = <>{applied}{closed}{ignore}{duplicate}</>;
   } else if (PENDING_STATUSES.includes(job.status)) {
     main = <>
-      {dismiss}
       <Link className="btn-primary whitespace-nowrap px-2 py-0.5 text-xs" to={`/jobs/${job.id}?apply=1`} aria-label={`Apply to ${job.title}`}>Apply</Link>
-      {applied}
+      {notRelevant}
     </>;
+    more = <>{applied}{closed}{ignore}{duplicate}</>;
   } else if (APPLIED_STATUSES.includes(job.status)) {
     main = <Link className={b} to={`/jobs/${job.id}#follow-ups`} aria-label={`Follow up on ${job.title}`}>Follow up</Link>;
   }
   return (
-    <span className="inline-flex max-w-[15rem] flex-wrap items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
       {main}
-      <RowMenu job={job} />
+      <RowMenu job={job} actions={more} />
     </span>
   );
 }
@@ -323,7 +368,7 @@ function JobCards({ jobs, selected, toggle, skills, onSkill }: { jobs: Job[]; se
   return (
     <ul className="divide-y divide-slate-100">
       {jobs.map((j) => (
-        <li key={j.id} className={`flex gap-3 py-3 ${selected.has(j.id) ? "bg-indigo-50/60" : ""}`}>
+        <li key={j.id} className={`flex gap-3 py-3 ${j.leaving ? "row-leave" : ""} ${selected.has(j.id) ? "bg-indigo-50/60" : ""}`}>
           <input type="checkbox" className="mt-1 self-start" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
@@ -402,10 +447,10 @@ const daysAgo = (days: number) => {
 
 export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   const [params, setParams] = useSearchParams();
-  // Plain /jobs opens on New: jobs that just arrived and haven't been decided yet. Setting a
-  // status moves a job to its own tab. Links with filters (Today, Insights) search all open jobs.
+  // Plain /jobs opens on All open: jobs as they were imported, not decided yet. Setting a
+  // status moves a job to its own tab. Links with filters (Today, Insights) search All jobs.
   const filtered = FILTERS.some((f) => f !== "sort" && params.has(f));
-  const tabKey = view === "closed" ? "closed" : params.get("tab") ?? (filtered ? "all" : "new");
+  const tabKey = view === "closed" ? "closed" : (params.get("tab") === "new" ? "all" : params.get("tab")) ?? (filtered ? "every" : "all");
   const tab = JOB_TABS.find((t) => t.key === tabKey) ?? JOB_TABS[0];
   const closed = tab.key === "closed";
   const page = Number(params.get("page") ?? 1);
@@ -418,7 +463,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     const saved = prefs.get(VIEW_KEY);
     if (!saved || FILTERS.some((f) => f !== "sort" && params.has(f))) return;
     const next = new URLSearchParams(saved);
-    if (view !== "closed") next.set("tab", params.get("tab") ?? "new");
+    if (view !== "closed") next.set("tab", params.get("tab") ?? "all");
     setParams(next, { replace: true });
   }, [restored, params, setParams, view]);
 
@@ -493,8 +538,8 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   /** Apply a change made by the user, and remember it for next time. */
   const update = (next: URLSearchParams) => {
     next.delete("page");
-    // Search and filters work inside the tab you're on: without this, plain /jobs (New) would
-    // turn into All open as soon as a filter appears in the address.
+    // Search and filters work inside the tab you're on: without this, plain /jobs (All open)
+    // would turn into All as soon as a filter appears in the address.
     if (view !== "closed" && !next.has("tab")) next.set("tab", tabKey);
     setParams(next);
     const keep = new URLSearchParams(next);
@@ -536,9 +581,12 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
     prefs.set(VIEW_KEY, null);
     setParams(closed ? new URLSearchParams() : new URLSearchParams({ tab: tab.key }));
   };
-  const MORE_KEYS = ["recommendation", "tier", "technology", "location", "source", "posted_after", "experience", "has_application", "stale"];
-  const moreActive = MORE_KEYS.filter((k) => params.get(k)).length;
-  const [showMore, setShowMore] = useState(moreActive > 0);
+  const PANEL_KEYS = ["min_score", "work_model", "posted_within", "added_via", "recommendation", "tier", "technology", "location",
+    "source", "posted_after", "experience", "has_application", "stale"];
+  const activeFilters = PANEL_KEYS.filter((k) => params.get(k)).length;
+  // Opens by itself for filters only the panel shows (quick views and chips cover the common ones).
+  const [showFilters, setShowFilters] = useState(() =>
+    ["recommendation", "tier", "technology", "location", "source", "posted_after", "experience", "stale"].some((k) => params.get(k)));
   const customized = sort !== DEFAULT_SORT || FILTERS.some((f) => f !== "sort" && params.has(f));
   const select = (key: string, options: string[], label: string) => (
     <select className="input" aria-label={label} value={params.get(key) ?? ""} onChange={(e) => set(key, e.target.value)}>
@@ -549,14 +597,14 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1>{tab.key === "all" ? "All open jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
+        <h1>{tab.key === "all" ? "All open jobs" : tab.key === "every" ? "All jobs" : closed ? "Closed positions" : `${tab.label} jobs`}</h1>
         <div className="flex items-center gap-2">
           <DuplicatesLink />
           <Link className="btn-primary sm:hidden" to="/jobs/new">Add Job</Link>
         </div>
       </div>
       <StatusTabs active={tab.key} query={query} />
-      {tab.key !== "all" && tab.statuses.length > 1 && <StatusChips tab={tab} query={query} picked={picked} onPick={setStatuses} />}
+      {tab.key !== "every" && tab.statuses.length > 1 && <StatusChips tab={tab} query={query} picked={picked} onPick={setStatuses} />}
       {/* Like Magento's admin grid: search, sort, paging and bulk actions stay under the top bar
           while the list scrolls; the filter panel below scrolls away (not on phones). */}
       <div ref={toolbarRef} data-testid="jobs-toolbar" style={sticky ? { top: stickyTop } : undefined}
@@ -566,19 +614,27 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           <input className="input min-w-56 flex-1" placeholder="Search title, company, skill, location or job ID (#123)" aria-label="Search jobs"
             key={params.get("q") ?? ""} defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)}
             onBlur={(e) => e.target.value !== (params.get("q") ?? "") && set("q", e.target.value)} />
-          {tab.key === "all" && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
-            emptyLabel="Any open status" /></div>}
+          {tab.key === "every" && <div className="w-56"><StatusMultiSelect options={tab.statuses} value={picked} onChange={setStatuses}
+            emptyLabel="Any status" /></div>}
           <select className="input w-auto" aria-label="Sort" value={sort} onChange={(e) => sortBy(e.target.value)} title="Remembered until you change it or press Reset">
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
+          <button type="button" aria-expanded={showFilters} aria-controls="job-filters" onClick={() => setShowFilters((v) => !v)}
+            className={`btn-secondary gap-1.5 ${showFilters || activeFilters ? "border-indigo-300 text-indigo-700" : ""}`}>
+            <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor"><path d="M3 4.75A.75.75 0 0 1 3.75 4h12.5a.75.75 0 0 1 .53 1.28L12 10.06v4.19a.75.75 0 0 1-.33.62l-2.5 1.67A.75.75 0 0 1 8 15.92v-5.86L3.22 5.28A.75.75 0 0 1 3 4.75Z" /></svg>
+            Filters{activeFilters ? <span className="rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold text-white">{activeFilters}</span> : null}
+          </button>
+          {customized && (
+            <button type="button" className="link text-sm" title="Clear filters and go back to the default order" onClick={reset}>Reset</button>
+          )}
         </div>
         {data && data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "job" : "jobs"} />}
         {data && data.items.length > 0 && <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />}
       </section>
       </div>
-      <Card>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <QuickViews params={params} onApply={(view) => {
-          const next = new URLSearchParams(tab.key === "all" || closed ? "" : `tab=${tab.key}`);
+          const next = new URLSearchParams(tab.key === "every" || closed ? "" : `tab=${tab.key}`);
           if (params.get("sort")) next.set("sort", params.get("sort")!);
           for (const [k, v] of Object.entries(view)) next.set(k, v);
           update(next);
@@ -588,25 +644,20 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           else if (key === "technology") setMany({ technology: "", skills_mode: "", skills_exact: "" });
           else set(key, "");
         }} />
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Chips label="Score" options={SCORE_CHIPS} value={params.get("min_score") ?? ""} onChange={(v) => set("min_score", v)} />
-          <Chips label="Work" options={WORK_CHIPS} value={params.get("work_model") ?? ""} onChange={(v) => set("work_model", v)} />
-          <Chips label="Posted" options={POSTED_CHIPS} value={params.get("posted_within") ?? ""} onChange={(v) => set("posted_within", v)} />
-          <select className="input w-auto py-1 text-xs" aria-label="Added via" value={params.get("added_via") ?? ""} onChange={(e) => set("added_via", e.target.value)}
-            title="How the job came into the app">
-            <option value="">Added via: any</option>
-            {Object.entries(ADDED_VIA).map(([value, t]) => <option key={value} value={value}>Added via: {t.label}</option>)}
-          </select>
-          <span className="flex-1" />
-          <button type="button" className="link text-sm" aria-expanded={showMore} onClick={() => setShowMore((v) => !v)}>
-            {showMore ? "Fewer filters" : `More filters${moreActive ? ` (${moreActive})` : ""}`}
-          </button>
-          {customized && (
-            <button type="button" className="link text-sm" title="Clear filters and go back to best match first" onClick={reset}>Reset</button>
-          )}
-        </div>
-        {showMore && (
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 md:grid-cols-4 lg:grid-cols-5">
+      </div>
+      {showFilters && (
+        <section id="job-filters" className="card panel-in space-y-3 p-4!" aria-label="Filters">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Chips label="Score" options={SCORE_CHIPS} value={params.get("min_score") ?? ""} onChange={(v) => set("min_score", v)} />
+            <Chips label="Work" options={WORK_CHIPS} value={params.get("work_model") ?? ""} onChange={(v) => set("work_model", v)} />
+            <Chips label="Posted" options={POSTED_CHIPS} value={params.get("posted_within") ?? ""} onChange={(v) => set("posted_within", v)} />
+            <select className="input w-auto py-1 text-xs" aria-label="Added via" value={params.get("added_via") ?? ""} onChange={(e) => set("added_via", e.target.value)}
+              title="How the job came into the app">
+              <option value="">Added via: any</option>
+              {Object.entries(ADDED_VIA).map(([value, t]) => <option key={value} value={value}>Added via: {t.label}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 md:grid-cols-4 lg:grid-cols-5">
             <SkillsFilter params={params} onChange={setMany} />
             <input className="input" type="number" min={0} max={100} placeholder="Min score (e.g. 75)" aria-label="Min score"
               key={params.get("min_score") ?? ""} defaultValue={params.get("min_score") ?? ""} onBlur={(e) => e.target.value !== (params.get("min_score") ?? "") && set("min_score", e.target.value)} />
@@ -625,17 +676,17 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
               Scores updating only
             </label>
           </div>
-        )}
-      </Card>
-      {(isLoading || !restored) && <Spinner />}
+        </section>
+      )}
+      {(isLoading || !restored) && <SkeletonList rows={8} label="Loading jobs…" />}
       {error && <ErrorBox error={error} />}
       {data && (
         <section id="jobs-list" className="card" style={{ scrollMarginTop: sticky ? headerBottom + 8 : 64 }}>
-          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "all" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (<>
+          {!data.items.length ? <Empty>{closed ? "No closed positions. Set a job's status to Closed when the posting is taken down." : tab.key === "every" ? "No jobs match these filters." : `No ${tab.label.toLowerCase()} jobs match these filters.`}</Empty> : (<>
             {/* Wide screens: no inner scroll box, so the column headers can stick to the page. */}
             <div ref={tableWrapRef} className={stickyHead ? "" : "overflow-x-auto"}>
               {phone ? <JobCards jobs={data.items} selected={selected} toggle={toggle} skills={skillList(params.get("technology"))} onSkill={toggleSkill} /> : <>
-              <p className="mb-2 text-xs text-slate-500"><b>Click a row</b> to preview it here (↑ ↓ move, Esc closes) · <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.</p>
+              <ListLegend />
               <table className="min-w-full divide-y divide-slate-100 [&_td]:px-2 [&_th]:px-2">
                 <thead className={stickyHead ? "sticky z-10" : ""} style={stickyHead ? { top: headerBottom } : undefined}><tr>
                   <th className="th w-8">
@@ -659,7 +710,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                 <tbody className="divide-y divide-slate-50">
                   {data.items.map((j) => (
                     <tr key={j.id} data-job-row onClick={(e) => openPreview(e, j.id)}
-                      className={`cursor-pointer ${preview === j.id ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300" : selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}`}>
+                      className={`job-row cursor-pointer transition-colors ${j.leaving ? "row-leave" : ""} ${preview === j.id ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300" : selected.has(j.id) ? "bg-indigo-50/60" : "row-hover hover:bg-slate-50"}`}>
                       <td className="td w-8"><input type="checkbox" aria-label={`Select ${j.title}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="td text-xs tabular-nums text-slate-500"><Link to={`/jobs/${j.id}`} className="hover:text-indigo-700" title="Job ID">#{j.id}</Link></td>
                       <td className="td"><ScoreBadge score={j.match_score} stale={j.score_stale} /></td>
@@ -670,7 +721,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                           {j.jd_status !== "OK" && <Badge tone="amber">no JD</Badge>}
                           <AddedViaTags values={j.added_via} />
                         </div>
-                        <JobSkills job={j} active={skillList(params.get("technology"))} onPick={toggleSkill} />
+                        <JobSkills job={j} max={4} active={skillList(params.get("technology"))} onPick={toggleSkill} />
                       </td>
                       <td className="td max-w-32 text-xs" title={[j.location, j.work_model !== "UNKNOWN" ? humanize(j.work_model) : ""].filter(Boolean).join(" · ")}>
                         <div className="truncate">{j.location ?? "—"}</div>
@@ -684,9 +735,9 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
                         <div title={`Posted on the job site: ${formatDate(j.posting_date)}`}>{formatShortDate(j.posting_date)}</div>
                         <div className="text-slate-500" title={`Added to this app: ${formatDate(j.created_at)}`}>added {formatShortDate(j.created_at)}</div>
                       </td>
-                      <td className="td min-w-[15rem]">
+                      <td className="td min-w-[13rem]">
                         <JobStatusSummary status={j.status} since={j.status_changed_at} />
-                        <div className="mt-1.5 border-t border-dashed border-slate-200 pt-1.5"><NextStep job={j} /></div>
+                        <div className="mt-1.5"><NextStep job={j} /></div>
                       </td>
                     </tr>
                   ))}
@@ -707,6 +758,20 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
   );
 }
 
+/** How to read the list, folded into one line (open it for the score colours). */
+function ListLegend() {
+  return (
+    <details className="group mb-2 text-xs text-slate-500">
+      <summary className="cursor-pointer list-none select-none hover:text-slate-700">
+        <b>Click a row</b> to preview it (↑ ↓ move, Esc closes) · <span className="underline decoration-dotted">what the colours mean</span>
+      </summary>
+      <p className="mt-1">
+        <b>Posted</b> = on the job site, <b>Added</b> = to this app · score: <span className="text-emerald-600">90+ excellent</span> · <span className="text-sky-600">80+ strong</span> · <span className="text-indigo-600">70+ worth a look</span> · <span className="text-amber-600">60+ weak</span>. <Badge tone="amber">no JD</Badge> = no description, score is a rough guess.
+      </p>
+    </details>
+  );
+}
+
 /** One-click views: each sets a few filters at once (the tab and sort stay). */
 const QUICK_VIEWS: { label: string; title: string; view: Record<string, string> }[] = [
   { label: "Top matches", title: "Score 80 or more", view: { min_score: "80" } },
@@ -717,7 +782,7 @@ const QUICK_VIEWS: { label: string; title: string; view: Record<string, string> 
 
 function QuickViews({ params, onApply }: { params: URLSearchParams; onApply: (view: Record<string, string>) => void }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick views">
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick views">
       <span className="text-xs font-medium text-slate-500">Quick views</span>
       {QUICK_VIEWS.map((q) => {
         const on = Object.entries(q.view).every(([k, v]) => params.get(k) === v);
@@ -769,7 +834,7 @@ function ActiveFilters({ params, tab, onRemove }: {
   }
   if (!chips.length) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+    <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
       <span className="text-xs font-medium text-slate-500">Filtered by</span>
       {chips.map(([k, v, text]) => (
         <span key={`${k}=${v}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">

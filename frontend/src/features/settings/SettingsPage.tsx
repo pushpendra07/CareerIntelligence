@@ -8,6 +8,7 @@ import type { ChatStatus } from "../chat/Chat";
 import { collectorOutdated, collectorVersion, extensionDownloadUrl } from "../jobs/collector";
 import { ScannerSettings } from "../scanner/ScannerSettings";
 import { SavedSheetsSettings } from "../sheets/SavedSheetsSettings";
+import { AiJobSearchSettings, aiJobSearchStatus } from "./AiJobSearchSettings";
 import { BackupSettings } from "./BackupSettings";
 
 interface ScoringConfig {
@@ -52,7 +53,7 @@ function ScoringSettings() {
       <p className="mb-3 text-sm text-slate-600">
         Every job gets a 0–100 match score from these parts. Raise a part to make it count more; they must add up to 100.
         Saving re-scores all jobs within a minute (version {cfg.data?.version} now). What you want — roles, skills, locations, salary — is set in{" "}
-        <Link className="link" to="/preferences">My profile → Target roles</Link>.
+        <Link className="link" to="/preferences">My profile → Skills & targets</Link>.
       </p>
       <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
         {weights.map((k) => (
@@ -385,6 +386,7 @@ function SourcesOverview() {
   const sheets = useQuery({ queryKey: ["sheets"], queryFn: () => api.get<{ last_imported_at: string | null }[]>("/sheets") }).data;
   const access = useQuery({ queryKey: ["sheets", "access"], queryFn: () => api.get<{ service_account: string | null }>("/sheets/access") }).data;
   const co = useQuery({ queryKey: ["career-ops"], queryFn: () => api.get<{ configured?: boolean; last_import?: { started_at: string } | null }>("/career-ops/status") }).data;
+  const ajs = useQuery({ queryKey: ["ai-job-search"], queryFn: aiJobSearchStatus }).data;
   const lastSheet = (sheets ?? []).map((x) => x.last_imported_at).filter(Boolean).sort().at(-1) ?? null;
   const row = (href: string, name: string, state: ReactNode, last: string | null | undefined | false, ok: boolean) => (
     <a href={href} className="flex items-start gap-2 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
@@ -397,10 +399,11 @@ function SourcesOverview() {
     </a>
   );
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Job sources">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" aria-label="Job sources">
       {row("#scanner", "Job board search (built-in)", scanner ? `${scanner.scannable} companies searched${scanner.search_all_companies ? " (all companies)" : ""}` : "…", scanner?.last_run?.started_at, !!scanner?.scannable)}
       {row("#sheets", "Google Sheets", sheets ? `${sheets.length} saved · ${access?.service_account ? "private sheets connected" : "only link-shared sheets"}` : "…", lastSheet, !!sheets?.length)}
       {row("#career-ops", "Career-Ops", co ? (co.configured ? "Set up" : "Not set up (optional)") : "…", co?.last_import?.started_at, !!co?.configured)}
+      {row("#ai-job-search", "AI Job Search", ajs ? (ajs.available ? "Set up" : "Not set up (optional)") : "…", ajs?.last_import?.started_at, !!ajs?.available)}
       {row("#extension", "Chrome extension", collectorVersion() ? "Installed — click it on any job page" : "Not installed — download it below", false, !!collectorVersion())}
     </div>
   );
@@ -421,10 +424,11 @@ export function SettingsPage({ view = "sources" }: { view?: SettingsView }) {
       <div><h1>Settings</h1><PageIntro>{INTRO[view]}</PageIntro></div>
       {view === "sources" && <>
         <SourcesOverview />
-        <p className="text-sm text-slate-600">Which jobs any source may save (skills a job must have, skills and roles to ignore): <Link className="link" to="/settings/import-rules">Import rules</Link>.</p>
+        <p className="text-sm text-slate-600">Which jobs any source may save (your target titles and skills, roles and skills to ignore): <Link className="link" to="/preferences#import-filter">My profile → Skills & targets → Which jobs to save</Link>.</p>
         <section id="scanner" className="scroll-mt-16"><ScannerSettings /></section>
         <section id="sheets" className="scroll-mt-16"><SavedSheetsSettings /></section>
         <section id="career-ops" className="scroll-mt-16"><CareerOpsSettings /></section>
+        <section id="ai-job-search" className="scroll-mt-16"><AiJobSearchSettings /></section>
         <section id="extension" className="scroll-mt-16"><ExtensionSettings /></section>
       </>}
       {view === "scoring" && <ScoringSettings />}

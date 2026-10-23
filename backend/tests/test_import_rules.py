@@ -114,3 +114,88 @@ def test_add_job_by_hand(client: TestClient) -> None:
     # turned off: everything is saved again
     save(client, enabled=False)
     assert client.post("/api/v1/jobs", json=body).status_code == 201
+
+
+def test_title_fits_ignores_level_words() -> None:
+    assert import_rules.title_fits("Senior Magento Developer", "Magento 2 Developer")
+    assert import_rules.title_fits("Senior Magento Developer", "Lead Magento Developers (Remote)")
+    assert import_rules.title_fits("Adobe Commerce Tech Lead", "Adobe Commerce Tech Lead - Pune")
+    assert not import_rules.title_fits("Senior Magento Developer", "Magento Architect")
+    assert not import_rules.title_fits("Senior Magento Developer", "Senior Java Developer")
+
+
+def test_rules_reuse_the_target_profile(client: TestClient, db: Session) -> None:
+    from app.services.profile_service import update_target
+
+    update_target(db, {"target_titles": ["Senior Magento Developer", "Adobe Commerce Tech Lead"],
+                       "required_skills": ["Magento"], "excluded_roles": ["Intern"],
+                       "excluded_technologies": ["Salesforce"]})
+    save(client, required_skills=[], from_profile={
+        "target_titles": True, "required_skills": True, "excluded_roles": True,
+        "excluded_technologies": True})
+    got = client.get("/api/v1/import-rules").json()
+    assert got["rules"]["from_profile"]["target_titles"] is True
+    assert "Senior Magento Developer" in got["profile"]["target_titles"]
+
+    def check(title: str, jd: str = "") -> dict[str, Any]:
+        r = client.post("/api/v1/import-rules/check", json={"title": title, "description": jd})
+        return r.json()  # type: ignore[no-any-return]
+
+    ok = check("Magento 2 Developer", "Magento and PHP")
+    assert ok["saved"] and ok["found_roles"] == ["Senior Magento Developer"]
+    assert check("Java Developer", "Magento")["reason"].startswith(
+        "title fits none of your target titles")
+    assert check("Magento Developer Intern")["reason"] == "excluded role “Intern” (target profile)"
+    assert check("Magento Developer", "Magento on Salesforce Commerce")["reason"] == \
+        "excluded technology “Salesforce” (target profile)"
+
+    rows = [{"title": "Magento Developer", "company": "Kept Co", "url": "https://k.example/jobs/1",
+             "description": "Magento 2"},
+            {"title": "Java Developer", "company": "Gone Co", "url": "https://g.example/jobs/2",
+             "description": "Java"}]
+    done = client.post("/api/v1/jobs/agent-import", json={"jobs": rows}).json()
+    assert [r["result"] for r in done["results"]] == ["new", "filtered"]
+
+    # Unlinked: the profile lists no longer filter (the scoring still uses them).
+    save(client, required_skills=[], from_profile={"target_titles": False})
+    assert check("Java Developer", "Java")["saved"]
+
+
+def test_impact_shows_what_rules_would_have_blocked(client: TestClient, db: Session) -> None:
+    from app.services.job_service import JobInput, ingest_job
+
+    for title, jd in (("Magento Developer", "Magento"), ("Java Developer", "Spring"),
+                      ("Sales Executive", "")):
+        ingest_job(db, JobInput(title=title, company_name="Impact Co", jd_text=jd,
+                                url=f"https://i.example/jobs/{title.split()[0]}", origin="manual"))
+    r = client.post("/api/v1/import-rules/impact", json={"rules": {
+        "enabled": True, "required_roles": ["Developer"], "ignored_skills": ["Spring"]}}).json()
+    assert r["checked"] == 3 and r["blocked"] == 2
+    assert {x["title"] for x in r["examples"]} == {"Java Developer", "Sales Executive"}
+    assert {x["reason"] for x in r["reasons"]} == {"ignored skill “Spring”",
+                                                   "title has none of your roles to keep"}
+    assert [j.title for j in db.query(Job).order_by(Job.id)] == [  # nothing changed
+        "Magento Developer", "Java Developer", "Sales Executive"]
+
+
+def test_extra_words_can_be_switched_off() -> None:
+    r = rules(required_skills=[], ignored_roles=["Intern"])
+    assert import_rules.check(r, "PHP Intern") == "ignored role “Intern”"
+    off = {**r, "extras_enabled": False}
+    assert import_rules.check(off, "PHP Intern") is None
+    assert import_rules.explain(off, "PHP Intern")["found_ignored_roles"] == []
+    linked = {"excluded_roles": ["Intern"]}
+    assert import_rules.check(off, "PHP Intern", profile=linked) == \
+        "excluded role “Intern” (target profile)"  # the profile lists still apply
+
+
+def test_check_and_impact_use_unsaved_profile_lists(client: TestClient) -> None:
+    rules_on = {"enabled": True, "required_skills": [],
+                "from_profile": {"excluded_technologies": True}}
+    r = client.post("/api/v1/import-rules/check", json={
+        "title": "Java Developer", "description": "Spring", "rules": rules_on,
+        "profile": {"excluded_technologies": ["Spring"]}}).json()
+    assert r["reason"] == "excluded technology “Spring” (target profile)"
+    r = client.post("/api/v1/import-rules/check", json={
+        "title": "Java Developer", "description": "Spring", "rules": rules_on}).json()
+    assert r["saved"]  # the saved profile has no excluded technologies

@@ -193,6 +193,15 @@
   :focus-visible { @apply outline-2 outline-offset-2 outline-indigo-500; }
 }
 
+/* Phones and tablets: iOS zooms the whole page in when a text box with text under 16px gets
+   focus, and stays zoomed, so the layout looks broken. Text boxes are 16px there instead.
+   Unlayered + !important: it must beat text-sm / text-xs utilities on the fields. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select, textarea { font-size: 16px !important; }
+}
+
 /* Tailwind v4: reusable classes are declared as utilities so they can compose with @apply. */
 @utility input { @apply w-full rounded-xl border border-slate-200 bg-surface px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 disabled:bg-slate-100; }
 @utility label { @apply mb-1 block text-xs font-medium text-slate-600; }
@@ -226,3 +235,19 @@
 @utility lift { @apply transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-(--shadow-lift); }
 /* Pill tabs (Today | Insights, Jobs | Companies…). */
 @utility pill-tabs { @apply inline-flex max-w-full gap-1 rounded-xl border border-slate-200/80 bg-surface/70 p-1 shadow-(--shadow-card) backdrop-blur; }
+
+/* Small motion: menus pop in, panels slide down. Off for people who ask for less motion. */
+@keyframes menu-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes panel-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@utility menu-pop { animation: menu-pop 120ms ease-out; transform-origin: top right; }
+@utility panel-in { animation: panel-in 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .menu-pop, .panel-in { animation: none; }
+}
+
+/* Loading placeholders: a soft pulse. A job leaving the list fades out before it goes. */
+@utility skeleton { @apply animate-pulse rounded-md bg-slate-200/70 motion-reduce:animate-none; }
+@utility row-leave { opacity: 0; transition: opacity 200ms ease-out; pointer-events: none; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@utility toast-in { animation: toast-in 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .toast-in { animation: none; } }

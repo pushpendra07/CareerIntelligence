@@ -198,7 +198,7 @@ export function ChatLauncher() {
       <ChatPanel onClose={() => setOpen(false)} />
     </div>
   ) : (
-    <button className="fixed right-4 bottom-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700"
+    <button className="fixed right-4 bottom-20 z-40 md:bottom-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700"
       aria-label="Open assistant (⌘J)" title="Assistant (⌘J)" onClick={() => setOpen(true)}>
       <Icon name="chat" className="h-6 w-6" />
     </button>

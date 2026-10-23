@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
-import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, Spinner, StatusBadge, PAGE_SIZE, PageIntro } from "../../components/ui";
+import { BackButton, Card, Empty, ErrorBox, KeyValue, Pagination, ScoreBadge, SkeletonList, Spinner, StatusBadge, PAGE_SIZE, PageIntro } from "../../components/ui";
 import type { Application, Page } from "../../types/api";
 import { formatDate, formatDateTime, formatMoney, humanize } from "../../utils/format";
 
@@ -41,7 +41,7 @@ export function ApplicationsPage() {
             <option value="">Any status</option>{APP_STATUSES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
           </select>
         </div>
-        {list.isLoading && <Spinner />}
+        {list.isLoading && <SkeletonList rows={6} label="Loading applications…" />}
         {list.error && <ErrorBox error={list.error} />}
         {list.data && (!list.data.items.length ? <Empty>No applications yet. Use "Apply" on a job.</Empty> : (
           <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100">

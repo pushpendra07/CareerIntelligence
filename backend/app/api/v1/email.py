@@ -59,6 +59,12 @@ def updates(db: DB, state: str | None = Query(None, pattern="^(PENDING|DONE|DISM
     return email_updates.describe(db, email_updates.list_updates(db, state, job_id, limit))
 
 
+@router.post("/updates/rematch")
+def rematch(db: DB) -> dict[str, int]:
+    """Match the emails waiting for review again (e.g. after adding the job one is about)."""
+    return email_updates.rematch_pending(db)
+
+
 @router.post("/updates/confirm-all")
 def confirm_all(db: DB) -> dict[str, int]:
     """Confirm every pending update that knows its job."""

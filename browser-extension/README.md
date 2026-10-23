@@ -2,11 +2,15 @@
 
 Adds jobs to your Career Intelligence app straight from the browser. No AI, no tokens.
 
-- **Add this job:** open any job posting (LinkedIn, Naukri, Indeed, Foundit, Glassdoor, Instahyre,
-  Wellfound, Cutshort, Hirist, iimjobs, or a company careers page) and click the extension's icon.
-  The job is saved right away and the popup shows **Added #123 · score 78**, **Already in your
-  list: #512** (the link is added to that job), or **You deleted this job before → Add it anyway**.
-  If the page doesn't show a title or company, the popup asks for them.
+- **Add this job:** open any job posting (LinkedIn, Naukri, Indeed, Foundit/Monster, Shine,
+  TimesJobs, Glassdoor, Instahyre, Wellfound, Cutshort, Hirist, iimjobs, Apna, Internshala, or a
+  company careers page) and click the extension's icon. Title, company, location, experience,
+  salary and description are read from the page — nothing to type. The job is saved right away
+  and the popup shows **Added #123 · score 78**, **Already in your list: #512** with why it
+  matched (same link, same posting ID, same company and title on another portal, a repost) —
+  it is not added again, the link is added to that job — or **You deleted this job before →
+  Add it anyway**. On a search results page it asks you to open one job first. Only if a page
+  shows neither title nor company does the popup ask for them.
 - **Fill an application:** on a job application form (Greenhouse, Lever, Ashby, Workday,
   SmartRecruiters, Workable, a company's own form…) click the icon → **Fill this application**.
   Empty fields it recognises are filled from your app (name, email, phone, LinkedIn, city,
@@ -49,7 +53,7 @@ the same browser first.
 | File | Role |
 |---|---|
 | `manifest.json` | Manifest V3. Permissions: `activeTab` + `scripting` (read the page you click it on), `tabs` (collector tab), `storage` (addresses); hosts: the app on 127.0.0.1/localhost and the supported portals |
-| `extract.js` | Reads a job page: schema.org `JobPosting` data first, then each portal's page layout, then the page itself (careers sites). Also lists job links on a portal's search page. Read-only |
+| `extract.js` | Reads a job page: schema.org `JobPosting` data first, then each portal's page layout, then fallbacks that survive layout changes (tab title "Title \| Company \| Portal", company links, the "About the job" section), then the page itself (careers sites). Cleans tracking from links and flags search pages. Also lists job links on a portal's search page. Read-only |
 | `popup.html` / `popup.js` | The toolbar button: an application form → fill it (`GET /api/v1/apply/lookup`, `/jobs/{id}/apply-kit`, the CV file) and record it (`POST /jobs/{id}/applied`); any other page → `POST /api/v1/jobs/agent-import` |
 | `autofill.js` | Fills an application form from the apply kit: matches fields by label/name/placeholder, sets values like typing, attaches the CV. Never submits or clicks. Tested in `frontend/src/test/extension-autofill.test.ts` |
 | `background.js` | The collector: opens the portal search, reads the links, opens each job, sends the jobs back to the app tab. Only accepts requests from the app's own pages and only opens the supported portals' https pages; one collection at a time |

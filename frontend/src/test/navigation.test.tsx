@@ -101,8 +101,9 @@ describe("job status tabs", () => {
     expect(list.searchParams.get("closed")).toBe("true");
     expect(list.searchParams.getAll("status")).toEqual(["CLOSED"]);
     const tab = async (name: RegExp) => screen.findByRole("tab", { name });
-    expect(await tab(/All open\s*408/)).toHaveAttribute("href", "/jobs?tab=all&q=magento");
-    expect(await tab(/^New\s*400/)).toHaveAttribute("href", "/jobs?tab=new&q=magento");
+    expect(await tab(/All open\s*400/)).toHaveAttribute("href", "/jobs?tab=all&q=magento"); // New + Discovered
+    expect(await tab(/^All\s*417/)).toHaveAttribute("href", "/jobs?tab=every&q=magento"); // all but closed
+    expect(screen.queryByRole("tab", { name: /^New/ })).not.toBeInTheDocument();
     expect(await tab(/Pending\s*2/)).toHaveAttribute("href", "/jobs?tab=pending&q=magento");
     expect(await tab(/Applied\s*4/)).toBeInTheDocument();
     expect(await tab(/Interview\s*1/)).toBeInTheDocument();
@@ -135,51 +136,54 @@ describe("job status tabs", () => {
 
   it("searching or filtering stays in the tab you're on", async () => {
     const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 }, "GET /jobs/status-counts": {} });
-    renderAt(<><JobsPage /><Where /></>, { path: "/jobs", route: "/jobs" }); // plain /jobs = New
-    expect(await screen.findByRole("heading", { name: "New jobs" })).toBeInTheDocument();
+    renderAt(<><JobsPage /><Where /></>, { path: "/jobs", route: "/jobs" }); // plain /jobs = All open
+    expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument();
     const search = screen.getByLabelText("Search jobs");
     await userEvent.type(search, "magento{Enter}");
-    expect(await screen.findByRole("heading", { name: "New jobs" })).toBeInTheDocument(); // not All open
+    expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument(); // not All
     const last = listRequest(api.fn, true);
     expect(last.searchParams.get("q")).toBe("magento");
     expect(last.searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
-    expect(screen.getByTestId("where")).toHaveTextContent("tab=new");
+    expect(screen.getByTestId("where")).toHaveTextContent("tab=all");
 
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=pending" });
-    await userEvent.click((await screen.findAllByRole("button", { name: /More filters/ })).at(-1)!);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Filters/ })).at(-1)!);
     await userEvent.type(screen.getAllByLabelText("Skills").at(-1)!, "PHP{Enter}");
     const pending = listRequest(api.fn, true);
     expect(pending.searchParams.get("technology")).toBe("PHP");
     expect(pending.searchParams.getAll("status")).toEqual(["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"]);
   });
 
-  it("opens on New: jobs that just arrived, newest first", async () => {
+  it("opens on All open: jobs as imported, no status set since, newest first", async () => {
     const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
-    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs" });
-    expect(await screen.findByRole("heading", { name: "New jobs" })).toBeInTheDocument();
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=new" }); // old links still work
+    expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument();
     expect(listRequest(api.fn).searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
     expect(listRequest(api.fn).searchParams.get("sort")).toBe("-created_at");
   });
 
-  it("links with filters search every open job", async () => {
+  it("links with filters search every job", async () => {
     mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?min_score=70" });
-    expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "All jobs" })).toBeInTheDocument();
   });
 
-  it("all-open tab lists every job still in play: the sum of the to-review and in-progress tabs", async () => {
+  it("all-open tab lists only jobs as imported; the All tab lists every status but closed", async () => {
     const api = mockApi({ "GET /jobs": { items: [], total: 0, page: 1, size: 50 } });
     renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=all" });
+    expect(await screen.findByRole("heading", { name: "All open jobs" })).toBeInTheDocument();
+    expect(listRequest(api.fn).searchParams.getAll("status")).toEqual(["NEW", "DISCOVERED"]);
+
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=every" });
     expect(await screen.findByText("No jobs match these filters.")).toBeInTheDocument();
-    expect(listRequest(api.fn).searchParams.get("closed")).toBe("false");
-    const sent = listRequest(api.fn).searchParams.getAll("status");
-    for (const open of ["NEW", "SHORTLISTED", "APPLIED", "RECRUITER_CONTACTED", "INTERVIEW", "OFFER"]) expect(sent).toContain(open);
-    for (const finished of ["NOT_RELEVANT", "REJECTED", "WITHDRAWN", "CLOSED"]) expect(sent).not.toContain(finished);
-    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any open status");
+    expect(listRequest(api.fn, true).searchParams.get("closed")).toBe("false");
+    const sent = listRequest(api.fn, true).searchParams.getAll("status");
+    for (const s of ["NEW", "SHORTLISTED", "APPLIED", "INTERVIEW", "OFFER", "REJECTED", "NOT_RELEVANT"]) expect(sent).toContain(s);
+    expect(sent).not.toContain("CLOSED");
+    expect(screen.getByRole("button", { name: "Status" })).toHaveTextContent("Any status");
     await userEvent.click(screen.getByRole("button", { name: "Status" }));
     const box = screen.getByRole("listbox", { name: "Job statuses" });
     expect(box).not.toHaveTextContent("Closed");
-    expect(box).not.toHaveTextContent("Not Relevant"); // finished jobs have their own tabs
     await userEvent.click(within(box).getByLabelText("Applied"));
     expect(listRequest(api.fn, true).searchParams.getAll("status")).toEqual(["APPLIED"]);
   });
