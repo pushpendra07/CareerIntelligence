@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import DomainValidationError
 from app.core.text import clean
 from app.models.job import WorkModel
+from app.services.import_rules import FilteredJobError
 from app.services.job_service import DeletedJobError, JobInput, ingest_job
 
 MAX_ROWS = 200
@@ -123,11 +124,13 @@ def import_jobs(db: Session, rows: list[Any], *, dry_run: bool = False,
                            existing_title=r.job.title, existing_status=r.job.status)
         except DeletedJobError:
             out.update(result="deleted")
+        except FilteredJobError as exc:
+            out.update(result="filtered", error=exc.reason)
         except DomainValidationError as exc:
             out.update(result="invalid", error=exc.message)
         results.append(out)
     counts = {k: sum(1 for r in results if r["result"] == k)
-              for k in ("new", "duplicate", "repeat", "deleted", "invalid")}
+              for k in ("new", "duplicate", "repeat", "deleted", "filtered", "invalid")}
     if dry_run:
         batch.rollback()
         return {"dry_run": True, "counts": counts, "results": results}

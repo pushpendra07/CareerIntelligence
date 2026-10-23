@@ -140,7 +140,7 @@ function CareerOpsSettings() {
       {running && <p className="mt-2 rounded bg-indigo-50 p-2 text-sm text-indigo-800">Career-Ops is scanning job boards (started {formatDateTime(running.started_at)}). This can take 15–30 minutes; you can keep using the app.</p>}
       {!running && last && (
         <p className="mt-2 text-sm">
-          Last result: {last.stats?.created ?? 0} new, {last.stats?.merged ?? 0} updated from {last.stats?.records ?? 0} Career-Ops records.
+          Last result: {last.stats?.created ?? 0} new, {last.stats?.merged ?? 0} updated from {last.stats?.records ?? 0} Career-Ops records{last.stats?.filtered_skipped ? `; ${last.stats.filtered_skipped} skipped by your import rules` : ""}.
           {(last.errors ?? []).filter((e: { stage?: string }) => e.stage).map((e: { stage: string; error: string }, i: number) => (
             <span key={i} className="block text-rose-600">{humanize(e.stage)}: {e.error}</span>
           ))}
@@ -246,7 +246,7 @@ function DataSettings() {
     onSuccess: () => qc.invalidateQueries(),
   });
   const entities = ["jobs", "companies", "applications", "recruiters", "interviews", "questions", "offers", "followups"];
-  const result = imp.data as { created?: number; merged?: number; skipped?: number; errors?: unknown[] } | undefined;
+  const result = imp.data as { created?: number; merged?: number; skipped?: number; filtered_skipped?: number; errors?: unknown[] } | undefined;
   return (
     <div className="space-y-4">
       <BackupSettings />
@@ -272,7 +272,7 @@ function DataSettings() {
           : <p className="mt-1 text-xs text-slate-500">Jobs need at least <b>title</b> and <b>company</b>; also read: url, jd, location, work_model, salary_min, salary_max, required_skills, status.</p>}
         {result && (
           <p className="mt-2 rounded bg-emerald-50 p-2 text-sm text-emerald-800">
-            Imported: {result.created ?? 0} new, {result.merged ?? 0} already in the app{result.skipped ? `, ${result.skipped} skipped` : ""}{result.errors?.length ? `, ${result.errors.length} rows with errors` : ""}.
+            Imported: {result.created ?? 0} new, {result.merged ?? 0} already in the app{result.skipped ? `, ${result.skipped} skipped` : ""}{result.filtered_skipped ? `, ${result.filtered_skipped} skipped by import rules` : ""}{result.errors?.length ? `, ${result.errors.length} rows with errors` : ""}.
           </p>
         )}
         {imp.error && <ErrorBox error={new Error(errorMessage(imp.error))} />}
@@ -397,15 +397,11 @@ function SourcesOverview() {
     </a>
   );
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5" aria-label="Job sources">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Job sources">
       {row("#scanner", "Job board search (built-in)", scanner ? `${scanner.scannable} companies searched${scanner.search_all_companies ? " (all companies)" : ""}` : "…", scanner?.last_run?.started_at, !!scanner?.scannable)}
       {row("#sheets", "Google Sheets", sheets ? `${sheets.length} saved · ${access?.service_account ? "private sheets connected" : "only link-shared sheets"}` : "…", lastSheet, !!sheets?.length)}
       {row("#career-ops", "Career-Ops", co ? (co.configured ? "Set up" : "Not set up (optional)") : "…", co?.last_import?.started_at, !!co?.configured)}
       {row("#extension", "Chrome extension", collectorVersion() ? "Installed — click it on any job page" : "Not installed — download it below", false, !!collectorVersion())}
-      <Link to="/jobs/new" className="flex items-start gap-2 rounded-md border border-slate-200 p-3 hover:bg-slate-50">
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
-        <span className="text-sm"><b>Add Job by hand</b><span className="block text-xs text-slate-500">For LinkedIn, Naukri, Indeed — paste the link and description.</span></span>
-      </Link>
     </div>
   );
 }
@@ -425,6 +421,7 @@ export function SettingsPage({ view = "sources" }: { view?: SettingsView }) {
       <div><h1>Settings</h1><PageIntro>{INTRO[view]}</PageIntro></div>
       {view === "sources" && <>
         <SourcesOverview />
+        <p className="text-sm text-slate-600">Which jobs any source may save (skills a job must have, skills and roles to ignore): <Link className="link" to="/settings/import-rules">Import rules</Link>.</p>
         <section id="scanner" className="scroll-mt-16"><ScannerSettings /></section>
         <section id="sheets" className="scroll-mt-16"><SavedSheetsSettings /></section>
         <section id="career-ops" className="scroll-mt-16"><CareerOpsSettings /></section>

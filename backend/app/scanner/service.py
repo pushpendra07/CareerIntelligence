@@ -38,6 +38,7 @@ from app.scanner.providers import (
     teamtailor_board,
 )
 from app.services.activity import record_activity
+from app.services.import_rules import FilteredJobError
 from app.services.job_service import DeletedJobError, JobInput, ingest_job
 
 logger = logging.getLogger(__name__)
@@ -256,6 +257,9 @@ def _run_scan(db: Session, company_ids: list[int] | None, trigger: str, http: Ht
                     stats["updated"] += 1
             except DeletedJobError:
                 stats["skipped"]["deleted"] = stats["skipped"].get("deleted", 0) + 1
+            except FilteredJobError:
+                stats["skipped"]["import_rules"] = stats["skipped"].get("import_rules", 0) + 1
+                row["filtered"] = row.get("filtered", 0) + 1
             except Exception as exc:  # noqa: BLE001 - one bad posting must not stop the scan
                 logger.warning("scanned job failed", extra={"url": job.url, "error": str(exc)})
         stats["kept"] += len(res.jobs)

@@ -266,6 +266,18 @@ Conventions:
   previous]: the cases a rate or median rests on. Names: overview, pipeline, jobs, market,
   applications, interviews, offers, companies, sources, followups, skills, activity, scans.
 
+### import rules
+- `GET /api/v1/import-rules` — `rules` (`enabled`, `required_skills`, `ignored_skills`,
+  `required_roles`, `ignored_roles`, `keep_without_description`, `sources`) and `sources`
+  (origin → name: scan, career_ops, sheet, import, agent, manual). Change them with
+  `PATCH /api/v1/settings/app {"import_rules": {...}}`.
+- `POST /api/v1/import-rules/check {title, description?, rules?}` — would this job be saved
+  (`saved`, `reason`, `found_skills`, `found_ignored_skills`, `found_roles`,
+  `found_ignored_roles`)? `rules` tests unsaved rules; nothing is saved.
+- A new job that breaks a rule is not saved: `POST /jobs` (when `manual` is a source) returns
+  422 `job_filtered`; agent-import rows get `result: "filtered"`; file / sheet / Career-Ops
+  imports count `filtered_skipped`; scans count `skipped.import_rules`.
+
 ### career-ops
 - `GET /api/v1/career-ops/status` — includes `automation` (`schedule_hours`, `auto_import`, `next_scan_at`); change it with `PATCH /api/v1/settings/app {"career_ops": {"schedule_hours": 24, "auto_import": true}}`
 - `POST /api/v1/career-ops/import`

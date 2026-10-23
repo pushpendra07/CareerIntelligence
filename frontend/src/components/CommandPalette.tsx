@@ -23,7 +23,7 @@ export const GO_KEYS: Record<string, { to: string; label: string }> = {
   j: { to: "/jobs", label: "All jobs" },
   r: { to: "/jobs/review", label: "Review new jobs" },
   c: { to: "/companies", label: "Companies" },
-  p: { to: "/applications/board", label: "Pipeline board" },
+  p: { to: "/applications/board", label: "Pipeline" },
   f: { to: "/followups", label: "Follow-ups" },
   i: { to: "/reports", label: "Reports" },
   m: { to: "/profile", label: "My profile" },

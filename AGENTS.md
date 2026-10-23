@@ -461,6 +461,11 @@ Never insert `Job` rows directly. Jobs saved twice before the rules caught them:
 `GET /jobs/duplicates`, `POST /jobs/duplicates/merge` (UI: Jobs → "N duplicates",
 `/jobs/duplicates`); the copy kept is the one with the furthest status.
 
+- **Import rules** (Settings → Import rules, `services/import_rules.py`, app settings
+  `import_rules`): before a **new** job is created, `ingest_job` checks required / ignored skills
+  (title + JD + sent skills) and required / ignored roles (title) for the origins in `sources`;
+  a failure raises `FilteredJobError` (a `DomainValidationError`, code `job_filtered`), which
+  importers count as skipped. Existing jobs are still merged. New import paths must catch it.
 - `JobInput.origin`: `manual` | `import` | `career_ops` | `scan`. Only `manual` may re-add a
   job the user deleted (`DeletedJob` tombstones); other origins raise `DeletedJobError`, which
   importers count as skipped.

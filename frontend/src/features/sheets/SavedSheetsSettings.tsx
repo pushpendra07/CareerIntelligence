@@ -4,7 +4,7 @@ import { ApiError, api, errorMessage } from "../../api/client";
 import { Card, Empty, ErrorBox, Spinner } from "../../components/ui";
 import { formatDateTime } from "../../utils/format";
 
-interface TabResult { tab: string; kind: string | null; read?: number; created?: number; merged?: number; deleted_skipped?: number; error?: string }
+interface TabResult { tab: string; kind: string | null; read?: number; created?: number; merged?: number; deleted_skipped?: number; filtered_skipped?: number; error?: string }
 export interface SavedSheet {
   id: number;
   url: string;
@@ -67,7 +67,7 @@ function SheetRow({ sheet }: { sheet: SavedSheet }) {
               : "Not imported yet"}
           </p>
           {r && r.tabs.length > 1 && (
-            <p className="text-xs text-slate-500">{r.tabs.map((t) => `${t.tab || "sheet"}: ${t.created ?? 0} new / ${t.merged ?? 0} existing`).join(" · ")}</p>
+            <p className="text-xs text-slate-500">{r.tabs.map((t) => `${t.tab || "sheet"}: ${t.created ?? 0} new / ${t.merged ?? 0} existing${t.filtered_skipped ? ` / ${t.filtered_skipped} skipped by import rules` : ""}`).join(" · ")}</p>
           )}
         </div>
         <div className="flex items-center gap-2">

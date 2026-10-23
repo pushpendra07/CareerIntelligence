@@ -141,6 +141,8 @@ CV ─▶ Professional Profile ─▶ Target Profile
 <tr><td valign="top">
 
 ### 📬 Pipeline
+- **Pipeline list**: every application with stage tabs and counts, a status menu and
+  **Next stage →** in each row, and status changes for several at once.
 - **Applications**: CV version, method, recruiter, referral, expected CTC, notice period,
   and a full event history. A **follow-up is created automatically** 7 days after applying.
 - **Recruiter CRM**: contact status (Contacted, Replied, Interested…) and follow-up dates.
@@ -282,14 +284,16 @@ Career Intelligence is running
 1. **CVs** → upload your CV → **Merge into profile**.
 2. **Profile** and **Target Profile** → review them and set your **salary targets** (salary is
    scored as "unknown" until you do).
+3. *(Optional)* **Settings → Import rules**: skills a job must have (e.g. PHP, Magento), skills
+   and roles to ignore — new jobs from any source that break them are not saved.
 3. **Settings → Job board search → Search now** to search the job boards of companies marked
    *Job search* (and **Find job boards** to discover boards for companies that only have a careers page).
-4. **Settings → Job sources → Chrome extension → Download**, install it (Load unpacked), then click
+5. **Settings → Job sources → Chrome extension → Download**, install it (Load unpacked), then click
    it on any LinkedIn / Naukri / careers-page job to add it. Or use **Add Job** (paste URL + description).
-5. *(Optional)* **Jobs → AI search** to search portals with the Job collector, Claude or Gemini.
-6. *(Optional)* **Settings → Career-Ops → Import now** (or *Run automatically*) to pull in jobs that
+6. *(Optional)* **Jobs → AI search** to search portals with the Job collector, Claude or Gemini.
+7. *(Optional)* **Settings → Career-Ops → Import now** (or *Run automatically*) to pull in jobs that
    [Career-Ops](https://github.com/career-ops-hq/career-ops) has found.
-7. **Today** → work through **Today's Priorities**, or ask the **Assistant** (⌘J) *“what should I apply to today?”*
+8. **Today** → work through **Today's Priorities**, or ask the **Assistant** (⌘J) *“what should I apply to today?”*
 
 <details>
 <summary><b>Optional: bulk-import companies from your own research files</b></summary>

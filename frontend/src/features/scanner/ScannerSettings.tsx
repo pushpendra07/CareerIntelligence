@@ -57,6 +57,7 @@ const LISTS: [keyof ScannerConfig, string, string][] = [
 const SKIP_LABELS: Record<string, string> = {
   title: "title not relevant", excluded_title: "excluded title", location: "location",
   too_old: "too old", jd_keywords: "stack not in JD", over_limit: "over per-company limit",
+  import_rules: "by your import rules",
 };
 
 export function num(v: unknown): number {

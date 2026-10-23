@@ -72,6 +72,7 @@ def _import_tab(db: Session, label: str, rows: list[dict[str, Any]]) -> dict[str
         stats = data_io.import_jobs(db, rows, label, origin="sheet")
         return {"kind": kind, "read": stats["read"], "created": stats["created"],
                 "merged": stats["merged"], "deleted_skipped": stats.get("deleted_skipped", 0),
+                "filtered_skipped": stats.get("filtered_skipped", 0),
                 "errors": len(stats["errors"])}
     summary = import_records(db, records_from_rows(rows, "google_sheet"), "google_sheet")
     return {"kind": kind, "read": summary.read, "created": summary.created,

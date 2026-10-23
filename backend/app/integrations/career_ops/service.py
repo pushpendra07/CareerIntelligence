@@ -30,6 +30,7 @@ from app.integrations.career_ops import readers, runner
 from app.models.career_ops import CareerOpsImport
 from app.models.job import Job, JobStatus
 from app.services.activity import record_activity
+from app.services.import_rules import FilteredJobError
 from app.services.job_service import DeletedJobError, JobInput, ingest_job
 
 logger = logging.getLogger(__name__)
@@ -328,6 +329,8 @@ def import_from_career_ops(
                 touched.append(job.id)
         except DeletedJobError:
             stats["deleted_skipped"] = stats.get("deleted_skipped", 0) + 1
+        except FilteredJobError:
+            stats["filtered_skipped"] = stats.get("filtered_skipped", 0) + 1
         except Exception as exc:  # noqa: BLE001 - one bad record must not stop the import
             logger.exception("career-ops record failed", extra={"url": rec.url})
             errors.append({"url": rec.url, "error": str(exc)})

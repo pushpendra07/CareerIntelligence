@@ -52,6 +52,7 @@ export const routes: RouteObject[] = [
       { path: "settings", ...page(() => import("../features/settings/SettingsPage"), (m) => m.SettingsPage) },
       { path: "settings/scoring", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="scoring" />) },
       { path: "settings/data", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="data" />) },
+      { path: "settings/import-rules", ...page(() => import("../features/settings/ImportRulesSettings"), (m) => m.ImportRulesSettings) },
       { path: "settings/reminders", ...page(() => import("../features/settings/ReminderSettings"), (m) => m.ReminderSettings) },
       { path: "settings/email", ...page(() => import("../features/email/EmailUpdates"), (m) => m.EmailSettings) },
       { path: "settings/about", ...page(() => import("../features/settings/SettingsPage"), (m) => () => <m.SettingsPage view="about" />) },

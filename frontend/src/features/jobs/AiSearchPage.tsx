@@ -14,7 +14,7 @@ export type Preferences = {
 };
 
 type RowResult = {
-  index: number; result: "new" | "duplicate" | "repeat" | "deleted" | "invalid"; title?: string; company?: string; url?: string | null;
+  index: number; result: "new" | "duplicate" | "repeat" | "deleted" | "filtered" | "invalid"; title?: string; company?: string; url?: string | null;
   has_description?: boolean; job_id?: number | null; matched_by?: string | null; existing_title?: string; existing_status?: string;
   same_as?: number; error?: string;
 };
@@ -77,7 +77,7 @@ function CopyButton({ text }: { text: string }) {
 
 const RESULT: Record<RowResult["result"], { label: string; tone: "green" | "gray" | "amber" | "red" | "blue" }> = {
   new: { label: "New", tone: "green" }, duplicate: { label: "Already in the app", tone: "gray" }, repeat: { label: "Repeated in the list", tone: "gray" },
-  deleted: { label: "You deleted it before", tone: "amber" }, invalid: { label: "Can't add", tone: "red" },
+  deleted: { label: "You deleted it before", tone: "amber" }, filtered: { label: "Not allowed by your import rules", tone: "amber" }, invalid: { label: "Can't add", tone: "red" },
 };
 
 function parseJobs(text: string): unknown[] | string {

@@ -91,7 +91,7 @@ function Intro({ onStart }: { onStart: () => void }) {
   const points = [
     ["Every job in one place", "Company job boards, Google Sheets, files and jobs you paste in, without duplicates."],
     ["A clear 0–100 match score", "Each job is scored against your CV and what you want, with the reasons."],
-    ["Never miss a step", "Pipeline board, follow-up reminders, interview prep, offers and weekly goals."],
+    ["Never miss a step", "Pipeline of every application, follow-up reminders, interview prep, offers and weekly goals."],
     ["Your data stays yours", "Runs on your computer, with automatic backups. No account, no tracking."],
   ];
   return (

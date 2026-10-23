@@ -212,6 +212,17 @@ Jobs saved twice earlier show as **N duplicates** on the Jobs page; open it to m
 | **CSV / JSON** | Settings → Backup & import → Import a file | One-off lists |
 | **Career-Ops** (optional) | Settings → Career-Ops → **Scan + import** / **Import now**, or automatically (*Run automatically*: every N hours, and import as soon as Career-Ops finds something new) — set up once with `./scripts/setup-career-ops.sh` | Career-Ops' own company list in `career-ops/portals.yml` (no AI, no tokens) |
 
+**Import rules** (Settings → Import rules) decide which new jobs any source may save — tick
+*Use import rules*, then add or remove (× on a chip) **skills a job must have** (e.g. PHP,
+Magento, Magento 2, Adobe Commerce: the title or description must mention at least one),
+**skills to ignore** (e.g. Java: a job mentioning one is not saved), **roles to keep** (the title
+must contain one; empty = any) and **roles to ignore** (e.g. Intern). Whole words, any case
+("Java" ≠ "JavaScript", "Magento 2" = "Magento2"); ignore rules win. Choose which sources the
+rules apply to (all but Add Job by default) and whether jobs with no description yet are kept.
+*Test a job against these rules* shows the decision before you save. Skipped jobs are counted
+in each import's result ("N skipped by import rules"); jobs already in the app are never
+removed or blocked.
+
 Job board search setup (once): Settings → Job board search → *What to keep*:
 titles to keep (e.g. magento, adobe commerce, php), generic titles that need your stack in the
 description, titles to skip (intern, sales…), locations to keep (india, remote, your cities) and
@@ -387,22 +398,25 @@ follow-ups, since that's usually catching up on old ones.
 On an application: update its status (Applied → Screening → Interview → Offer / Rejected /
 Withdrawn), see its **History**, and add **follow-ups** (reminders). The Applications list's
 **Follow-up** column shows the next open follow-up from the Follow-ups list (red with "· due" when
-it's today or late; click it to open Follow-ups); the Board uses the same date.
+it's today or late; click it to open Follow-ups); the Pipeline page uses the same date.
 
-**Pipeline → Board** (the Pipeline menu opens it): every application as a card in its stage's
-column — Applied · Recruiter contacted · Screening · Interview · Interview done – no reply ·
-Offer · Accepted · Rejected; On hold / Withdrawn / Closed sit underneath. **Drag a card** to
-another column (or use its **Move to…** menu) when something happens: the job's status and
-follow-ups update with it. Cards show the score, days since applying, a late follow-up in red,
-"No update in 14+ days", and "date approximate" for applications recorded automatically; a red
-(follow-up late) or amber (quiet) stripe marks cards that need you. **Next stage →** on a card
-moves it one column on in one click.
+**Pipeline** (the Pipeline menu opens it): every application in one list, with **stage tabs
+grouped like the Jobs page** — *Everything* (All open · All), *Waiting* (Applied · Recruiter
+contacted · Screening · On hold), *Interviews* (Interview · Interview done – no reply), *Offers*
+(Offer · Accepted) and *Finished* (Rejected · Withdrawn · Closed), each with its count. Each row
+has the job and company, a **Status** menu (change it there when something happens: the job's
+status and follow-ups update with it), **Next stage →** (one click on), days since applying
+("date approximate" for applications recorded automatically), the next follow-up (red when
+late), the last update ("No update in 14+ days") and the score; a red (follow-up late) or amber
+(quiet) bar on the left marks rows that need you. Tick rows (or **Select all on this page**) and
+use **Set status to… → Update** to change several at once. Long lists are split into pages
+(rows per page at the bottom, remembered in this browser).
 
-Above the board, the **funnel** shows how many applications got a reply, an interview and an
+Above the list, the **funnel** shows how many applications got a reply, an interview and an
 offer (with %; a rejected application still counts for the stage it reached), and **Needs
-attention** (click it to show only those cards). The toolbar searches a job or company, sorts
-cards (newest, best match, waiting longest), shows **Needs attention only** and can **Hide
-accepted & rejected**; these choices are remembered in this browser.
+attention** (click it to show only those rows). The toolbar searches a job or company, sorts
+(newest, best match, waiting longest), and shows **Needs attention only**; these choices and the stage tab are remembered in this
+browser.
 
 ## 9. Interviews, prep and the question bank
 
@@ -563,6 +577,7 @@ Settings has these tabs (plus **Reminders** and **Email** — connect your inbox
 | Tab | What's there |
 |---|---|
 | **Job sources** | An overview of every job source (set up? last run?), then: **Job board search** — *Search every company* switch, Search now, Find job boards, coverage, last run details, filters and schedule; **Google Sheets** — saved sheets, Import, a *Private — can't import* badge and fixes, private-sheet connection (service account); **Career-Ops** (optional) — Import now, Scan + import, *Run automatically* (Scan + import every N hours; import when its files change), *What Career-Ops searches* (its companies and filters, read-only) |
+| **Import rules** | Which new jobs any source may save: skills a job must have, skills to ignore, roles to keep, roles to ignore, which sources they apply to, jobs without a description, and a tester |
 | **Scoring** | What each part of the 0–100 score looks at, their weights (must total 100), the score each recommendation label needs, and (Advanced) company-tier points and deal-breakers. Save re-scores every job; Undo changes discards edits |
 | **Backup & import** | Download a full JSON backup or any list as CSV; import jobs or recruiters from a CSV/JSON file |
 | **About & AI** | Whether optional AI is on and how to turn it on; versions, Google account, Career-Ops path, storage |
@@ -619,7 +634,7 @@ Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI
   page, run an action (add a job, scan job boards, back up now, import a file) or open a job or
   company by name. `↑`/`↓` to choose, `Enter` to open, `Esc` to close.
 - **Shortcuts** (not while typing in a field): `/` search everything · `C` add a job ·
-  `G` then `T` Today, `J` jobs, `R` review new, `C` companies, `P` pipeline board, `F` follow-ups,
+  `G` then `T` Today, `J` jobs, `R` review new, `C` companies, `P` pipeline, `F` follow-ups,
   `I` reports, `M` my profile, `,` settings · `?` shows them all.
 - **Notifications:** the 🔔 bell at the top right lists what needs you now, grouped (and
   filterable): interviews coming up, follow-ups due or late, jobs shortlisted but not applied to
@@ -645,6 +660,6 @@ Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI
 - **Messages:** saving a job, changing a status, applying or backing up shows a short message at
   the bottom of the screen; failed one-click actions show the error there too.
 - **Phone:** the menu opens from ☰ (the theme switch is at its bottom); job lists show one card
-  per job instead of a table; wide tables and the Pipeline board scroll sideways.
+  per job instead of a table; wide tables (the Pipeline list too) scroll sideways.
 - **Install as an app:** in Chrome or Edge, use *Install Career Intelligence* in the address bar
   (or ⋮ → *Cast, save and share → Install page as app*) to open it in its own window.

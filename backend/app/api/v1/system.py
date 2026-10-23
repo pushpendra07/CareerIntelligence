@@ -19,6 +19,7 @@ from app.services import (
     email_updates,
     extension_package,
     goals_service,
+    import_rules,
 )
 from app.services.job_service import get_job
 from app.skills.catalog import CATALOG_VERSION
@@ -81,6 +82,7 @@ DEFAULT_APP_SETTINGS: dict[str, Any] = {
     "career_ops": career_ops.DEFAULT_SETTINGS,  # automatic Scan + import / import on change
     "assistant": chat_service.DEFAULT_SETTINGS,  # the Assistant chat on/off, AI on/off
     "email": email_updates.DEFAULTS,  # checking the inbox for job-search emails (Settings -> Email)
+    "import_rules": import_rules.DEFAULTS,  # which new jobs may be saved (Settings -> Import rules)
 }
 
 
@@ -121,9 +123,31 @@ def patch_app_settings(db: DB, body: dict[str, Any]) -> dict[str, Any]:
         merged["career_ops"] = career_ops.validate_settings(merged["career_ops"])
     if "email" in body:
         merged["email"] = email_updates.validate_settings(merged["email"])
+    if "import_rules" in body:
+        merged["import_rules"] = import_rules.validate_settings(merged["import_rules"])
     row.data = merged
     db.commit()
     return {**DEFAULT_APP_SETTINGS, **row.data}
+
+
+class RuleCheckIn(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    description: str = Field(default="", max_length=200_000)
+    rules: dict[str, Any] | None = None  # unsaved rules from the form; default: the saved ones
+
+
+@router.get("/import-rules")
+def get_import_rules(db: DB) -> dict[str, Any]:
+    """The saved rules, and the sources they can apply to."""
+    return {"rules": import_rules.get_rules(db), "sources": import_rules.SOURCES}
+
+
+@router.post("/import-rules/check")
+def check_import_rules(db: DB, body: RuleCheckIn) -> dict[str, Any]:
+    """Would a job with this title and description be saved? Nothing is saved."""
+    rules = (import_rules.validate_settings(body.rules) if body.rules is not None
+             else import_rules.get_rules(db))
+    return import_rules.explain(rules, body.title, body.description)
 
 
 @router.get("/extension.zip")

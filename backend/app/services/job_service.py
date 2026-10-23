@@ -38,6 +38,7 @@ from app.jobs.jd_parser import (
 )
 from app.models.company import Company, Contact
 from app.models.job import DeletedJob, Job, JobComment, JobSourceLink, JobStatus, WorkModel
+from app.services import import_rules
 from app.services.activity import record_activity
 from app.services.company_service import find_or_create_by_name
 from app.services.contact_extraction import link_job_contacts
@@ -547,6 +548,11 @@ def ingest_job(
         )
         result = IngestResult(job, created=False, matched_by=matched_by)
     else:
+        rules = import_rules.get_rules(db)
+        if import_rules.applies(rules, data.origin):  # Settings → Import rules; new jobs only
+            skills = [*(data.required_skills or []), *(data.preferred_skills or [])]
+            if reason := import_rules.check(rules, title, data.jd_text, skills):
+                raise import_rules.FilteredJobError(reason)
         job = Job(
             company=company,
             company_id=company.id,

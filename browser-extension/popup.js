@@ -39,6 +39,9 @@ async function save(job, opts = {}) {
   } else if (r.result === "deleted") {
     show(`<h2 class="warn">You deleted this job before</h2>${head}<button id="anyway">Add it anyway</button>`);
     document.getElementById("anyway").onclick = () => save(job, { allow_deleted: true });
+  } else if (r.result === "filtered") {
+    show(`<h2 class="warn">Not added: ${esc(r.error || "it doesn't match your import rules")}</h2>${head}
+      <p class="muted">Change the rules in the app: Settings → Import rules.</p>`);
   } else {
     form(job, r.error || "Some details are missing.");
   }

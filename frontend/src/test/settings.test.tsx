@@ -35,7 +35,7 @@ describe("settings", () => {
     expect(await screen.findByText("152 companies searched")).toBeInTheDocument();
     expect(await screen.findByText("1 saved · private sheets connected")).toBeInTheDocument();
     expect(await screen.findByText("Not set up (optional)")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Add Job by hand/ })).toHaveAttribute("href", "/jobs/new");
+    expect(screen.queryByRole("link", { name: /Add Job by hand/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Download extension (.zip)" })).toHaveAttribute("href", expect.stringContaining("/api/v1/extension.zip?app="));
     expect(screen.getByText("Not installed in this browser.")).toBeInTheDocument();
     // Removed: the one-off sheet import (Google Sheets card does it) and notification options that did nothing.

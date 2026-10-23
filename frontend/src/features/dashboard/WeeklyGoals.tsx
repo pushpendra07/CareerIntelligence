@@ -26,7 +26,7 @@ function GoalRow({ g, daysLeft }: { g: Goal; daysLeft: number }) {
         <span className="text-slate-400"> · last week {g.last_week}</span>
       </div>
       {!!g.approximate && (
-        <div className="text-xs text-amber-700" title="Recorded when a job was set to Applied (e.g. by a sheet import), so the date may not be when you applied. Open them on the Pipeline board to set the real date.">
+        <div className="text-xs text-amber-700" title="Recorded when a job was set to Applied (e.g. by a sheet import), so the date may not be when you applied. Open them on the Pipeline page to set the real date.">
           incl. {g.approximate} recorded automatically · dates approximate
         </div>
       )}

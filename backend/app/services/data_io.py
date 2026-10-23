@@ -23,6 +23,7 @@ from app.models.offer import Offer
 from app.services.activity import record_activity
 from app.services.company_service import export_rows as company_rows
 from app.services.company_service import save_contact, to_csv
+from app.services.import_rules import FilteredJobError
 from app.services.job_service import DeletedJobError, JobInput, ingest_job
 
 
@@ -452,6 +453,8 @@ def import_jobs(
             ids.append(result.job.id)
         except DeletedJobError:
             stats["deleted_skipped"] = stats.get("deleted_skipped", 0) + 1
+        except FilteredJobError:
+            stats["filtered_skipped"] = stats.get("filtered_skipped", 0) + 1
         except Exception as exc:  # noqa: BLE001 - report per-row errors, keep going
             stats["errors"].append({"row": n, "error": str(exc)[:300]})
     db.commit()
