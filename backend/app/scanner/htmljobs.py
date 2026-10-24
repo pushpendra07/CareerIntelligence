@@ -6,7 +6,8 @@ Two shapes are common on small companies' sites:
 
 Only text that reads like a job title counts; services pages ("Hire Magento Developers"),
 blog posts and menu items are left out. Whatever is found still goes through the scanner's
-title, location and age filters. No AI, no guessing beyond what the page shows.
+title, location and age filters. No AI, no guessing beyond what the page shows. Openings the
+page marks as closed ("Position - Currently Closed", "Filled") are left out.
 """
 
 import re
@@ -36,6 +37,10 @@ NOT_A_JOB_RE = re.compile(
 JOB_PATH_RE = re.compile(
     r"/(?:jobs?|careers?|openings?|current-openings|positions?|vacanc(?:y|ies)|"
     r"opportunit(?:y|ies)|job-details?|jobdetails)/", re.IGNORECASE)
+# A badge or note saying the opening is no longer open (misspellings seen on real pages).
+CLOSED_RE = re.compile(
+    r"\b(?:curr?u?e?n(?:t|tl)y\s+)?closed\b|\bposition\s+(?:is\s+)?filled\b|\bfilled\b|"
+    r"\bexpired\b|\bno longer (?:open|available|accepting)\b|\bnot hiring\b", re.IGNORECASE)
 SKIP_EXT_RE = re.compile(r"\.(pdf|jpe?g|png|svg|gif|css|js|zip|docx?)$", re.IGNORECASE)
 
 
@@ -53,13 +58,21 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60]
 
 
+def is_closed(text: str) -> bool:
+    return bool(CLOSED_RE.search(text))
+
+
 def job_links(html: str, page_url: str, limit: int = 40) -> list[tuple[str, str]]:
-    """(title, url) for links on the same site whose text is a job title."""
+    """(title, url) for links on the same site whose text is a job title. A card-style link
+    (heading + badges + city) is titled by its heading; one marked closed is skipped."""
     host = urlsplit(page_url).hostname or ""
     site = ".".join(host.split(".")[-2:])
     out: dict[str, str] = {}
     for href, inner in ANCHOR_RE.findall(html or ""):
-        title = _clean(inner)
+        if is_closed(_clean(inner)):
+            continue
+        heading = HEADING_RE.search(inner)
+        title = _clean(heading.group(2) if heading else inner)
         if not looks_like_job_title(title):
             continue
         url = urljoin(page_url, href.strip())
@@ -89,8 +102,11 @@ def job_headings(html: str, page_url: str, limit: int = 40) -> list[dict[str, st
             continue
         seen.add(title.lower())
         end = matches[i + 1].start() if i + 1 < len(matches) else min(len(html), m.end() + 6000)
+        description = html_to_text(html[m.end():end])[:6000]
+        if is_closed(title) or is_closed(description[:120]):  # "Closed" badge next to it
+            continue
         out.append({"title": title, "url": f"{base}#job/{_slug(title)}",
-                    "description": html_to_text(html[m.end():end])[:6000]})
+                    "description": description})
         if len(out) >= limit:
             break
     return out

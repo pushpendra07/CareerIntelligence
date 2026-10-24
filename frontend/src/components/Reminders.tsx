@@ -25,6 +25,8 @@ const SENT = "reminders.sent.v1";
 const NEW_JOBS = "reminders.newJobs.v1"; // new-job count last seen, to notify when a scan adds more
 const SEEN = "bell.seen.v1"; // notifications already seen in the bell
 const LAST_EVENT = "reminders.lastEvent.v1"; // last scheduled reminder shown in this browser
+const SHOWN = "reminders.shown.v1"; // notification key → when a tab of this browser showed it
+const LOCK = "career-intelligence.notifications"; // held by the one tab that sends notifications
 const ICON = "/icon-192.png";
 const TITLE = "Career Intelligence";
 const POLL_MS = 5 * 60_000;
@@ -72,7 +74,48 @@ export const useReminders = () => useQuery({ queryKey: ["reminders"], queryFn: (
 
 type Summary = { new_jobs?: number; new_70_plus?: number } | undefined;
 
+/**
+ * True the first time any tab of this browser asks for `key` (in the last 24 hours), so a
+ * notification is shown once however many tabs of the app are open.
+ */
+export function claimNote(key: string, now = Date.now()): boolean {
+  let shown: Record<string, number> = {};
+  try { shown = JSON.parse(read(SHOWN) ?? "{}") as Record<string, number>; } catch { /* start again */ }
+  const fresh = Object.fromEntries(Object.entries(shown).filter(([, t]) => now - t < 86_400_000));
+  if (key in fresh) return false;
+  fresh[key] = now;
+  write(SHOWN, JSON.stringify(fresh));
+  return true;
+}
+
+let notifierTab = false;
+let lockRequested = false;
+const notifierListeners = new Set<(on: boolean) => void>();
+const setNotifierTab = () => { notifierTab = true; notifierListeners.forEach((f) => f(true)); };
+
+/**
+ * Whether this tab is the one that sends browser notifications: the first open tab holds a
+ * Web Lock until it closes, then the next tab takes over. Without Web Locks every tab may
+ * send, and `claimNote` keeps it to one.
+ */
+export function useNotifierTab(): boolean {
+  const [on, setOn] = useState(notifierTab);
+  useEffect(() => {
+    notifierListeners.add(setOn);
+    if (!lockRequested) {
+      lockRequested = true;
+      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+      if (!locks) setNotifierTab();
+      else locks.request(LOCK, () => { setNotifierTab(); return new Promise<void>(() => {}); }).catch(setNotifierTab);
+    }
+    setOn(notifierTab);
+    return () => { notifierListeners.delete(setOn); };
+  }, []);
+  return on;
+}
+
 function notify(n: Note, navigate: (to: string) => void) {
+  if (!claimNote(n.key)) return; // another tab showed it
   const shown = new Notification(n.title, { body: n.body, tag: n.key, icon: ICON, badge: ICON });
   shown.onclick = () => { window.focus(); navigate(n.url); shown.close(); };
 }
@@ -81,7 +124,7 @@ function notify(n: Note, navigate: (to: string) => void) {
 export function newJobsNote(now: number, best: number, last: number | null): Note | null {
   if (last === null || now <= last) return null;
   const added = now - last;
-  return { key: `new:${now}`, title: `${added} new job${added === 1 ? "" : "s"} found`,
+  return { key: `new:${last}:${now}`, title: `${added} new job${added === 1 ? "" : "s"} found`,
     body: best ? `${best} new jobs score 70+. Review them now.` : "Review them when you have a minute.", url: "/jobs/review" };
 }
 
@@ -97,7 +140,8 @@ export function useUnreadBadge(unread: number) {
 /** Browser notifications while the app is open (when turned on in this browser). */
 export function useBrowserReminders(summary?: Summary) {
   const navigate = useNavigate();
-  const on = read(ENABLED) === "1" && supported() && Notification.permission === "granted";
+  const notifier = useNotifierTab();
+  const on = notifier && read(ENABLED) === "1" && supported() && Notification.permission === "granted";
   const q = useReminders();
   useEffect(() => {
     if (!on || !q.data) return;
@@ -108,12 +152,12 @@ export function useBrowserReminders(summary?: Summary) {
   }, [on, q.data, navigate]);
   const newJobs = summary?.new_jobs;
   useEffect(() => {
-    if (newJobs === undefined) return;
+    if (newJobs === undefined || !notifier) return; // the notifying tab keeps the count
     const last = read(NEW_JOBS);
     const note = newJobsNote(newJobs, summary?.new_70_plus ?? 0, last === null ? null : Number(last));
     if (on && note) notify(note, navigate);
     write(NEW_JOBS, String(newJobs));
-  }, [newJobs, summary?.new_70_plus, on, navigate]);
+  }, [newJobs, summary?.new_70_plus, notifier, on, navigate]);
 }
 
 export type BellKind = "interview" | "followup" | "apply" | "new" | "reminder";
@@ -183,10 +227,12 @@ export const useReminderEvents = () => useQuery({
 
 /**
  * Scheduled reminders, the moment they fire: a toast in the app and (when allowed) a browser
- * notification. The server keeps the schedule; every open tab only shows what's new.
+ * notification. The server keeps the schedule; every open tab shows the toast, only the
+ * notifying tab sends the notification.
  */
 export function useScheduledReminders(onNew: (e: ReminderEvent) => void) {
   const navigate = useNavigate();
+  const notifier = useNotifierTab();
   const q = useReminderEvents();
   const latest = useRef<number | null>(null);
   useEffect(() => {
@@ -197,13 +243,13 @@ export function useScheduledReminders(onNew: (e: ReminderEvent) => void) {
     const fresh = q.data.filter((e) => e.id > last).sort((a, b) => a.id - b.id);
     for (const e of fresh) {
       onNew(e);
-      if (read(ENABLED) === "1" && supported() && Notification.permission === "granted") {
+      if (notifier && read(ENABLED) === "1" && supported() && Notification.permission === "granted") {
         notify({ key: `rem:${e.id}`, title: e.title, body: e.body, url: e.url }, navigate);
       }
     }
     latest.current = Math.max(last, max);
     write(LAST_EVENT, String(latest.current));
-  }, [q.data, onNew, navigate]);
+  }, [q.data, onNew, notifier, navigate]);
 }
 
 /** The bell in the top bar: what needs you now, with details, and what you haven't read. */

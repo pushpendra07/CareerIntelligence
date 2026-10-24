@@ -143,10 +143,19 @@ def test_careers_page_listing_links_and_headings() -> None:
     assert htmljobs.job_links(links_page, "https://acme.example/careers") == [
         ("Senior Magento Developer", "https://acme.example/careers/senior-magento-developer")]
 
+    # Card links: titled by their heading; ones marked closed are left out.
+    cards = """<a href="/career/symfony-developer"><h4>Symfony Developer</h4>
+      <span>Postion - Curruntly Closed</span><div>Surat, Gujarat</div></a>
+      <a href="/career/seo-executive"><h4>SEO Executive</h4><div>Surat, Gujarat</div></a>
+      <a href="/career/php-lead">PHP Lead (Position filled)</a>"""
+    assert htmljobs.job_links(cards, "https://acme.example/career") == [
+        ("SEO Executive", "https://acme.example/career/seo-executive")]
+
     headings_page = """<h2>Why join us?</h2><p>Great team.</p>
       <h3>Laravel Developer (3-5 yrs, Jaipur)</h3><p>PHP, Laravel, MySQL. Mail hr@acme.example</p>
       <h3>Representative Office</h3><p>Dubai</p><h3>Connect to an expert</h3>
-      <h3>Software Tester</h3><p>Manual and Selenium.</p>"""
+      <h3>Software Tester</h3><p>Manual and Selenium.</p>
+      <h3>QA Lead</h3><p>Currently closed. Manual testing.</p>"""
     found = htmljobs.job_headings(headings_page, "https://acme.example/careers")
     assert [h["title"] for h in found] == ["Laravel Developer (3-5 yrs, Jaipur)", "Software Tester"]
     assert found[0]["url"] == "https://acme.example/careers#job/laravel-developer-3-5-yrs-jaipur"
