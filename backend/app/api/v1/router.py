@@ -6,6 +6,7 @@ from app.api.v1 import (
     applications,
     apply,
     auth,
+    calendar,
     career_ops,
     chat,
     companies,
@@ -48,5 +49,6 @@ api_router.include_router(setup.router)
 api_router.include_router(reminder_rules.router)
 api_router.include_router(sheets.router)
 api_router.include_router(advisor.router)
+api_router.include_router(calendar.router)
 api_router.include_router(chat.router)
 api_router.include_router(system.router)

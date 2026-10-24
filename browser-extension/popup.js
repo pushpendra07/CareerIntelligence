@@ -86,40 +86,34 @@ async function applyFlow(tab) {
   show(`<h2>Application form found</h2>
     ${job ? `<p>For <b>${esc(job.title)}</b><br><span class="muted">${esc(job.company)} · ${jobLink(appUrl, { job_id: job.id })}</span></p>`
       : '<p class="muted">This page isn\'t linked to a job in your list: your details and answers can still be filled in.</p>'}
+    <label class="check"><input type="checkbox" id="next-pages" checked> Keep filling the next pages of this form</label>
     <button id="fill">Fill this application</button>
     <button id="add-instead" class="secondary">Add this job instead</button>
-    <p class="muted">Only empty fields are filled. Nothing is submitted: you check the form and press Submit.</p>`);
+    <p class="muted">Your details come from the app: <a href="${esc(appUrl)}/apply-details" target="_blank" rel="noopener">My profile → Application details</a>.
+      Only empty fields are filled. Nothing is submitted: you check the form and press Submit.</p>`);
   document.getElementById("add-instead").onclick = () => addFlow(tab);
-  document.getElementById("fill").onclick = () => fill(tab, job);
+  document.getElementById("fill").onclick = () => {
+    // Next pages load fresh: the extension may fill them only with your OK for this site (asked
+    // once by Chrome). It must be asked straight from the click, before anything else.
+    const origin = new URL(tab.url).origin;
+    const ask = document.getElementById("next-pages").checked
+      ? chrome.permissions.request({ origins: [`${origin}/*`] }).catch(() => false) : Promise.resolve(false);
+    ask.then((nextPages) => fill(tab, job, nextPages));
+  };
 }
 
-async function fill(tab, job) {
+async function fill(tab, job, nextPages) {
   const { appUrl } = await ciSettings();
   show('<p class="muted">Filling…</p>');
-  let kit, file = null, fileError = "";
+  let kit, r, fileError;
   try {
-    kit = await ciApi(job ? `/jobs/${job.id}/apply-kit` : "/apply/kit");
+    ({ kit, result: r, fileError } = await ciFillTab(tab.id, job && job.id, true));
   } catch (e) {
-    return show(`<h2 class="bad">Couldn't get your details</h2><p>${esc(e.message)}</p>`);
+    return show(`<h2 class="bad">Couldn't fill the form</h2><p>${esc(e.message)}</p>`);
   }
-  if (kit.cv) {
-    try { file = await ciFileBase64(kit.cv.download); } catch (e) { fileError = e.message; }
+  if (nextPages) {
+    await chrome.runtime.sendMessage({ type: "follow-start", tabId: tab.id, origin: new URL(tab.url).origin, jobId: job ? job.id : null }).catch(() => {});
   }
-  const [res] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    args: [kit, file && file.b64, file && file.type, kit.cv && (kit.cv.filename || `${kit.cv.name}.pdf`)],
-    func: (k, b64, type, name) => {
-      let cv = null;
-      if (b64) {
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        cv = new File([bytes], name || "cv.pdf", { type });
-      }
-      return globalThis.ciAutofill.fill(k, cv);
-    },
-  });
-  const r = (res && res.result) || { filled: [], cvAttached: false, fileFieldFound: false };
   const fields = [...new Set(r.filled.filter((f) => f !== "CV"))];
   const cvLine = r.cvAttached ? '<p class="ok">✓ CV attached</p>'
     : r.fileFieldFound ? `<p class="warn">Attach your CV yourself${kit.cv ? `: <a href="${esc(appUrl)}${esc(kit.cv.download)}" target="_blank" rel="noopener">${esc(kit.cv.name)}</a>` : ""}${fileError ? ` (${esc(fileError)})` : ""}.</p>` : "";
@@ -128,6 +122,7 @@ async function fill(tab, job) {
     ${fields.length ? `<p class="muted">${esc(fields.join(", "))}</p>` : '<p class="muted">Copy from the Apply assistant on the job page instead.</p>'}
     ${cvLine}${missing}
     <p><b>Check every field</b> (filled ones are outlined green), answer the rest, then press Submit on the page.</p>
+    <p class="muted">${nextPages ? "The next pages of this form are filled too, until you press Stop on the page." : "New steps on this page are filled as they appear, until you press Stop on the page."}</p>
     ${job ? '<button id="record">I submitted it — record application</button>' : ""}`);
   if (job) document.getElementById("record").onclick = () => recordApplied(job, kit);
 }

@@ -21,6 +21,7 @@ import { JobContact } from "./JobContact";
 import { CvTailor } from "./CvTailor";
 import { ApplyAssistant } from "./ApplyAssistant";
 import { StickyBar, useScrolledPast } from "../../components/StickyBar";
+import { AddToCalendar } from "../../components/AddToCalendar";
 import { APPLIED_STATUSES, JobStatusOptions, NEW_STATUSES, PENDING_STATUSES } from "./JobsPage";
 
 const MATCH_TONE: Record<string, "green" | "blue" | "amber" | "red" | "gray"> = {
@@ -375,7 +376,8 @@ export function JobDetailPage() {
               <div className="mt-3 space-y-4 text-sm">
                 <KeyValue items={[
                   ["Employment", j.employment_type ?? "—"], ["Seniority", humanize(j.seniority)],
-                  ["Deadline", formatDate(j.application_deadline)], ["Added (exact time)", formatDateTime(j.created_at)],
+                  ["Deadline", j.application_deadline
+                    ? <span key="d">{formatDate(j.application_deadline)} <AddToCalendar kind="deadline" id={j.id} compact /></span> : "—"], ["Added (exact time)", formatDateTime(j.created_at)],
                 ]} />
                 <div><div className="label">Required skills</div><Chips items={j.required_skills} tone="indigo" /></div>
                 <div><div className="label">Preferred skills</div><Chips items={j.preferred_skills} /></div>

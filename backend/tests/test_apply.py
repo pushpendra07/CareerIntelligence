@@ -57,3 +57,32 @@ def test_lookup_finds_the_job_from_its_posting_or_its_form(client: TestClient) -
         assert r.status_code == 200 and r.json()["id"] == j["id"], url
     missing = client.get("/api/v1/apply/lookup", params={"url": "https://example.com/careers/1"})
     assert missing.status_code == 404
+
+
+def test_name_parts_address_and_your_message_to_the_recruiter(client: TestClient) -> None:
+    client.patch("/api/v1/profile", json={"full_name": "Asha Rani Verma",
+                                          "location": "Pune, India"})
+    you = client.get("/api/v1/apply/kit").json()["applicant"]
+    assert (you["first_name"], you["middle_name"], you["last_name"]) == ("Asha", "Rani", "Verma")
+
+    client.put("/api/v1/apply/answers", json={
+        "last_name": "Rani Verma", "date_of_birth": "1988-03-07", "linkedin": "https://www.linkedin.com/in/asha-rv",
+        "address_line1": "12 MG Road", "state": "Maharashtra",
+        "postal_code": "411001", "country": "India", "salary_negotiable": "Yes",
+        "recruiter_message": "Hi, I'd love to talk about the {title} role at {company}."})
+    kit = client.get("/api/v1/apply/kit").json()
+    you = kit["applicant"]
+    # A saved name part wins; the middle name isn't guessed once you've set your own.
+    assert (you["first_name"], you["middle_name"], you["last_name"]) == ("Asha", "", "Rani Verma")
+    assert you["linkedin"] == "https://www.linkedin.com/in/asha-rv"
+    assert "LinkedIn" not in kit["missing"] and you["date_of_birth"] == "1988-03-07"
+    bad = client.put("/api/v1/apply/answers", json={"date_of_birth": "7 March 1988"})
+    assert bad.status_code == 422  # saved as YYYY-MM-DD only
+    assert (you["address_line1"], you["city"], you["state"], you["postal_code"],
+            you["country"], you["salary_negotiable"]) == (
+        "12 MG Road", "Pune", "Maharashtra", "411001", "India", "Yes")
+    assert kit["cover_note"] == ""  # needs the job's title and company
+
+    j = job(client)
+    kit = client.get(f"/api/v1/jobs/{j['id']}/apply-kit").json()
+    assert kit["cover_note"] == "Hi, I'd love to talk about the Magento Lead role at Acme."

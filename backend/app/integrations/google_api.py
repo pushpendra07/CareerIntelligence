@@ -25,6 +25,8 @@ from app.core.http import FetchResult, safe_request
 
 SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly"
 TOKEN_URI = "https://oauth2.googleapis.com/token"  # noqa: S105 - a URL, not a secret
+# Older keys name the previous address of the same endpoint.
+GOOGLE_TOKEN_URIS = (TOKEN_URI, "https://accounts.google.com/o/oauth2/token")  # noqa: S105
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 DEFAULT_KEY_FILE = Path("secrets/google-service-account.json")
 
@@ -47,7 +49,11 @@ class ServiceAccount:
             raise SheetAccessError(f"Could not read the Google key file {path}: {exc}") from exc
         if info.get("type") != "service_account" or not info.get("private_key"):
             raise SheetAccessError(f"{path} is not a Google service-account key (JSON)")
-        return cls(info["client_email"], info["private_key"], info.get("token_uri") or TOKEN_URI)
+        # The key file's token_uri is only used if it is Google's: the request isn't SSRF-guarded.
+        uri = info.get("token_uri") or TOKEN_URI
+        if uri not in GOOGLE_TOKEN_URIS:
+            raise SheetAccessError(f"{path}: token_uri is not a Google address ({uri})")
+        return cls(info["client_email"], info["private_key"], uri)
 
 
 def key_file(configured: Path | None) -> Path | None:

@@ -194,3 +194,17 @@ def test_sheet_dates_reach_the_job(client: TestClient) -> None:
     [link] = client.get(f"/api/v1/jobs/{job_id}").json()["source_links"]
     assert link["imported"]["added_to_sheet"] == "2026-10-09"
     assert link["first_seen_at"] <= link["last_seen_at"]
+
+
+def test_a_key_file_with_a_non_google_token_address_is_refused(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import json
+
+    import pytest
+
+    from app.integrations.google_api import ServiceAccount, SheetAccessError
+    path = tmp_path / "sa.json"
+    path.write_text(json.dumps({"type": "service_account", "private_key": "x",
+                                "client_email": "a@b.iam.gserviceaccount.com",
+                                "token_uri": "http://169.254.169.254/token"}))
+    with pytest.raises(SheetAccessError, match="not a Google address"):
+        ServiceAccount.load(path)

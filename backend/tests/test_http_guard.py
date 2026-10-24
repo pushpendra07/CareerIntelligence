@@ -78,6 +78,15 @@ def test_check_host_returns_the_checked_addresses(monkeypatch: pytest.MonkeyPatc
         guard._check_host("https://a.example/")
 
 
+
+def test_only_web_ports_are_fetched(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(guard.socket, "getaddrinfo", fake_dns("93.184.216.34"))
+    assert guard._check_host("https://a.example:8443/jobs") == ["93.184.216.34"]
+    for url in ("http://a.example:22/", "http://a.example:25/", "https://a.example:99999/"):
+        with pytest.raises(guard.BlockedURLError):
+            guard._check_host(url)
+
+
 class FakeSocket:
     def setsockopt(self, *_: object) -> None:
         return None

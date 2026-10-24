@@ -92,6 +92,9 @@ Conventions:
   (kept as a source too; 422 for a search/listing page or a link that belongs to another job;
   `""` clears it)
 - `GET /api/v1/jobs/status-counts` (jobs per status for the same filters as `GET /jobs`)
+- `GET /api/v1/jobs/export?format=csv|json&with_description=&ids=` + the same filters and `sort`
+  as `GET /jobs` — every matching job (all pages) as a download; `ids` = only those jobs. CSV has
+  a UTF-8 mark for Excel; descriptions (`original_jd`) only with `with_description=true`
 - `GET /api/v1/jobs/fetch-descriptions` — open jobs still missing a description, and the latest run
 - `POST /api/v1/jobs/fetch-descriptions` `{"limit": 40, "min_score": 0}` — read missing
   descriptions from each job's link in the background, best scores first (one run at a time)
@@ -145,12 +148,15 @@ Conventions:
 - `GET /api/v1/settings/scoring/history`
 
 ### apply
-- `GET /api/v1/jobs/{job_id}/apply-kit` — what the application form asks for: `applicant` (name,
-  email, phone, LinkedIn, city, experience, current/expected CTC, notice period, relocation, work
+- `GET /api/v1/jobs/{job_id}/apply-kit` — what the application form asks for: `applicant` (full,
+  first, middle and last name, date of birth (YYYY-MM-DD), email, phone, LinkedIn, address line 1/2, city, state, postal code,
+  country, experience, current/expected CTC, salary negotiable, notice period, relocation, work
   authorisation, GitHub, portfolio), `labels`, `answers` (saved Q&A), `cv` (`download` path),
-  `cover_note`, `email` (`to, subject, body` when there's a contact) and `missing`. Nothing is sent.
+  `cover_note` (your saved `recruiter_message` with `{title}`/`{company}` filled in, else a draft
+  for the job), `email` (`to, subject, body` when there's a contact) and `missing`. Nothing is sent.
 - `GET /api/v1/apply/kit` — the same without a job · `GET/PUT /api/v1/apply/answers` — the saved
-  answers (app settings `apply`)
+  Application details (app settings `apply`; empty name parts, email, phone, LinkedIn and city come from the profile).
+  The Job collector extension reads these when it fills a form.
 - `GET /api/v1/apply/lookup?url=` — the job a posting or its application form (…/apply) belongs
   to, by link or the board's job ID; 404 if none
 - `POST /api/v1/jobs/{job_id}/applied` `{method?, cv_version_id?, note?}` — you submitted it:
@@ -222,6 +228,16 @@ Conventions:
   job board as a company with Job search on; per URL: `company_id, name, created, board` (null =
   not scannable yet) or `error`. At most 50.
 - `POST /api/v1/setup/complete` — setup finished (or skipped); it doesn't open again.
+
+### calendar
+- `GET /api/v1/calendar/{interview|followup|offer|deadline}/{id}.ics` — one event as an .ics file
+  (interviews with a 30-minute alarm; follow-ups, offer expiry / joining, apply-by as all-day)
+- `GET /api/v1/calendar/{kind}/{id}/google` — 307 to Google Calendar's new-event page, filled in
+- `GET /api/v1/calendar/feed` → `{enabled, path}` · `POST /api/v1/calendar/feed[?new_link=true]`
+  turns the feed on (or replaces its link) · `DELETE /api/v1/calendar/feed` turns it off
+- `GET /api/v1/calendar/feed.ics?token=` — the subscription feed (no login; 404 without the right
+  key): scheduled interviews, open follow-ups, offer dates and apply-by dates of jobs not applied
+  to, from 30 days ago on. Key in `backend/secrets/calendar-feed.json` (0600), never in backups
 
 ### scheduled reminders
 - `GET /api/v1/reminder-rules` → `{desktop, desktop_available, rules: [{id, kind (check_portals |
@@ -333,6 +349,10 @@ Read-only adapter for an AI Job Search checkout (`AI_JOB_SEARCH_PATH`, default `
 ### cv-advice
 - `GET /api/v1/cv-advice` (skills to add to the CV; skills you lack — from open jobs' match results)
 - `POST /api/v1/cv-advice/skills/{action}` (`add-to-profile` | `add-to-search` | `hide` | `unhide`, body `{"skill"}`)
+- `GET /api/v1/cv-advice/roadmap` — skill roadmap (read-only): each of the 25 most-asked missing
+  skills tried on your open jobs by the scoring engine (`new_good`: jobs reaching the Scoring
+  "recommended" threshold, `jobs_raised`, `avg_gain`, `strong_share`, `close_to`, `examples`), and
+  `roadmap`: up to 6 steps, each the skill adding the most good jobs on top of the earlier steps
 
 ### system
 - `GET /api/v1/ai/status`

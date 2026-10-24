@@ -38,9 +38,13 @@ class AccountUpdate(BaseModel):
 
 def _client(request: Request) -> str:
     # Through a Cloudflare tunnel every request comes from 127.0.0.1; Cloudflare names the
-    # real visitor in CF-Connecting-IP (it overwrites any value the visitor sends).
-    return request.headers.get("cf-connecting-ip") or (
-        request.client.host if request.client else "?")
+    # real visitor in CF-Connecting-IP (it overwrites any value the visitor sends). Only
+    # trusted from this machine: anyone reaching the app directly could set it freely and get
+    # a fresh lockout counter on every guess.
+    peer = request.client.host if request.client else "?"
+    if peer in ("127.0.0.1", "::1", "localhost"):
+        return request.headers.get("cf-connecting-ip") or peer
+    return peer
 
 
 def _logged_in(account: auth.Account, request: Request, body: dict[str, Any],

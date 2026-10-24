@@ -17,6 +17,21 @@ class AnswerIn(BaseModel):
 
 
 class ApplyAnswersIn(BaseModel):
+    first_name: str = ""
+    middle_name: str = ""
+    last_name: str = ""
+    date_of_birth: str = Field(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$")  # YYYY-MM-DD
+    email: str = ""
+    phone: str = ""
+    linkedin: str = ""
+    address_line1: str = ""
+    address_line2: str = ""
+    city: str = ""
+    state: str = ""
+    postal_code: str = ""
+    country: str = ""
+    salary_negotiable: str = ""
+    recruiter_message: str = Field(default="", max_length=5000)
     current_ctc: str = ""
     expected_ctc: str = ""
     notice_period: str = ""

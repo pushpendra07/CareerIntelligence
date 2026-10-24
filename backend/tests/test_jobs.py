@@ -770,6 +770,7 @@ def test_extension_adds_one_job_once_across_portals(client: TestClient) -> None:
 
 def test_extension_download_is_set_up_for_this_app(client: TestClient) -> None:
     import io
+    import json
     import zipfile
 
     r = client.get("/api/v1/extension.zip", params={"app": "http://127.0.0.1:5173/jobs"})
@@ -780,7 +781,15 @@ def test_extension_download_is_set_up_for_this_app(client: TestClient) -> None:
     assert "career-intelligence-extension/icons/icon-48.png" in names
     settings = zf.read("career-intelligence-extension/settings.js").decode()
     assert 'apiUrl: "http://testserver", appUrl: "http://127.0.0.1:5173"' in settings
+    manifest = json.loads(zf.read("career-intelligence-extension/manifest.json"))
+    assert manifest["content_scripts"][0]["matches"] == ["http://127.0.0.1/*", "http://localhost/*"]
     assert client.get("/api/v1/extension.zip", params={"app": "javascript:x"}).status_code == 422
+    # Through a tunnel: the page bridge must run on the tunnel's address too.
+    r = client.get("/api/v1/extension.zip", params={"app": "https://abc.trycloudflare.com/"})
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    manifest = json.loads(zf.read("career-intelligence-extension/manifest.json"))
+    assert "https://abc.trycloudflare.com/*" in manifest["content_scripts"][0]["matches"]
+    assert "https://abc.trycloudflare.com/*" in manifest["host_permissions"]
 
 
 def test_search_finds_jobs_by_skill(client: TestClient, db: Session) -> None:
@@ -803,3 +812,37 @@ def test_search_finds_jobs_by_skill(client: TestClient, db: Session) -> None:
     assert found(q="graphql") == {gql}  # nice-to-have skills count too
     assert found(q="php") == {m2}  # not in any title: found through the skills
     assert found(technology="magento2") == {m2}
+
+
+def test_export_the_jobs_the_list_shows(client: TestClient) -> None:
+    import csv
+    import io
+
+    def add(title: str, status: str | None = None) -> int:
+        j = client.post("/api/v1/jobs", json={"title": title, "company": "Export Co",
+                                              "jd": "PHP; Magento 2. =cmd|' /C calc'!A0"}).json()
+        if status:
+            client.post(f"/api/v1/jobs/{j['job']['id']}/status", json={"status": status})
+        return int(j["job"]["id"])
+
+    applied = add("Magento Lead", "APPLIED")
+    shortlisted = add("PHP Architect", "SHORTLISTED")
+    add("Laravel Developer", "NOT_RELEVANT")
+
+    r = client.get("/api/v1/jobs/export", params={"status": ["APPLIED", "SHORTLISTED"],
+                                                  "sort": "title"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert 'filename="jobs-' in r.headers["content-disposition"]
+    assert r.text.startswith("﻿")  # Excel reads it as UTF-8
+    rows = list(csv.DictReader(io.StringIO(r.text.lstrip("﻿"))))
+    assert [x["id"] for x in rows] == [str(applied), str(shortlisted)]  # only the tab, in order
+    assert rows[0]["company"] == "Export Co" and rows[0]["status"] == "APPLIED"
+    assert "original_jd" not in rows[0]  # descriptions only on request
+
+    q = client.get("/api/v1/jobs/export", params={"q": "architect", "format": "json",
+                                                  "with_description": "true"}).json()
+    assert [x["id"] for x in q["items"]] == [shortlisted] and q["count"] == 1
+    assert "Magento 2" in q["items"][0]["original_jd"]
+
+    picked = client.get("/api/v1/jobs/export", params={"ids": [applied], "format": "json"}).json()
+    assert [x["id"] for x in picked["items"]] == [applied]  # only the selected rows

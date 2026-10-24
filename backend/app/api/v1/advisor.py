@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.api.deps import DB
-from app.services import cv_advisor
+from app.services import cv_advisor, skill_roadmap
 
 router = APIRouter(prefix="/cv-advice", tags=["cv-advice"])
 
@@ -25,3 +25,10 @@ def skill_action(
     db: DB, action: Literal["add-to-profile", "add-to-search", "hide", "unhide"], body: SkillIn
 ) -> dict[str, Any]:
     return cv_advisor.act(db, action, body.skill)
+
+
+@router.get("/roadmap")
+def roadmap(db: DB) -> dict[str, Any]:
+    """Missing skills ranked by how many open jobs they'd bring to a good score, and a
+    learning order (each step adds the most new good jobs on top of the earlier ones)."""
+    return skill_roadmap.roadmap(db)

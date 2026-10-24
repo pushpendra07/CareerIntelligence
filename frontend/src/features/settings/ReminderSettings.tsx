@@ -4,6 +4,7 @@ import { api, errorMessage } from "../../api/client";
 import { ListInput } from "../../components/ListInput";
 import { ReminderToggle } from "../../components/Reminders";
 import { Card, ErrorBox, Field, PageIntro, Spinner } from "../../components/ui";
+import { CalendarFeed } from "../../components/AddToCalendar";
 import { formatDateTime } from "../../utils/format";
 
 export type Rule = {
@@ -121,6 +122,7 @@ export function ReminderSettings() {
   return (
     <div className="space-y-5">
       <div><h1>Reminders</h1><PageIntro>Nudges on a schedule — check the job portals, apply to shortlisted jobs, follow up — like a cron job. The app checks every minute while it runs; each reminder shows in the 🔔 bell, as a message in the app and as a notification.</PageIntro></div>
+      <CalendarFeed />
       <Card title="Where reminders reach you">
         <ul className="space-y-3 text-sm">
           <li className="flex flex-wrap items-center gap-2"><span className="font-medium text-slate-700">In the app:</span> the 🔔 bell and a message at the bottom of the screen — always on.</li>

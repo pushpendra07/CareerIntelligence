@@ -4,11 +4,12 @@ import csv
 import io
 import json
 import re
+from collections.abc import Iterable
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import DomainValidationError
@@ -37,51 +38,50 @@ def _iso(v: Any) -> Any:
     return v
 
 
+JOB_COLUMNS = [
+    "id", "title", "company", "status", "match_score", "recommendation", "career_ops_score",
+    "source", "sources", "added_via", "source_url", "location", "work_model", "employment_type",
+    "experience_min", "experience_max", "salary_min", "salary_max", "salary_currency",
+    "posting_date", "application_deadline", "created_at", "required_skills",
+    "preferred_skills", "notes", "original_jd",
+]
+
+
+def job_rows(jobs: Iterable[Job]) -> list[dict[str, Any]]:
+    """Jobs as export rows (company and source links must be loaded)."""
+    return [
+        {
+            **{c: _iso(getattr(j, c, None)) for c in JOB_COLUMNS},
+            "company": j.company.name,
+            "sources": "; ".join(sorted({s.source for s in j.source_links})),
+            "added_via": "; ".join(j.added_via or []),
+        }
+        for j in jobs
+    ]
+
+
+def export_jobs(db: Session, stmt: Select[Any], fmt: str, with_description: bool) -> str:
+    """The jobs a list shows (its filters and sort), as CSV or JSON: the Jobs page's Export."""
+    jobs = db.scalars(stmt.options(selectinload(Job.company), selectinload(Job.source_links)))
+    rows = job_rows(jobs)
+    cols = JOB_COLUMNS if with_description else [c for c in JOB_COLUMNS if c != "original_jd"]
+    if not with_description:
+        for r in rows:
+            r.pop("original_jd", None)
+    if fmt == "json":
+        return json.dumps({"entity": "jobs", "count": len(rows), "items": rows}, default=str,
+                          indent=2)
+    return "\ufeff" + to_csv(rows, cols)  # the mark tells Excel the file is UTF-8
+
+
 def _rows(db: Session, entity: str) -> tuple[list[str], list[dict[str, Any]]]:
     if entity == "companies":
         rows = company_rows(db)
         return list(rows[0].keys()) if rows else ["id", "name"], rows
     if entity == "jobs":
-        cols = [
-            "id",
-            "title",
-            "company",
-            "status",
-            "match_score",
-            "recommendation",
-            "career_ops_score",
-            "source",
-            "sources",
-            "source_url",
-            "location",
-            "work_model",
-            "employment_type",
-            "experience_min",
-            "experience_max",
-            "salary_min",
-            "salary_max",
-            "salary_currency",
-            "posting_date",
-            "application_deadline",
-            "required_skills",
-            "preferred_skills",
-            "notes",
-            "original_jd",
-        ]
-        out = []
-        for j in db.scalars(
-            select(Job)
-            .options(selectinload(Job.company), selectinload(Job.source_links))
-            .order_by(Job.id)
-        ):
-            out.append(
-                {
-                    **{c: _iso(getattr(j, c, None)) for c in cols},
-                    "company": j.company.name,
-                    "sources": "; ".join(sorted({s.source for s in j.source_links})),
-                }
-            )
-        return cols, out
+        jobs = db.scalars(select(Job).options(selectinload(Job.company),
+                                              selectinload(Job.source_links)).order_by(Job.id))
+        return JOB_COLUMNS, job_rows(jobs)
     simple: dict[str, tuple[Any, list[str]]] = {
         "applications": (
             Application,

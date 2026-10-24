@@ -45,6 +45,8 @@ export const routes: RouteObject[] = [
       { path: "cvs", ...page(() => import("../features/cvs/CVsPage"), (m) => m.CVsPage) },
       { path: "cvs/:id", ...page(() => import("../features/cvs/CVDetailPage"), (m) => m.CVDetailPage) },
       { path: "profile", ...page(() => import("../features/profile/ProfilePage"), (m) => m.ProfilePage) },
+      { path: "apply-details", ...page(() => import("../features/profile/ApplicationDetailsPage"), (m) => m.ApplicationDetailsPage) },
+      { path: "skill-roadmap", ...page(() => import("../features/profile/SkillRoadmapPage"), (m) => m.SkillRoadmapPage) },
       { path: "preferences", ...page(() => import("../features/profile/PreferencesPage"), (m) => m.PreferencesPage) },
       { path: "analytics", ...page(() => import("../features/analytics/AnalyticsPage"), (m) => m.AnalyticsPage) },
       { path: "reports", ...page(() => import("../features/reports/ReportsPage"), (m) => m.ReportsPage) },

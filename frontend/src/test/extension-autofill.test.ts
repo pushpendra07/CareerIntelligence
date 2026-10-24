@@ -1,7 +1,9 @@
 import source from "../../../browser-extension/autofill.js?raw";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-type Autofill = { hasForm: () => boolean; fill: (kit: unknown, cv: File | null) => { filled: string[]; cvAttached: boolean; fileFieldFound: boolean } };
+type Result = { filled: string[]; cvAttached: boolean; fileFieldFound: boolean };
+type Autofill = { hasForm: () => boolean; wantsCv: () => boolean; fill: (kit: unknown, cv: File | null) => Result;
+  follow: (kit: unknown, cv: File | null) => Result; stop: () => void; following: () => boolean };
 const load = (): Autofill => {
   new Function(source)();
   return (globalThis as unknown as { ciAutofill: Autofill }).ciAutofill;
@@ -59,5 +61,84 @@ describe("Apply: filling an application form", () => {
   it("says when a page has no application form", () => {
     document.body.innerHTML = `<main><h1>Magento Lead</h1><p>Apply on our careers site.</p><input type="search" placeholder="Search jobs"></main>`;
     expect(load().hasForm()).toBe(false);
+  });
+
+  it("fills name parts, address, salary negotiable and the message to the recruiter", () => {
+    document.body.innerHTML = `<form>
+      <label for="fn">First name</label><input id="fn">
+      <label for="mn">Middle name</label><input id="mn">
+      <label for="ln">Last name</label><input id="ln">
+      <label for="em">Email address</label><input id="em">
+      <label for="a1">Address line 1</label><input id="a1">
+      <label for="a2">Address line 2</label><input id="a2">
+      <label for="ci">City</label><input id="ci">
+      <label for="st">State</label><input id="st">
+      <label for="us">Are you located in the United States?</label><input id="us">
+      <label for="pc">PIN code</label><input id="pc">
+      <label for="cc">Phone country code</label><input id="cc">
+      <label for="co">Country</label><select id="co"><option value="">Select</option><option value="IN">India</option><option value="US">United States</option></select>
+      <label for="neg">Is your expected salary negotiable?</label><input id="neg">
+      <label for="msg">Message to the recruiter</label><textarea id="msg"></textarea>
+    </form>`;
+    const kit = { ...KIT, applicant: { ...KIT.applicant, middle_name: "", address_line1: "12 MG Road", address_line2: "Flat 4",
+      state: "Maharashtra", postal_code: "411001", country: "India", salary_negotiable: "Yes" } };
+    load().fill(kit, null);
+    expect(val("#mn")).toBe(""); // no middle name: not filled with the first name
+    expect([val("#fn"), val("#ln"), val("#em")]).toEqual(["Asha", "Verma", "asha@example.com"]); // "email address" is not the address
+    expect([val("#a1"), val("#a2"), val("#ci"), val("#st"), val("#pc"), val("#co")]).toEqual(["12 MG Road", "Flat 4", "Pune", "Maharashtra", "411001", "IN"]);
+    expect(val("#us")).toBe(""); // "United States" is not your state
+    expect(val("#cc")).toBe(""); // a country code is not your phone number
+    expect(val("#neg")).toBe("Yes"); // not your expected salary
+    expect(val("#msg")).toBe("Hello, I lead Magento teams.");
+  });
+
+  it("writes the date of birth the way each field wants it", () => {
+    document.body.innerHTML = `<form>
+      <label for="d1">Date of birth</label><input id="d1" type="date">
+      <label for="d2">DOB</label><input id="d2" placeholder="DD/MM/YYYY">
+      <label for="d3">Birth date</label><input id="d3" placeholder="MM-DD-YYYY">
+    </form>`;
+    load().fill({ ...KIT, applicant: { ...KIT.applicant, date_of_birth: "1988-03-07" } }, null);
+    expect([val("#d1"), val("#d2"), val("#d3")]).toEqual(["1988-03-07", "07/03/1988", "03-07-1988"]);
+  });
+
+  it("answers Yes/No questions with radio buttons", () => {
+    document.body.innerHTML = `<form>
+      <fieldset><legend>Are you willing to relocate?</legend>
+        <label><input type="radio" name="reloc" value="1"> Yes</label><label><input type="radio" name="reloc" value="0"> No</label></fieldset>
+      <fieldset><legend>Is your salary negotiable?</legend>
+        <label><input type="radio" name="neg" value="y" checked> No</label><label><input type="radio" name="neg" value="n"> Yes</label></fieldset>
+    </form>`;
+    const r = load().fill({ ...KIT, applicant: { ...KIT.applicant, salary_negotiable: "Yes" } }, null);
+    expect((document.querySelector('[name="reloc"][value="1"]') as HTMLInputElement).checked).toBe(true);
+    expect((document.querySelector('[name="neg"][value="y"]') as HTMLInputElement).checked).toBe(true); // already chosen: kept
+    expect(r.filled).toContain("Willing to relocate");
+  });
+
+  it("fills the next step of a multi-step form when it appears, and stops", async () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<form id="f"><label for="fn">First name</label><input id="fn"><label for="cv">Resume</label><input id="cv" type="file"></form>`;
+      const a = load();
+      const first = a.follow(KIT, null);
+      expect(first.filled).toEqual(["First name"]);
+      expect(a.following()).toBe(true);
+      expect(document.querySelector("[data-ci-autofill]")).not.toBeNull(); // the on-page badge with Stop
+      expect(a.wantsCv()).toBe(true);
+      // You empty a filled field: it stays empty. Then step 2 appears.
+      (document.getElementById("fn") as HTMLInputElement).value = "";
+      document.getElementById("f")!.insertAdjacentHTML("beforeend", `<label for="em">Email</label><input id="em" type="email">`);
+      await vi.advanceTimersByTimeAsync(700);
+      expect(val("#em")).toBe("asha@example.com");
+      expect(val("#fn")).toBe("");
+      a.stop();
+      expect(a.following()).toBe(false);
+      expect(document.querySelector("[data-ci-autofill]")).toBeNull();
+      document.getElementById("f")!.insertAdjacentHTML("beforeend", `<label for="ph">Phone</label><input id="ph" type="tel">`);
+      await vi.advanceTimersByTimeAsync(700);
+      expect(val("#ph")).toBe(""); // stopped: nothing more is filled
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -65,9 +65,9 @@ const JD_PREVIEW = 1500;
 export type SkillMarks = { have: string[]; related: string[]; missing: string[] };
 
 const MARK_CLASS = {
-  have: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200",
-  related: "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
-  missing: "bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-200",
+  have: "bg-emerald-100 text-emerald-900",
+  related: "bg-amber-100 text-amber-900",
+  missing: "bg-rose-100 text-rose-900",
 };
 
 /** The job's skills as the score saw them: ones you have, related ones, and missing ones. */

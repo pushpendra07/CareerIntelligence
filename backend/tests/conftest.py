@@ -36,10 +36,13 @@ def _no_real_google_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
 
 @pytest.fixture(autouse=True)
 def _no_real_email_account(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Tests never read the email account saved on this machine (backend/secrets/)."""
+    """Tests never read the email account or calendar feed key saved on this machine
+    (backend/secrets/)."""
     from app.integrations import email_inbox
+    from app.services import calendar_service
 
     monkeypatch.setattr(email_inbox, "ACCOUNT_FILE", tmp_path / "secrets" / "email-account.json")
+    monkeypatch.setattr(calendar_service, "FEED_FILE", tmp_path / "secrets" / "calendar-feed.json")
 
 
 def _test_database_url() -> str:

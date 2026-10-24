@@ -5,6 +5,7 @@ written into settings.js, so it works without changing anything after "Load unpa
 """
 
 import io
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -32,6 +33,22 @@ def _origin(url: str) -> str:
     return f"{parts.scheme}://{parts.netloc}"
 
 
+def _with_app_host(manifest: bytes, app_url: str) -> bytes:
+    """The manifest with the app's own host added, so the page bridge also runs on the app
+    when it is reached through a tunnel or another address (match patterns have no port)."""
+    parts = urlsplit(app_url.strip())
+    pattern = f"{parts.scheme}://{parts.hostname}/*"
+    data = json.loads(manifest)
+    hosts = data.setdefault("host_permissions", [])
+    bridge = data["content_scripts"][0]["matches"]
+    if pattern in bridge:
+        return manifest
+    bridge.append(pattern)
+    if pattern not in hosts:
+        hosts.append(pattern)
+    return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode()
+
+
 def build_zip(api_url: str, app_url: str) -> bytes:
     """All extension files under one folder, with settings.js pointing at this app."""
     root = extension_dir()
@@ -46,5 +63,7 @@ def build_zip(api_url: str, app_url: str) -> bytes:
             data = path.read_bytes()
             if rel.as_posix() == "settings.js":
                 data = re.sub(rb"const CI_DEFAULTS = \{[^\n]*\};", defaults.encode(), data, count=1)
+            elif rel.as_posix() == "manifest.json":
+                data = _with_app_host(data, app_url)
             zf.writestr(f"{ZIP_FOLDER}/{rel.as_posix()}", data)
     return buf.getvalue()

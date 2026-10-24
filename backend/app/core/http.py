@@ -42,6 +42,9 @@ class FetchError(OSError):
     failure, so callers that handle those handle this too."""
 
 
+# Only web servers are fetched: a page can't point the app at SSH, mail or database ports.
+WEB_PORTS = (80, 443, 8080, 8443)
+
 # Characters a URL may contain as they are; anything else (spaces in a redirect Location) is
 # percent-encoded, otherwise http.client refuses the request.
 _URL_SAFE = ":/?#[]@!$&'()*+,;=%~"
@@ -52,6 +55,12 @@ def _check_host(url: str) -> list[str]:
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise BlockedURLError(f"Unsupported URL: {url}")
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise BlockedURLError(f"Bad port in {url}") from exc
+    if port is not None and port not in WEB_PORTS:
+        raise BlockedURLError(f"Refusing port {port} for {parts.hostname}")
     try:
         infos = socket.getaddrinfo(parts.hostname, parts.port or 443)
     except socket.gaierror as exc:

@@ -110,8 +110,16 @@ def test_too_many_wrong_passwords_lock_the_client_out(
         assert _login(client, "me", "bad") == 401
     locked = client.post("/api/v1/auth/login", json={"username": "me", "password": "longenough"})
     assert locked.status_code == 429 and locked.json()["error"]["code"] == "too_many_attempts"
-    # Another visitor (behind Cloudflare) is not locked out.
-    other = client.post("/api/v1/auth/login", json={"username": "me", "password": "longenough"},
+    # A direct visitor can't dodge the lockout by naming another address.
+    spoofed = client.post("/api/v1/auth/login", json={"username": "me", "password": "longenough"},
+                          headers={"cf-connecting-ip": "203.0.113.9"})
+    assert spoofed.status_code == 429
+    # Through the tunnel (cloudflared on this machine) another visitor is not locked out.
+    tunnel = TestClient(client.app, client=("127.0.0.1", 50000))
+    for _ in range(auth.MAX_FAILURES):
+        assert tunnel.post("/api/v1/auth/login", json={"username": "me", "password": "bad"},
+                           headers={"cf-connecting-ip": "203.0.113.7"}).status_code == 401
+    other = tunnel.post("/api/v1/auth/login", json={"username": "me", "password": "longenough"},
                         headers={"cf-connecting-ip": "203.0.113.9"})
     assert other.status_code == 200
 

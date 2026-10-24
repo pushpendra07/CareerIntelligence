@@ -300,3 +300,48 @@ await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     expect(listUrls(api.fn).at(-1)!.searchParams.get("technology")).toBe("GraphQL"); // Enter applies it
   });
 });
+
+describe("export", () => {
+  it("downloads the list's tab and filters, or only the selected jobs", async () => {
+    mockApi({ "GET /jobs": page([JOB, { ...JOB, id: 8, title: "PHP Architect" }]) });
+    renderAt(<JobsPage />, { path: "/jobs", route: "/jobs?tab=pending&q=magento&technology=php" });
+    await screen.findByText("PHP Architect");
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    const box = screen.getByRole("dialog", { name: "Export jobs" });
+    expect(box).toHaveTextContent("2 jobs — this tab and filters");
+    const csv = new URL(within(box).getByRole("link", { name: "CSV (Excel)" }).getAttribute("href")!, "http://x");
+    expect(csv.pathname).toBe("/api/v1/jobs/export");
+    expect(csv.searchParams.get("format")).toBe("csv");
+    expect(csv.searchParams.get("q")).toBe("magento");
+    expect(csv.searchParams.get("technology")).toBe("php");
+    expect(csv.searchParams.getAll("status")).toEqual(["REVIEWING", "SHORTLISTED", "READY_TO_APPLY", "ON_HOLD"]); // the tab
+    expect(csv.searchParams.has("ids")).toBe(false);
+    expect(csv.searchParams.has("page")).toBe(false); // every page, not just this one
+    await userEvent.click(within(box).getByLabelText("Include job descriptions"));
+    const json = new URL(within(box).getByRole("link", { name: "JSON" }).getAttribute("href")!, "http://x");
+    expect(json.searchParams.get("with_description")).toBe("true");
+
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select PHP Architect" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    await userEvent.click(screen.getByLabelText("Only the 1 selected"));
+    const picked = new URL(screen.getByRole("link", { name: "CSV (Excel)" }).getAttribute("href")!, "http://x");
+    expect(picked.searchParams.getAll("ids")).toEqual(["8"]);
+    expect(screen.getByRole("dialog", { name: "Export jobs" })).toHaveTextContent("1 job you selected");
+  });
+});
+
+describe("export errors", () => {
+  it("shows the app's message when the download fails", async () => {
+    mockApi({
+      "GET /jobs": page([JOB]),
+      "GET /jobs/export": new Response(JSON.stringify({ error: { code: "x", message: "Log in first" } }), { status: 401 }),
+    });
+    const { Toaster } = await import("../components/Toaster");
+    renderAt(<><JobsPage /><Toaster /></>, { path: "/jobs", route: "/jobs" });
+    await screen.findByText("Magento Lead");
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    await userEvent.click(screen.getByRole("link", { name: "CSV (Excel)" }));
+    expect(await screen.findByText("Export failed: Log in first")).toBeInTheDocument();
+  });
+});

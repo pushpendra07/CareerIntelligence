@@ -80,6 +80,42 @@ async function collect(appTab, portal, searchUrls, max) {
   }
 }
 
+// --- Filling the next pages of an application form -------------------------------------------
+// After "Fill this application" with "Keep filling the next pages", each page of that form that
+// loads in the same tab (same site, which you allowed) is filled too, for up to 2 hours or until
+// Stop. Pages on other sites (a sign-in page in between) are skipped, not filled.
+const FOLLOW_MS = 2 * 60 * 60 * 1000;
+const followKey = (tabId) => `follow:${tabId}`;
+
+async function following(tabId) {
+  const key = followKey(tabId);
+  const state = (await chrome.storage.session.get(key))[key];
+  if (state && state.until < Date.now()) { await chrome.storage.session.remove(key); return null; }
+  return state || null;
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status !== "complete" || !tab.url) return;
+  const state = await following(tabId);
+  if (!state) return;
+  let origin;
+  try { origin = new URL(tab.url).origin; } catch { return; }
+  if (origin !== state.origin) return;
+  if (!(await chrome.permissions.contains({ origins: [`${origin}/*`] }))) return;
+  await sleep(800); // the form is often drawn just after "complete"
+  ciFillTab(tabId, state.jobId, true).catch(() => {});
+});
+chrome.tabs.onRemoved.addListener((tabId) => { chrome.storage.session.remove(followKey(tabId)); });
+
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (sender.id !== chrome.runtime.id) return;
+  if (!sender.tab && msg.type === "follow-start") { // from the popup
+    chrome.storage.session.set({ [followKey(msg.tabId)]: { origin: msg.origin, jobId: msg.jobId, until: Date.now() + FOLLOW_MS } });
+  } else if (sender.tab && msg.type === "autofill-stop") { // Stop on the page's badge
+    chrome.storage.session.remove(followKey(sender.tab.id));
+  }
+});
+
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!sender.tab || !sender.url) return;
   (async () => {

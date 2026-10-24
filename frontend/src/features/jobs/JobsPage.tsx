@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, errorMessage } from "../../api/client";
+import { API_BASE, api, errorMessage, qs } from "../../api/client";
 import { Badge, CopyLinkButton, Empty, ErrorBox, JobStatusSummary, Pagination, ScoreBadge, SkeletonList, ADDED_VIA, AddedViaTags, usePageSize } from "../../components/ui";
 import { toast } from "../../components/Toaster";
 import type { Job, Page } from "../../types/api";
@@ -168,8 +168,8 @@ function StatusTabs({ active, query }: { active: string; query: Record<string, s
       <Link key={t.key} to={withFilters(tabHref(t.key))} role="tab" aria-selected={on}
         className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${on
           ? "bg-indigo-50 text-indigo-700 shadow-[inset_0_0_0_1px_var(--color-indigo-200)]"
-          : `${ARCHIVE_TABS.includes(t.key) ? "text-slate-400" : "text-slate-600"} hover:bg-slate-100 hover:text-slate-900`}`}>
-        {t.label}{n !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/70 text-indigo-600" : "bg-slate-100 text-slate-500"}`}>{n}</span>}
+          : `${ARCHIVE_TABS.includes(t.key) ? "text-slate-500" : "text-slate-600"} hover:bg-slate-100 hover:text-slate-900`}`}>
+        {t.label}{n !== undefined && <span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>{n}</span>}
       </Link>
     );
   };
@@ -627,6 +627,7 @@ export function JobsPage({ view = "open" }: { view?: "open" | "closed" }) {
           {customized && (
             <button type="button" className="link text-sm" title="Clear filters and go back to the default order" onClick={reset}>Reset</button>
           )}
+          <ExportJobs query={listQuery} total={data?.total} selected={[...selected]} />
         </div>
         {data && data.total > 0 && <Pagination position="top" page={page} size={size} total={data.total} onPage={setPage} noun={data.total === 1 ? "job" : "jobs"} />}
         {data && data.items.length > 0 && <BulkBar ids={[...selected]} onDone={() => setSelected(new Set())} />}
@@ -837,11 +838,82 @@ function ActiveFilters({ params, tab, onRemove }: {
     <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
       <span className="text-xs font-medium text-slate-500">Filtered by</span>
       {chips.map(([k, v, text]) => (
-        <span key={`${k}=${v}`} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+        <span key={`${k}=${v}`} className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-indigo-800">
           {text}
-          <button type="button" className="rounded-full px-1 hover:bg-indigo-100 dark:hover:bg-indigo-900" aria-label={`Remove filter ${text}`} onClick={() => onRemove(k, v)}>×</button>
+          <button type="button" className="rounded-full px-1 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-900" aria-label={`Remove filter ${text}`} onClick={() => onRemove(k, v)}>×</button>
         </span>
       ))}
+    </div>
+  );
+}
+
+/** Export what the list shows — this tab, these filters, this order, every page — or only the
+ * selected rows, as CSV (opens in Excel) or JSON. */
+function ExportJobs({ query, total, selected }: { query: Record<string, string | string[]>; total: number | undefined; selected: number[] }) {
+  const [open, setOpen] = useState(false);
+  const [onlySelected, setOnlySelected] = useState(false);
+  const [withDescription, setWithDescription] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: globalThis.MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+  }, [open]);
+  const picked = onlySelected && selected.length > 0;
+  const href = (format: "csv" | "json") => `${API_BASE}/jobs/export${qs({ ...query, format, with_description: withDescription || undefined,
+    ids: picked ? selected : undefined })}`;
+  const count = picked ? selected.length : total;
+  // Downloaded here (not by the browser following the link) so a failure shows as a message.
+  const download = async (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = e.currentTarget.href;
+    setOpen(false);
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message ?? `The app answered ${res.status}`);
+      }
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "jobs-export";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(await res.blob());
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      toast(count === undefined ? "Export downloaded" : `Exported ${count} job${count === 1 ? "" : "s"}`);
+    } catch (err) {
+      toast(`Export failed: ${errorMessage(err)}`, "error");
+    }
+  };
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" className="btn-secondary" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((v) => !v)}
+        title="Download the jobs in this list">
+        <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.69L6.28 8.47a.75.75 0 0 0-1.06 1.06l4.25 4.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 1 0-1.06-1.06l-2.97 2.97V2.75ZM3.5 14.25a.75.75 0 0 0-1.5 0v1.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75v-1.5a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 1-.75.75H4.25a.75.75 0 0 1-.75-.75v-1.5Z" /></svg>
+        Export
+      </button>
+      {open && (
+        <div role="dialog" aria-label="Export jobs" className="menu-pop absolute right-0 z-30 mt-1 w-72 space-y-2 rounded-xl border border-slate-200 bg-surface p-3 text-sm shadow-(--shadow-lift)">
+          <p className="text-slate-600">
+            {count === undefined ? "The jobs in this list" : <><b>{count}</b> job{count === 1 ? "" : "s"}</>}
+            {picked ? " you selected" : " — this tab and filters, in this order, all pages"}.
+          </p>
+          {selected.length > 0 && (
+            <label className="flex items-center gap-2"><input type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} />
+              Only the {selected.length} selected</label>
+          )}
+          <label className="flex items-center gap-2"><input type="checkbox" checked={withDescription} onChange={(e) => setWithDescription(e.target.checked)} />
+            Include job descriptions</label>
+          <div className="flex gap-2 pt-1">
+            <a className="btn-primary flex-1 py-1.5" href={href("csv")} download onClick={download}>CSV (Excel)</a>
+            <a className="btn-secondary flex-1 py-1.5" href={href("json")} download onClick={download}>JSON</a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

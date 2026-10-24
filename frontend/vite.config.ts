@@ -6,7 +6,7 @@ import { defineConfig, loadEnv } from "vite";
 // The dev server proxies /api to the FastAPI backend, so the browser never needs CORS.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "");
-  const target = env.VITE_API_TARGET || "http://127.0.0.1:8000";
+  const target = env.VITE_API_TARGET || "http://127.0.0.1:8010";
   return {
     plugins: [react(), tailwindcss()],
     // ../browser-extension: its page reader is tested here (src/test/extension-extract.test.ts).

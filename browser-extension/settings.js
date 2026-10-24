@@ -46,3 +46,33 @@ async function ciImport(jobs, opts = {}) {
   if (!r.ok) throw new Error((data.error && data.error.message) || `The app answered ${r.status}`);
   return data;
 }
+
+/** Fill the application form in a tab from the app's apply kit (your Application details). With
+ * follow, the page keeps filling its next steps as they appear. The CV is downloaded only when
+ * the page has an empty file field. Returns { kit, result, fileError }. */
+async function ciFillTab(tabId, jobId, follow) {
+  const kit = await ciApi(jobId ? `/jobs/${jobId}/apply-kit` : "/apply/kit");
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["autofill.js"] });
+  let file = null, fileError = "";
+  if (kit.cv) {
+    const [need] = await chrome.scripting.executeScript({ target: { tabId }, func: () => globalThis.ciAutofill.wantsCv() });
+    if (need && need.result) {
+      try { file = await ciFileBase64(kit.cv.download); } catch (e) { fileError = e.message; }
+    }
+  }
+  const [res] = await chrome.scripting.executeScript({
+    target: { tabId },
+    args: [kit, file && file.b64, file && file.type, kit.cv && (kit.cv.filename || `${kit.cv.name}.pdf`), !!follow],
+    func: (k, b64, type, name, keepGoing) => {
+      let cv = null;
+      if (b64) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        cv = new File([bytes], name || "cv.pdf", { type });
+      }
+      return keepGoing ? globalThis.ciAutofill.follow(k, cv) : globalThis.ciAutofill.fill(k, cv);
+    },
+  });
+  return { kit, result: (res && res.result) || { filled: [], cvAttached: false, fileFieldFound: false }, fileError };
+}

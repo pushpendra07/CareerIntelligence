@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Card, Chips, Empty, ErrorBox, Field, KeyValue, Pagination, Spinner, StatusBadge, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { Job, Offer, Page } from "../../types/api";
+import { AddToCalendar } from "../../components/AddToCalendar";
 import { formatDate, formatMoney, humanize } from "../../utils/format";
 
 interface Comparison {
@@ -29,6 +30,9 @@ function OfferCard({ o }: { o: Offer }) {
         ["Equity", o.equity], ["Joining", formatDate(o.joining_date)], ["Location", o.location], ["Work model", humanize(o.work_model)],
         ["Offer date", formatDate(o.offer_date)], ["Expires", formatDate(o.expiry_date)],
       ]} />
+      {((open && o.expiry_date) || (o.status === "ACCEPTED" && o.joining_date)) && (
+        <p className="mt-2"><AddToCalendar kind="offer" id={o.id} /> <span className="text-xs text-slate-500">({open ? "expiry date" : "joining date"})</span></p>
+      )}
       <div className="mt-2"><Chips items={o.benefits} /></div>
       {o.negotiation_log.length > 0 && (
         <ol className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs">

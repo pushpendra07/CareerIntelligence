@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 
 COOKIE = "ci_session"
 MAX_AGE = 30 * 24 * 3600  # 30 days
+# The calendar feed is fetched by calendar apps (no login cookie): it checks its own key.
 OPEN_PATHS = ("/api/v1/health", "/api/v1/auth/status", "/api/v1/auth/login",
-              "/api/v1/auth/logout")
+              "/api/v1/auth/logout", "/api/v1/calendar/feed.ics")
 DEFAULT_USERNAME = "admin"
 MIN_PASSWORD = 8
 # Wrong passwords: this many from one client within the window locks it out for the window.

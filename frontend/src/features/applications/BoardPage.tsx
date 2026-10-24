@@ -201,7 +201,7 @@ function StageTabs({ active, apps, onPick }: { active: string; apps: BoardApp[];
           ? "bg-indigo-50 text-indigo-700 shadow-[inset_0_0_0_1px_var(--color-indigo-200)]"
           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}>
         {t.statuses.length === 1 && <span aria-hidden className={`h-2 w-2 rounded-full ${dotFor(t.statuses[0]!)}`} />}
-        {t.label}<span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-white/70 text-indigo-600" : "bg-slate-100 text-slate-500"}`}>{n}</span>
+        {t.label}<span className={`rounded-full px-1.5 text-xs tabular-nums ${on ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>{n}</span>
       </button>
     );
   };

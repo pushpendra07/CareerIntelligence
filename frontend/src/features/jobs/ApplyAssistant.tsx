@@ -5,10 +5,13 @@ import { api } from "../../api/client";
 import { Card, CopyButton, ErrorBox, Field, Spinner } from "../../components/ui";
 
 export type ApplyAnswers = {
-  current_ctc: string; expected_ctc: string; notice_period: string; relocate: string; work_authorization: string;
-  github: string; portfolio: string; current_company: string; current_title: string;
+  first_name: string; middle_name: string; last_name: string; date_of_birth: string; email: string; phone: string; linkedin: string;
+  address_line1: string; address_line2: string; city: string; state: string; postal_code: string; country: string;
+  current_ctc: string; expected_ctc: string; salary_negotiable: string; notice_period: string; relocate: string; work_authorization: string;
+  github: string; portfolio: string; current_company: string; current_title: string; recruiter_message: string;
   answers: { question: string; answer: string }[];
 };
+type SavedKey = keyof Omit<ApplyAnswers, "answers">;
 export type ApplyKit = {
   job: { id: number; title: string; company: string; status: string; url: string | null } | null;
   applicant: Record<string, string>; labels: Record<string, string>;
@@ -19,25 +22,42 @@ export type ApplyKit = {
 };
 
 /** The details shown with copy buttons, in the order forms usually ask for them. */
-const DETAIL_KEYS = ["full_name", "email", "phone", "linkedin", "location", "total_experience", "current_company",
-  "current_title", "current_ctc", "expected_ctc", "notice_period", "relocate", "work_authorization", "github", "portfolio"];
-const SAVED_FIELDS: [keyof Omit<ApplyAnswers, "answers">, string, string][] = [
-  ["current_ctc", "Current CTC", "e.g. 28 LPA"], ["expected_ctc", "Expected CTC", "empty: from Skills & targets"],
-  ["notice_period", "Notice period", "empty: from Skills & targets"], ["relocate", "Willing to relocate", "Yes / No / Pune, Bengaluru"],
-  ["work_authorization", "Work authorisation", "e.g. Indian citizen"], ["current_company", "Current company", "empty: from your profile"],
-  ["current_title", "Current title", "empty: from your profile"], ["github", "GitHub", "https://github.com/…"],
-  ["portfolio", "Portfolio / website", "https://…"],
+const DETAIL_KEYS = ["full_name", "first_name", "middle_name", "last_name", "date_of_birth", "email", "phone", "linkedin", "location",
+  "address_line1", "address_line2", "city", "state", "postal_code", "country", "total_experience", "current_company",
+  "current_title", "current_ctc", "expected_ctc", "salary_negotiable", "notice_period", "relocate", "work_authorization",
+  "github", "portfolio"];
+/** The saved details by section: [field, label, placeholder when nothing is worked out, input type]. */
+export const DETAIL_SECTIONS: { title: string; hint?: string; fields: [SavedKey, string, string, string?][] }[] = [
+  { title: "Name and date of birth", hint: "Empty name: taken from the full name on your profile.", fields: [
+    ["first_name", "First name", ""], ["middle_name", "Middle name", "none"], ["last_name", "Last name", ""],
+    ["date_of_birth", "Date of birth", "", "date"]] },
+  { title: "Contact", hint: "Empty: taken from your profile.", fields: [
+    ["email", "Email", "you@example.com"], ["phone", "Phone", "+91 …"],
+    ["linkedin", "LinkedIn URL", "https://www.linkedin.com/in/…"]] },
+  { title: "Address", fields: [
+    ["address_line1", "Address", "House / street"], ["address_line2", "Address line 2", "Area, landmark"],
+    ["city", "City", "from your profile's location"], ["state", "State", "e.g. Maharashtra"],
+    ["postal_code", "PIN / postal code", "e.g. 411001"], ["country", "Country", "e.g. India"]] },
+  { title: "Job and salary", fields: [
+    ["current_company", "Current company", "from your profile"], ["current_title", "Current title", "from your profile"],
+    ["current_ctc", "Current CTC", "e.g. 28 LPA"], ["expected_ctc", "Expected CTC", "from Skills & targets"],
+    ["salary_negotiable", "Salary negotiable", "Yes / No"], ["notice_period", "Notice period", "from Skills & targets"],
+    ["relocate", "Willing to relocate", "Yes / No / Pune, Bengaluru"], ["work_authorization", "Work authorisation", "e.g. Indian citizen"]] },
+  { title: "Links", fields: [
+    ["github", "GitHub", "https://github.com/…"], ["portfolio", "Portfolio / website", "https://…"]] },
 ];
 
-/** Answers you give on every form: saved once, used by the assistant and the extension. */
-function SavedAnswers({ onDone }: { onDone: () => void }) {
+/** Answers you give on every form: saved once, used by the assistant and the extension. An
+ * empty field shows what's used instead (worked out from your profile) as its placeholder. */
+export function SavedAnswers({ onDone }: { onDone?: () => void }) {
   const qc = useQueryClient();
   const saved = useQuery({ queryKey: ["apply", "answers"], queryFn: () => api.get<ApplyAnswers>("/apply/answers") });
+  const worked = useQuery({ queryKey: ["apply", "kit", "none"], queryFn: () => api.get<ApplyKit>("/apply/kit") }).data?.applicant ?? {};
   const [form, setForm] = useState<ApplyAnswers | null>(null);
   const f = form ?? saved.data ?? null;
   const save = useMutation({
     mutationFn: (body: ApplyAnswers) => api.put<ApplyAnswers>("/apply/answers", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["apply"] }); onDone(); },
+    onSuccess: (data) => { setForm(data); qc.invalidateQueries({ queryKey: ["apply"] }); onDone?.(); },
     meta: { success: "Answers saved", toastError: true },
   });
   if (!f) return <Spinner />;
@@ -46,10 +66,27 @@ function SavedAnswers({ onDone }: { onDone: () => void }) {
     set({ answers: f.answers.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(f); }}>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {SAVED_FIELDS.map(([k, label, placeholder]) => (
-          <Field key={k} label={label}><input className="input" value={f[k]} placeholder={placeholder} onChange={(e) => set({ [k]: e.target.value })} /></Field>
-        ))}
+      {DETAIL_SECTIONS.map((sec) => (
+        <fieldset key={sec.title} className="space-y-1">
+          <legend className="text-sm font-medium text-slate-700">{sec.title}</legend>
+          {sec.hint && <p className="text-xs text-slate-500">{sec.hint}</p>}
+          <div className="grid gap-2 sm:grid-cols-3">
+            {sec.fields.map(([k, label, placeholder, type]) => (
+              <Field key={k} label={label}><input className="input" type={type ?? "text"} value={f[k] ?? ""} placeholder={worked[k] || placeholder}
+                onChange={(e) => set({ [k]: e.target.value })} /></Field>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+      <div className="space-y-1">
+        <label htmlFor="recruiter-message" className="text-sm font-medium text-slate-700">Message to the recruiter</label>
+        <p className="text-xs text-slate-500">
+          Filled into “Cover letter” / “Message to the recruiter” boxes. <code>{"{title}"}</code> and <code>{"{company}"}</code> become the job's title and company.
+          Empty: a short note written for each job is used.
+        </p>
+        <textarea id="recruiter-message" className="input" rows={4} value={f.recruiter_message ?? ""}
+          placeholder="Hi, I'm interested in the {title} role at {company}. I lead Magento 2 teams…"
+          onChange={(e) => set({ recruiter_message: e.target.value })} />
       </div>
       <div className="space-y-2">
         <div className="text-sm font-medium text-slate-700">Your questions and answers</div>
@@ -65,7 +102,7 @@ function SavedAnswers({ onDone }: { onDone: () => void }) {
       </div>
       <div className="flex gap-2">
         <button className="btn-primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save answers"}</button>
-        <button type="button" className="btn-secondary" onClick={onDone}>Cancel</button>
+        {onDone && <button type="button" className="btn-secondary" onClick={onDone}>Cancel</button>}
       </div>
     </form>
   );
@@ -116,7 +153,7 @@ export function ApplyAssistant({ jobId, onTailor }: { jobId: number; onTailor?: 
           </div>
           {editing ? <div className="mt-2"><SavedAnswers onDone={() => setEditing(false)} /></div> : (
             <>
-              {k.missing.length > 0 && <p className="mt-1 text-xs text-amber-700">Missing: {k.missing.join(", ")} — add them in <Link className="link" to="/profile">My profile</Link> or Edit saved answers.</p>}
+              {k.missing.length > 0 && <p className="mt-1 text-xs text-amber-700">Missing: {k.missing.join(", ")} — add them in <Link className="link" to="/profile">My profile</Link> or <Link className="link" to="/apply-details">Application details</Link>.</p>}
               <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2" aria-label="Your details">
                 {DETAIL_KEYS.filter((key) => k.applicant[key]).map((key) => (
                   <div key={key} className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-100 py-1">

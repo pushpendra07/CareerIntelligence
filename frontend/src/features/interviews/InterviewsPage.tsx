@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api, errorMessage } from "../../api/client";
 import { BackButton, Card, Empty, ErrorBox, Field, KeyValue, Pagination, Spinner, StatusBadge, PageIntro, PAGE_SIZE } from "../../components/ui";
 import type { Interview, Job, Page } from "../../types/api";
+import { AddToCalendar } from "../../components/AddToCalendar";
 import { formatDateTime, humanize } from "../../utils/format";
 
 export const ROUNDS = ["RECRUITER_SCREEN", "HR", "TECHNICAL", "CODING", "SYSTEM_DESIGN", "MANAGERIAL", "CLIENT", "FINAL", "OFFER_HR"];
@@ -36,7 +37,10 @@ export function InterviewsPage() {
                   <td className="td text-sm">#{iv.round_number} {humanize(iv.round_type)}</td>
                   <td className="td"><StatusBadge value={iv.status} /></td>
                   <td className="td"><StatusBadge value={iv.result} /></td>
-                  <td className="td"><Link className="link text-sm" to={`/interviews/${iv.id}/prep`}>Prep</Link></td>
+                  <td className="td whitespace-nowrap">
+                    <Link className="link text-sm" to={`/interviews/${iv.id}/prep`}>Prep</Link>
+                    {iv.scheduled_at && (iv.status === "SCHEDULED" || iv.status === "RESCHEDULED") && <div><AddToCalendar kind="interview" id={iv.id} compact /></div>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -130,6 +134,7 @@ export function InterviewDetailPage() {
             ["Next round", i.next_round],
           ]} />
           {i.topics.length > 0 && <p className="mt-3 text-sm"><span className="label inline">Topics: </span>{i.topics.join(", ")}</p>}
+          {i.scheduled_at && (i.status === "SCHEDULED" || i.status === "RESCHEDULED") && <p className="mt-3"><AddToCalendar kind="interview" id={i.id} /></p>}
           {i.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{i.notes}</p>}
           {i.feedback && <div className="mt-3"><div className="label">Feedback</div><p className="whitespace-pre-wrap text-sm">{i.feedback}</p></div>}
         </Card>

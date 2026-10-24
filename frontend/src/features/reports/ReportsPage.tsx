@@ -394,7 +394,7 @@ export function ReportsPage() {
           <div id="report-tables" className="scroll-mt-16 space-y-4">
             {pick && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">Showing: {pick.label}</span>
+                <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800">Showing: {pick.label}</span>
                 <button className="link text-xs" onClick={() => onPick(null)}>Show all</button>
               </div>
             )}

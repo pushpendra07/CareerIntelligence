@@ -37,12 +37,12 @@ export const SECTIONS: Section[] = [
   { to: "/reports", label: "Reports", icon: "reports", hint: "Charts and details for any period: jobs, applications, interviews, offers, sources…",
     tabs: [{ to: "/reports", label: "Reports" }] },
   { to: "/profile", label: "My profile", icon: "profile", hint: "Your experience, what you want, CVs and interview answers",
-    tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Skills & targets" },
-      { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
+    tabs: [{ to: "/profile", label: "Profile" }, { to: "/preferences", label: "Skills & targets" }, { to: "/skill-roadmap", label: "Skill roadmap" },
+      { to: "/apply-details", label: "Application details" }, { to: "/cvs", label: "CVs" }, { to: "/questions", label: "Question bank" }] },
   { to: "/settings", label: "Settings", icon: "settings", hint: "Where jobs come from, how they're scored, backups",
     tabs: [{ to: "/settings", label: "Job sources" },
       { to: "/settings/scoring", label: "Scoring" },
-      { to: "/settings/reminders", label: "Reminders" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" }, { to: "/settings/login", label: "Login" },
+      { to: "/settings/reminders", label: "Reminders & calendar" }, { to: "/settings/email", label: "Email" }, { to: "/settings/data", label: "Backup & import" }, { to: "/settings/login", label: "Login" },
       { to: "/settings/about", label: "About & AI" }] },
 ];
 

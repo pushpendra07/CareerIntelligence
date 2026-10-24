@@ -13,13 +13,22 @@ Adds jobs to your Career Intelligence app straight from the browser. No AI, no t
   shows neither title nor company does the popup ask for them.
 - **Fill an application:** on a job application form (Greenhouse, Lever, Ashby, Workday,
   SmartRecruiters, Workable, a company's own form…) click the icon → **Fill this application**.
-  Empty fields it recognises are filled from your app (name, email, phone, LinkedIn, city,
-  experience, current/expected CTC, notice period, relocation, work authorisation, GitHub,
-  portfolio, your own saved questions and answers, a cover note) and your CV is attached when the
-  form has a file field. Filled fields are outlined green. It never overwrites a field, never
+  Empty fields it recognises are filled from your app (first, middle and last name, date of birth — in the field's own format —, email, phone,
+  LinkedIn, address, city, state, PIN/postal code, country, experience, current/expected CTC,
+  salary negotiable, notice period, relocation, work authorisation, GitHub, portfolio, your own
+  saved questions and answers, your message to the recruiter) and your CV is attached when the
+  form has a file field. Yes/No radio buttons are chosen from your answers. Filled fields are
+  outlined green. It never overwrites a field (nor one you emptied after it was filled), never
   fills questions about someone else (referrer, reference…), and **never submits**: check the
   form, press Submit, then click **I submitted it — record application** (the job becomes
-  Applied with a follow-up date). Details and answers live in the app (job page → Apply assistant).
+  Applied with a follow-up date). The details are fetched from the app each time: edit them in
+  **My profile → Application details**.
+- **Multi-page forms** (Workday, SuccessFactors…): with **Keep filling the next pages of this
+  form** ticked, each new step is filled as it appears, and a box on the page says how many
+  fields were filled, with **Stop filling**. For steps that load a new page, Chrome asks once to
+  allow the extension on that site (`optional_host_permissions`); the next pages in that tab on
+  that site are then filled for up to 2 hours or until Stop (`background.js`, state in
+  `chrome.storage.session`).
 - **Collect from a portal:** in the app, **Jobs → AI search → (portal) → Job collector**. The
   extension opens the portal's search, reads up to N jobs one by one (a few seconds each), and
   brings them back to the page, which checks them for duplicates before you click **Add**.
@@ -55,7 +64,7 @@ the same browser first.
 | `manifest.json` | Manifest V3. Permissions: `activeTab` + `scripting` (read the page you click it on), `tabs` (collector tab), `storage` (addresses); hosts: the app on 127.0.0.1/localhost and the supported portals |
 | `extract.js` | Reads a job page: schema.org `JobPosting` data first, then each portal's page layout, then fallbacks that survive layout changes (tab title "Title \| Company \| Portal", company links, the "About the job" section), then the page itself (careers sites). Cleans tracking from links and flags search pages. Also lists job links on a portal's search page. Read-only |
 | `popup.html` / `popup.js` | The toolbar button: an application form → fill it (`GET /api/v1/apply/lookup`, `/jobs/{id}/apply-kit`, the CV file) and record it (`POST /jobs/{id}/applied`); any other page → `POST /api/v1/jobs/agent-import` |
-| `autofill.js` | Fills an application form from the apply kit: matches fields by label/name/placeholder, sets values like typing, attaches the CV. Never submits or clicks. Tested in `frontend/src/test/extension-autofill.test.ts` |
+| `autofill.js` | Fills an application form from the apply kit: matches fields by label/name/placeholder, sets values like typing, picks Yes/No radio options, attaches the CV; `follow()` fills each next step as it appears (on-page box with Stop). Never submits or clicks a button. Tested in `frontend/src/test/extension-autofill.test.ts` |
 | `background.js` | The collector: opens the portal search, reads the links, opens each job, sends the jobs back to the app tab. Only accepts requests from the app's own pages and only opens the supported portals' https pages; one collection at a time |
 | `bridge.js` | Runs on the app's pages only: marks the page (`data-ci-collector`) and relays messages between the app and `background.js` |
 | `settings.js` | The app/API addresses and the import call |

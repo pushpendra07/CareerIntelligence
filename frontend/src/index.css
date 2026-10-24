@@ -29,6 +29,7 @@
  * Greys are inverted (slate-50 is the darkest background, slate-900 the lightest text); light
  * tints (50-300) become dark tinted backgrounds and text shades (600-900) become light, so every
  * badge, link and number stays readable. Shades 400-500 (bars, dots) are unchanged.
+ * So don't add dark: overrides for these colours: "dark:text-indigo-200" is a dark shade here.
  */
 .dark {
   color-scheme: dark;
@@ -187,8 +188,8 @@
     background-image: radial-gradient(1200px 380px at 70% -120px, color-mix(in oklab, var(--color-indigo-500) 9%, transparent), transparent 70%);
     background-repeat: no-repeat;
   }
-  h1 { @apply font-display text-2xl font-bold tracking-tight text-slate-900; }
-  h2 { @apply font-display text-[15px] font-bold tracking-tight text-slate-900; }
+  h1 { @apply font-display text-2xl font-bold tracking-tight text-slate-900; word-spacing: 0.08em; }
+  h2 { @apply font-display text-[15px] font-bold tracking-tight text-slate-900; word-spacing: 0.06em; }
   ::selection { @apply bg-indigo-200; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-indigo-500; }
 }

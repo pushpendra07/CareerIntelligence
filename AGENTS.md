@@ -322,6 +322,20 @@ Settings → Google Sheets lists saved sheets with **Import** and the last resul
   `api/v1/apply.py`): apply kit (`GET /jobs/{id}/apply-kit`), saved answers (`/apply/answers`,
   app settings `apply`), `POST /jobs/{id}/applied`, `GET /apply/lookup`. The extension's
   `autofill.js` fills forms from the kit and attaches the CV — it **never submits**; the user does.
+- **Application details** (My profile → Application details, `/apply-details`,
+  `features/profile/ApplicationDetailsPage.tsx`, form `SavedAnswers` in `ApplyAssistant.tsx`): name parts,
+  email / phone / LinkedIn (empty = profile), address, salary negotiable, message to the recruiter (`{title}`/`{company}`), saved Q&A — app settings
+  `apply` (`APPLY_FIELDS` in `services/apply_service.py`). The extension fetches them via the apply kit on
+  every fill; `follow()` in `autofill.js` fills multi-step forms, `background.js` the next pages (allowed sites).
+- **Skill roadmap** (My profile → Skill roadmap, `/skill-roadmap`, `features/profile/SkillRoadmapPage.tsx`;
+  `GET /cv-advice/roadmap`, `services/skill_roadmap.py`): missing skills re-scored on open jobs with the
+  engine (read-only), greedy learning path. ~2 s for 200 jobs.
+- **Calendar** (`services/calendar_service.py`, `api/v1/calendar.py`, UI `components/AddToCalendar.tsx`;
+  card on Settings → Reminders & calendar): per-item Google link / .ics on interviews, follow-ups, offers,
+  job deadlines; private feed `GET /calendar/feed.ics?token=` (in `OPEN_PATHS`, key in
+  `secrets/calendar-feed.json`).
+- **Job export** (Jobs → Export, `ExportJobs` in `JobsPage.tsx`; `GET /jobs/export`, `data_io.export_jobs`):
+  the list's own filters/tab/sort (all pages) or selected `ids`, CSV (BOM) or JSON.
 - **Tailor a CV for a job** (job page → **Tailor CV** button, `features/jobs/CvTailor.tsx`): `POST /jobs/{id}/cv-check`
   (ATS score, `cv/ats.py`) and `POST /jobs/{id}/cv-tailor` (DOCX copy, `cv/tailor_docx.py`, service
   `services/cv_tailor.py`). In memory only: the uploaded CV is **never** stored, logged or put in

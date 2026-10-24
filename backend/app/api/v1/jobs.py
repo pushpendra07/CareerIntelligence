@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -31,6 +31,7 @@ from app.schemas.job import (
 )
 from app.services import (
     agent_import,
+    data_io,
     description_service,
     freshness,
     job_service,
@@ -264,6 +265,25 @@ def merge_duplicates(db: DB, body: MergeDuplicatesIn) -> dict[str, Any]:
 def job_status_usage(db: DB) -> dict[str, int]:
     """How often each status was chosen, most used first — orders the status pickers."""
     return job_service.status_usage(db)
+
+
+@router.get("/jobs/export")
+def export_jobs(
+    db: DB, f: JobFiltersDep, format: Literal["csv", "json"] = "csv",  # noqa: A002
+    with_description: bool = False,
+    ids: Annotated[list[int] | None, Query(max_length=5000)] = None,
+) -> Response:
+    """The jobs the list shows — same filters, tab statuses and sort, every page — or only the
+    selected `ids`, as a CSV (opens in Excel) or JSON download. Descriptions only on request."""
+    order = job_service.SORTS.get(f.sort, job_service.SORTS["-match_score"])
+    stmt = job_service.filtered_jobs(f).order_by(*order)
+    if ids:
+        stmt = stmt.where(Job.id.in_(ids))
+    body = data_io.export_jobs(db, stmt, format, with_description)
+    media = "application/json" if format == "json" else "text/csv; charset=utf-8"
+    name = f"jobs-{date.today().isoformat()}.{format}"
+    return Response(body, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.get("/jobs/status-counts")

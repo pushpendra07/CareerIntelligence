@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../../api/client";
 import { Badge, JobStatusBadge } from "../../components/ui";
 import type { FollowUp } from "../../types/api";
+import { AddToCalendar } from "../../components/AddToCalendar";
 import { formatDate, humanize } from "../../utils/format";
 
 /** A date `days` from today, as YYYY-MM-DD (local time). */
@@ -60,6 +61,7 @@ export function FollowUpRow({ f, showJob = true }: { f: FollowUp; showJob?: bool
       <span className={`text-xs ${late ? "font-medium text-rose-600" : "text-slate-500"}`} title={formatDate(f.due_date)}>
         {f.completed ? "done" : dueLabel(f.due_date)}
       </span>
+      {!f.completed && !finished && <AddToCalendar kind="followup" id={f.id} compact />}
       {!f.completed && (finished ? (
         <button className="btn-secondary px-2 py-1 text-xs" disabled={busy} aria-label={`Dismiss: ${f.title}`} onClick={() => complete.mutate()}>Dismiss</button>
       ) : (

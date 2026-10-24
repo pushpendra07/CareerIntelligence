@@ -123,6 +123,14 @@ Tips:
 Set the **salary targets** — until you do, salary is scored as "unknown".
 Saving updates every score by itself within a minute.
 
+**My profile → Skill roadmap** shows which missing skills are worth learning. Each one is tried on
+your open jobs (scored again by the same rules, as if it were on your profile): **New good jobs**
+is how many would reach a good score (the Scoring *recommended* threshold, 80 by default), with
+jobs raised, average gain and the share of your 70+ jobs that ask for it. **Your learning path**
+orders up to six skills, each adding the most good jobs on top of the ones before. **I have it**
+adds a skill to your profile (jobs are re-scored); **Hide** stops suggesting it. Nothing changes
+until you click.
+
 ## 4. Check the scoring settings (optional)
 
 Settings → **Scoring**. The 0–100 score is the weighted sum of 9 components:
@@ -258,10 +266,15 @@ email shown as **Viewer**. Save each sheet's URL in the same panel.
   with **Copy** buttons (missing ones are named), **Open application page ↗**, **Email <HR>** when
   the job has a contact person (attach the downloaded CV), and **✓ I applied on the site / by
   email**, which marks the job Applied, records the application with that CV and plans a
-  follow-up. **Edit saved answers** keeps what forms ask every time (current and expected CTC,
-  notice period, relocation, work authorisation, current company/title, GitHub, portfolio) and
-  your own questions and answers. With the **Chrome extension**, on the application page click
-  its icon → **Fill this application**: empty fields are filled and the CV attached; you check
+  follow-up. **My profile → Application details** (also **Edit saved answers** here) keeps what
+  forms ask every time: first, middle and last name, date of birth, email, phone, LinkedIn URL (empty = from your profile), address,
+  city, state, PIN/postal code, country, current and expected CTC, salary negotiable, notice
+  period, relocation, work authorisation, current company/title, GitHub, portfolio, your
+  **message to the recruiter** (`{title}` and `{company}` are filled in for each job) and your own
+  questions and answers. With the **Chrome extension**, on the application page click its icon →
+  **Fill this application**: it fetches these details from the app, fills the empty fields and
+  attaches the CV. With **Keep filling the next pages of this form**, multi-step forms (Workday,
+  SuccessFactors…) are filled step by step until you press **Stop filling** on the page. You check
   the form and press Submit, then **I submitted it — record application**. Nothing is ever
   submitted for you.
 - **Tailor your CV for a job:** on the job page → **Tailor CV** (next to Edit job), upload
@@ -604,7 +617,10 @@ when their job board is known (**Find job boards**).
   `./scripts/restore-backup.sh backend/backups/career-backup-….zip` and type `restore`; then
   `./start.sh`.
 - **Export**: Settings → Backup & import → Download your data → jobs, companies,
-  applications… as CSV/JSON, or everything as one JSON file.
+  applications… as CSV/JSON, or everything as one JSON file. To export only some jobs: in **Jobs**,
+  pick the tab and filters (status, search, skills, score…), then **Export** → **CSV (Excel)** or
+  **JSON** — every job in that list, in its order; tick rows first for **Only the N selected**;
+  **Include job descriptions** adds the full text.
 - Your data lives in `backend/.devdb/` (database) and `storage/` (CV files).
 - **Login (optional)**: Settings → **Login** → *Turn on login* (username + password, at least 8
   characters). The app then asks for them (stays logged in 30 days per browser; **Log out** at
@@ -660,7 +676,14 @@ Using an AI agent instead? Say *"Find jobs for me"* — see README → *Using AI
   **Turn on notifications** (bottom of the bell) lets the browser show pop-ups with the app icon
   for follow-ups due, interviews 24 hours and 1 hour before, new jobs found by a scan, and your
   scheduled reminders — while the app is open in a tab.
-- **Reminders** (Settings → Reminders, or *Reminder schedule →* in the bell): nudges on a
+- **Calendar** (Settings → Reminders & calendar): interviews (with an alarm 30 minutes before),
+  follow-ups, offer expiry and joining dates, and apply-by dates show **Add to calendar: Google ·
+  .ics** where they appear — Google opens its new-event page filled in, .ics opens in Apple
+  Calendar or Outlook. **Get my calendar link** makes a private feed to subscribe to once (Apple
+  Calendar: File → New Calendar Subscription; Outlook: Subscribe from web; Google: From URL, which
+  needs the app reachable from the internet, e.g. `./start-tunnel.sh`); it updates by itself.
+  Anyone with the link sees those events, so **New link or turn off…** replaces or ends it.
+- **Reminders** (Settings → Reminders & calendar, or *Reminder schedule →* in the bell): nudges on a
   schedule, like a cron job — **Check job portals** (the portals you list; says how many new jobs
   wait), **Apply to shortlisted jobs**, **Follow up**, and your own (**+ Add a reminder**). Each
   can be turned on or off, with **How often**: every 5/15/30 minutes, every hour, every 2 or 4
